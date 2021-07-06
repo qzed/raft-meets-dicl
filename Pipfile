@@ -4,8 +4,14 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+tensorboardx = "*"
+toml = "*"
+torch = "*"
+torchvision = "*"
+tqdm = "*"
 
 [dev-packages]
+pycodestyle = "*"
 
 [requires]
 python_version = "3.9"
