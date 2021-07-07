@@ -22,10 +22,11 @@ class Dataset:
 
     def get_config(self):
         return {
+            'type': 'dataset',
             'spec': {
                 'id': self.id,
                 'name': self.name,
-                'path': self.path,
+                'path': str(self.path),
                 'layout': self.layout.get_config(),
                 'parameters': self.param_desc.get_config(),
             },
@@ -195,7 +196,7 @@ class Parameter:
 
         for val, sub in self.valsub.items():
             cfg['value'][val] = dict()
-            cfg['value'][val]['sub'] = sub
+            cfg['value'][val]['sub'] = dict(sub)
 
         return cfg
 

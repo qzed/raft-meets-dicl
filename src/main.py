@@ -15,11 +15,11 @@ def dump_full_config(data):
     # TODO: seeds, ...
 
     cfg = {
-        'cwd': Path.cwd(),
+        'cwd': str(Path.cwd()),
         'dataset': data.get_config(),
     }
 
-    print(toml.dumps(cfg, encoder=toml.TomlPathlibEncoder()))
+    print(toml.dumps(cfg))
 
 
 def main():
