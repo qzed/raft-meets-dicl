@@ -281,15 +281,16 @@ def load_dataset(path, params=dict()):
 def load_instance_from_config(cfg, path):
     path = Path(path)
 
-    file = cfg.get('file')
-    spec = cfg.get('spec')
+    spec = cfg['spec']
     params = cfg.get('parameters', dict())
 
-    if spec is None:
-        with open(path / file) as fd:
+    if not isinstance(spec, dict):
+        specfile = spec
+
+        with open(path / specfile) as fd:
             spec = toml.load(fd)
 
-        path = (path / file).parent
+        path = (path / specfile).parent
 
     return load_dataset_from_config(spec, path, params)
 

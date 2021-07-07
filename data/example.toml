@@ -1,4 +1,5 @@
-file = "dataset/ufreiburg-monkaa.toml"
+type = "dataset"
+spec = "dataset/ufreiburg-monkaa.toml"
 
 [parameters]
 pass = "clean"
