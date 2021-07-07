@@ -1,0 +1,9 @@
+[dataset]
+id = "kitti-2012"
+name = "KITTI 2012"
+path = "../../datasets/kitti-flow-2012/data"
+
+[layout]
+type = "generic"
+images = "training/colored_0/{seq:06d}_{idx:02d}.png"
+flows = "training/flow_occ/{seq:06d}_{idx:02d}.png"

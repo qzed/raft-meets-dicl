@@ -1,0 +1,9 @@
+[dataset]
+id = "ufreiburg-driving-clean"
+name = "Uni Freiburg Driving (clean)"
+path = "../../datasets/ufreiburg-driving/data"
+
+[layout]
+type = "generic"
+images = "frames_cleanpass/15mm_focallength/{scene}/slow/left/{idx:04d}.png"
+flows = "optical_flow/15mm_focallength/{scene}/slow/into_future/left/OpticalFlowIntoFuture_{idx:04d}_L.pfm"

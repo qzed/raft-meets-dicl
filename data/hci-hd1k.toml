@@ -1,0 +1,9 @@
+[dataset]
+id = "hci-hd1k"
+name = "HCI HD1K"
+path = "../../datasets/hci-hd1k/data/"
+
+[layout]
+type = "generic"
+images = "hd1k_input/image_2/{seq:06d}_{idx:04d}.png"
+flows = "hd1k_flow_gt/flow_occ/{seq:06d}_{idx:04d}.png"

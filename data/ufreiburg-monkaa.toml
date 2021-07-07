@@ -1,0 +1,9 @@
+[dataset]
+id = "ufreiburg-monkaa"
+name = "Uni Freiburg Monkaa"
+path = "../../datasets/ufreiburg-monkaa/data"
+
+[layout]
+type = "generic"
+images = "frames_cleanpass/{scene}/left/{idx:04d}.png"
+flows = "optical_flow/{scene}/into_future/left/OpticalFlowIntoFuture_{idx:04d}_L.pfm"
