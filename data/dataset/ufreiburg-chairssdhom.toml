@@ -1,0 +1,12 @@
+id = "ufreiburg-chairssdhom"
+name = "Uni Freiburg ChairsSDHom"
+path = "../../../datasets/ufreiburg-chairssdhom/data"
+
+[layout]
+type = "generic"
+images = "{type}/t{idx:d}/{seq:05d}.png"
+flows = "{type}/flow/{seq:05d}.pfm"
+
+[parameters.type]
+values = ["train", "test"]
+sub = "type"

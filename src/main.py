@@ -4,7 +4,7 @@ import toml
 
 from pathlib import Path
 
-import dataset
+from data import dataset
 
 
 def dump_full_config(data):
@@ -16,7 +16,7 @@ def dump_full_config(data):
 
     cfg = {
         'cwd': Path.cwd(),
-        'data': data.get_config(),
+        'dataset': data.get_config(),
     }
 
     print(toml.dumps(cfg, encoder=toml.TomlPathlibEncoder()))
@@ -24,13 +24,14 @@ def dump_full_config(data):
 
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
-    parser.add_argument('-d', '--dataset', required=True, help='The dataset to use')
+    parser.add_argument('-d', '--data', required=True, help='The data specification to use')
     args = parser.parse_args()
 
-    data = dataset.load(args.dataset)
+    data = dataset.load_instance(args.data)
 
     dump_full_config(data)
     print(f"Prepared dataset with {len(data)} samples")
+    print(data.validate_files())
 
 
 if __name__ == '__main__':

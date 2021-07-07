@@ -5,26 +5,31 @@ from pathlib import Path
 
 
 class Dataset:
-    def __init__(self, id, name, file, path, layout):
+    def __init__(self, id, name, path, layout, param_desc, param_vals):
+        if not path.exists():
+            raise ValueError("dataset root path does not exist")
+
         self.id = id
         self.name = name
-        self.file = file
         self.path = path
         self.layout = layout
-        self.files = layout.build_file_list(file.parent / path)
+        self.param_desc = param_desc
+        self.param_vals = param_vals
+        self.files = layout.build_file_list(path, param_desc, param_vals)
 
     def __str__(self):
         return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
 
     def get_config(self):
         return {
-            'file': self.file,
-            'dataset': {
+            'spec': {
                 'id': self.id,
                 'name': self.name,
                 'path': self.path,
+                'layout': self.layout.get_config(),
+                'parameters': self.param_desc.get_config(),
             },
-            'layout': self.layout.get_config()
+            'parameters': self.param_vals,
         }
 
     def validate_files(self):
@@ -52,7 +57,7 @@ class Layout:
     def get_config(self):
         raise NotImplementedError
 
-    def build_file_list(self, path):
+    def build_file_list(self, path, param_desc, param_vals):
         raise NotImplementedError
 
 
@@ -107,7 +112,7 @@ class GenericLayout(Layout):
             'flows': self.pat_flow,
         }
 
-    def build_file_list(self, path):
+    def build_file_list(self, path, param_desc, param_vals):
         # get image candidates (may include files that don't match pattern)
         images = path.glob(_pattern_to_glob(self.pat_img))
 
@@ -136,9 +141,18 @@ class GenericLayout(Layout):
         del filtered[-1]
 
         # build file list
+        params = param_desc.get_substitutions(param_vals)
+
         files = []
         for positional, named_list, idx in filtered:
             named = {fields[i]: named_list[i] for i in range(len(fields))}
+
+            # filter by selected parameters
+            if any([k in named and named[k] != params[k] for k in params.keys()]):
+                continue
+
+            # some parameters might be missing in the named list
+            named.update(params)
 
             img1 = self.pat_img.format(*positional, idx=idx, **named)
             img2 = self.pat_img.format(*positional, idx=idx+1, **named)
@@ -147,6 +161,80 @@ class GenericLayout(Layout):
             files += [(path / img1, path / img2, path / flow)]
 
         return files
+
+
+class Parameter:
+    @classmethod
+    def from_config(cls, name, cfg):
+        values = cfg.get('values')
+        sub = cfg.get('sub')
+
+        cfg_value = cfg.get('value')
+
+        valsub = dict()
+        if cfg_value is not None:
+            for val, val_cfg in cfg_value.items():
+                valsub[val] = val_cfg.get('sub')
+
+        return cls(name, values, sub, valsub)
+
+    def __init__(self, name, values, sub, valsub):
+        self.name = name
+        self.values = values
+        self.sub = sub
+        self.valsub = valsub
+
+    def get_config(self):
+        cfg = {
+            'values': self.values,
+            'sub': self.sub,
+        }
+
+        if self.valsub:
+            cfg['value'] = dict()
+
+        for val, sub in self.valsub.items():
+            cfg['value'][val] = dict()
+            cfg['value'][val]['sub'] = sub
+
+        return cfg
+
+    def get_substitutions(self, value):
+        if self.values is not None and value not in self.values:
+            raise KeyError(f"value '{value}'' is not valid for parameter '{self.name}'")
+
+        if self.valsub and value in self.valsub:
+            return self.valsub[value]
+
+        if self.sub:
+            return {self.sub: value}
+
+        return {}
+
+
+class ParameterDesc:
+    @classmethod
+    def from_config(cls, cfg):
+        return cls({p: Parameter.from_config(p, cfg[p]) for p in cfg.keys()})
+
+    def __init__(self, parameters):
+        self.parameters = parameters
+
+    def get_config(self):
+        return {p.name: p.get_config() for p in self.parameters.values()}
+
+    def get_substitutions(self, values):
+        subs = dict()
+
+        # check if some parameter has not been set
+        missing = self.parameters.keys() - values.keys()
+        if missing:
+            raise KeyError(f"unset dataset parameters: {missing}")
+
+        for k, v in values.items():
+            subs.update(self.parameters[k].get_substitutions(v))
+
+        return subs
 
 
 def _build_layout(cfg):
@@ -161,26 +249,54 @@ def _build_layout(cfg):
     return layouts[ty](cfg)
 
 
-def load_cfg(cfg, file=None):
-    file = cfg.get('file', file)
-    file = Path(file) if file is not None else None
+def load_dataset_from_config(cfg, path, params=dict()):
+    path = Path(path)
 
     # load base dataset config
-    cfg_ds = cfg['dataset']
-    ds_id = cfg_ds['id']
-    ds_name = cfg_ds['name']
-    ds_path = Path(cfg_ds.get('path', '.'))
+    ds_id = cfg['id']
+    ds_name = cfg['name']
+    ds_path = Path(cfg.get('path', '.'))
 
     # build file layout
     layout = _build_layout(cfg['layout'])
 
+    # load parameter options
+    param_desc = ParameterDesc.from_config(cfg.get('parameters', dict()))
+
     # TODO: file format
 
-    return Dataset(ds_id, ds_name, file, ds_path, layout)
+    return Dataset(ds_id, ds_name, path / ds_path, layout, param_desc, params)
 
 
-def load(path):
+def load_dataset(path, params=dict()):
+    path = Path(path)
+
     with open(path) as fd:
         cfg = toml.load(fd)
 
-    return load_cfg(cfg, path)
+    return load_dataset_from_config(cfg, path.parent, params)
+
+
+def load_instance_from_config(cfg, path):
+    path = Path(path)
+
+    file = cfg.get('file')
+    spec = cfg.get('spec')
+    params = cfg.get('parameters', dict())
+
+    if spec is None:
+        with open(path / file) as fd:
+            spec = toml.load(fd)
+
+        path = (path / file).parent
+
+    return load_dataset_from_config(spec, path, params)
+
+
+def load_instance(path):
+    path = Path(path)
+
+    with open(path) as fd:
+        cfg = toml.load(fd)
+
+    return load_instance_from_config(cfg, path.parent)

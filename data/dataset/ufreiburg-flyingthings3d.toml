@@ -1,0 +1,22 @@
+id = "ufreiburg-flyingthings3e"
+name = "Uni Freiburg FlyingThings3d"
+path = "../../../datasets/ufreiburg-flyingthings3d/data"
+
+[layout]
+type = "generic"
+images = "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png"
+flows = "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm"
+
+[parameters.pass]
+values = ["clean", "final"]
+sub = "pass"
+
+[parameters.type]
+values = ["train", "test"]
+value.train.sub = { type = "TRAIN" }
+value.test.sub = { type = "TEST" }
+
+[parameters.camera]
+values = ['left', 'right']
+value.left.sub = { camera = "left", camera_short="L" }
+value.right.sub = { camera = "right", camera_short="R" }

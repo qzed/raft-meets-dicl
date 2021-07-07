@@ -1,9 +1,0 @@
-[dataset]
-id = "mpi-sintel-clean"
-name = "MPI Sintel (clean)"
-path = "../../datasets/mpi-sintel-flow/data"
-
-[layout]
-type = "generic"
-images = "training/clean/{scene}/frame_{idx:04d}.png"
-flows = "training/flow/{scene}/frame_{idx:04d}.flo"

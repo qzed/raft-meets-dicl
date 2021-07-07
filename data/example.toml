@@ -1,0 +1,5 @@
+file = "dataset/ufreiburg-monkaa.toml"
+
+[parameters]
+pass = "clean"
+camera = "right"

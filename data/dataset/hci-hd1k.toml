@@ -1,7 +1,6 @@
-[dataset]
 id = "hci-hd1k"
 name = "HCI HD1K"
-path = "../../datasets/hci-hd1k/data/"
+path = "../../../datasets/hci-hd1k/data/"
 
 [layout]
 type = "generic"

@@ -1,0 +1,13 @@
+id = "mpi-sintel-clean"
+name = "MPI Sintel (clean)"
+path = "../../../datasets/mpi-sintel-flow/data"
+
+[layout]
+type = "generic"
+images = "{type}/clean/{scene}/frame_{idx:04d}.png"
+flows = "{type}/flow/{scene}/frame_{idx:04d}.flo"
+
+[parameters.type]
+values = ["train", "test"]
+value.train.sub = { type = "training" }
+value.test.sub = { type = "test" }

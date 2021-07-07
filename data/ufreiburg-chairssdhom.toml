@@ -1,9 +1,0 @@
-[dataset]
-id = "ufreiburg-chairssdhom"
-name = "Uni Freiburg ChairsSDHom"
-path = "../../datasets/ufreiburg-chairssdhom/data"
-
-[layout]
-type = "generic"
-images = "train/t{idx:d}/{seq:05d}.png"
-flows = "train/flow/{seq:05d}.pfm"

@@ -1,0 +1,13 @@
+id = "kitti-2012"
+name = "KITTI 2012"
+path = "../../../datasets/kitti-flow-2012/data"
+
+[layout]
+type = "generic"
+images = "{type}/colored_0/{seq:06d}_{idx:02d}.png"
+flows = "{type}/flow_occ/{seq:06d}_{idx:02d}.png"
+
+[parameters.type]
+values = ["train", "test"]
+value.train.sub = { type = "training" }
+value.test.sub = { type = "testing" }

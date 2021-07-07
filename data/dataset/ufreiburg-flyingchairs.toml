@@ -1,7 +1,6 @@
-[dataset]
 id = "ufreiburg-flyingchairs"
 name = "Uni Freiburg FlyingChairs"
-path = "../../datasets/ufreiburg-flyingchairs/data/data"
+path = "../../../datasets/ufreiburg-flyingchairs/data/data"
 
 [layout]
 type = "generic"

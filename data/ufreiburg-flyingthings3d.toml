@@ -1,9 +1,0 @@
-[dataset]
-id = "ufreiburg-flyingthings3e"
-name = "Uni Freiburg FlyingThings3d"
-path = "../../datasets/ufreiburg-flyingthings3d/data"
-
-[layout]
-type = "generic"
-images = "frames_cleanpass/TRAIN/{abc}/{seq:04d}/left/{idx:04d}.png"
-flows = "optical_flow/TRAIN/{abc}/{seq:04d}/into_future/left/OpticalFlowIntoFuture_{idx:04d}_L.pfm"

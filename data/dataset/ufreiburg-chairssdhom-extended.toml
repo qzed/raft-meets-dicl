@@ -1,0 +1,13 @@
+id = "ufreiburg-chairssdhom-extended"
+name = "Uni Freiburg ChairsSDHom (extended)"
+path = "../../../datasets/ufreiburg-chairssdhom-extended/data"
+
+[layout]
+type = "generic"
+images = "{type}/{seq:07d}-img_{idx:d}.png"
+flows = "{type}/{seq:07d}-flow_01.flo"
+
+[parameters.type]
+values = ["train", "test"]
+value.train.sub = { type = "train" }
+value.test.sub = { type = "val" }
