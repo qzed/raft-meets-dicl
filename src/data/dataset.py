@@ -3,9 +3,11 @@ import toml
 
 from pathlib import Path
 
+from .collection import DataCollection
 
-class Dataset:
-    def __init__(self, id, name, path, layout, filter, param_desc, param_vals):
+
+class Dataset(DataCollection):
+    def __init__(self, id, name, path, layout, param_desc, param_vals):
         if not path.exists():
             raise ValueError("dataset root path does not exist")
 
@@ -15,14 +17,7 @@ class Dataset:
         self.layout = layout
         self.param_desc = param_desc
         self.param_vals = param_vals
-        self.filter = filter
-
-        files = layout.build_file_list(path, param_desc, param_vals)
-
-        if filter is not None:
-            files = filter.filter(files, param_vals)
-
-        self.files = files
+        self.files = layout.build_file_list(path, param_desc, param_vals)
 
     def __str__(self):
         return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
@@ -35,22 +30,13 @@ class Dataset:
                 'name': self.name,
                 'path': str(self.path),
                 'layout': self.layout.get_config(),
-                'filter': self.filter.get_config() if self.filter else None,
                 'parameters': self.param_desc.get_config(),
             },
             'parameters': self.param_vals,
         }
 
-    def validate_files(self):
-        for img1, img2, flow in self.files:
-            if not img1.exists():
-                return False
-            if not img2.exists():
-                return False
-            if not flow.exists():
-                return False
-
-        return True
+    def get_files(self):
+        return self.files
 
     def __getitem__(self, index):
         pass    # TODO load actual files
@@ -361,62 +347,6 @@ def _build_layout(cfg):
     return layouts[ty](cfg)
 
 
-class Filter:
-    def __init__(self):
-        pass
-
-    def get_config(self):
-        raise NotImplementedError
-
-    def filter(self, path, param_vals):
-        raise NotImplementedError
-
-
-class SplitFilter(Filter):
-    @classmethod
-    def from_config(cls, path, cfg):
-        return cls(cfg['parameter'], path / cfg['file'])
-
-    def __init__(self, parameter, file):
-        super().__init__()
-
-        self.parameter = parameter
-        self.file = file
-
-    def get_config(self):
-        return {
-            'type': 'split',
-            'parameter': self.parameter,
-            'file': self.file,
-        }
-
-    def filter(self, files, param_vals):
-        value = param_vals.get(self.parameter)
-
-        if value is None:
-            return files
-
-        with open(self.file) as fd:
-            split = fd.read().split()
-
-        return [f for f, v in zip(files, split) if v == value]
-
-
-def _build_filter(path, cfg):
-    if cfg is None:
-        return None
-
-    filters = {
-        'split': SplitFilter.from_config,
-    }
-
-    ty = cfg['type']
-    if ty not in filters.keys():
-        raise ValueError(f"unknown filter type '{ty}'")
-
-    return filters[ty](path, cfg)
-
-
 def load_dataset_from_config(cfg, path, params=dict()):
     path = Path(path)
 
@@ -428,15 +358,12 @@ def load_dataset_from_config(cfg, path, params=dict()):
     # build file layout
     layout = _build_layout(cfg['layout'])
 
-    # build file filter
-    filter = _build_filter(path, cfg.get('filter'))
-
     # load parameter options
     param_desc = ParameterDesc.from_config(cfg.get('parameters', dict()))
 
     # TODO: file format
 
-    return Dataset(ds_id, ds_name, path / ds_path, layout, filter, param_desc, params)
+    return Dataset(ds_id, ds_name, path / ds_path, layout, param_desc, params)
 
 
 def load_dataset(path, params=dict()):

@@ -4,7 +4,7 @@ import toml
 
 from pathlib import Path
 
-from data import dataset
+import data
 
 
 def dump_full_config(data):
@@ -27,11 +27,10 @@ def main():
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
     args = parser.parse_args()
 
-    data = dataset.load_instance(args.data)
+    ds = data.load(args.data)
 
-    dump_full_config(data)
-    print(f"Prepared dataset with {len(data)} samples")
-    print(data.validate_files())
+    dump_full_config(ds)
+    print(f"Prepared dataset with {len(ds)} samples")
 
 
 if __name__ == '__main__':

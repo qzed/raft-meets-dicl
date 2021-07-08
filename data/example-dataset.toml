@@ -1,0 +1,8 @@
+type = "dataset"
+spec = "dataset/ufreiburg-driving.toml"
+
+[parameters]
+direction = "forwards"
+pass = "clean"
+focallength = "15mm"
+camera = "left"
