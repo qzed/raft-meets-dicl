@@ -1,9 +1,9 @@
 import parse
-import toml
 
 from pathlib import Path
 
 from .collection import DataCollection
+from ..utils import config
 
 
 class Dataset(DataCollection):
@@ -369,10 +369,7 @@ def load_dataset_from_config(cfg, path, params=dict()):
 def load_dataset(path, params=dict()):
     path = Path(path)
 
-    with open(path) as fd:
-        cfg = toml.load(fd)
-
-    return load_dataset_from_config(cfg, path.parent, params)
+    return load_dataset_from_config(config.load(path), path.parent, params)
 
 
 def load_instance_from_config(cfg, path):
@@ -382,11 +379,7 @@ def load_instance_from_config(cfg, path):
     params = cfg.get('parameters', dict())
 
     if not isinstance(spec, dict):
-        specfile = spec
-
-        with open(path / specfile) as fd:
-            spec = toml.load(fd)
-
+        specfile, spec = spec, config.load(path / spec)
         path = (path / specfile).parent
 
     return load_dataset_from_config(spec, path, params)
@@ -395,7 +388,4 @@ def load_instance_from_config(cfg, path):
 def load_instance(path):
     path = Path(path)
 
-    with open(path) as fd:
-        cfg = toml.load(fd)
-
-    return load_instance_from_config(cfg, path.parent)
+    return load_instance_from_config(config.load(path), path.parent)

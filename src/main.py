@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 import argparse
-import toml
 
 from pathlib import Path
 
-import data
+from . import data
+from .utils import config
 
 
 def dump_full_config(data):
@@ -19,7 +18,7 @@ def dump_full_config(data):
         'dataset': data.get_config(),
     }
 
-    print(toml.dumps(cfg))
+    print(config.to_string(cfg, fmt='json'))
 
 
 def main():
@@ -31,7 +30,3 @@ def main():
 
     dump_full_config(ds)
     print(f"Prepared dataset with {len(ds)} samples")
-
-
-if __name__ == '__main__':
-    main()

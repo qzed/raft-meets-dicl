@@ -1,9 +1,9 @@
-import toml
-
 from pathlib import Path
 
 from . import dataset
 from . import filter
+
+from ..utils import config
 
 
 def load_from_config(cfg, path):
@@ -24,7 +24,4 @@ def load_from_config(cfg, path):
 def load(path):
     path = Path(path)
 
-    with open(path) as fd:
-        cfg = toml.load(fd)
-
-    return load_from_config(cfg, path.parent)
+    return load_from_config(config.load(path), path.parent)
