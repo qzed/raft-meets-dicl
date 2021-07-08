@@ -4,7 +4,6 @@ import torch
 import re
 
 from pathlib import Path
-from PIL import Image
 
 # Note: Image channels are generally stored in RGB order. This means channels
 # need to be reversed when dealing with OpenCV (e.g. cv2.imshow), which expects
@@ -133,11 +132,17 @@ def build_loader(cfg):
 
 
 def read_image_generic(file):
-    with Image.open(file) as im:
-        im = np.array(im)
+    file = Path(file)
+
+    if not file.exists():
+        raise FileNotFoundError(f"File '{file}' does not exist")
+
+    # Note: this converts any grayscale image to BGR
+    data = cv2.imread(str(file), cv2.IMREAD_ANYDEPTH | cv2.IMREAD_COLOR)
+    data = data[:, :, ::-1]     # convert from BGR to RGB
 
     # convert to floats between zero and one
-    return im.astype(np.float32) / np.iinfo(im.dtype).max
+    return data.astype(np.float32) / np.iinfo(data.dtype).max
 
 
 def read_flow_kitti(file):
