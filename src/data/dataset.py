@@ -332,11 +332,6 @@ class ParameterDesc:
     def get_substitutions(self, values):
         subs = dict()
 
-        # check if some parameter has not been set
-        missing = self.parameters.keys() - values.keys()
-        if missing:
-            raise KeyError(f"unset dataset parameters: {missing}")
-
         for k, v in values.items():
             if k in self.parameters:
                 subs.update(self.parameters[k].get_substitutions(v))
