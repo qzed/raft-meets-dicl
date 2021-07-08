@@ -10,7 +10,6 @@ class SplitFilter(DataCollection):
         file = Path(path) / cfg['file']
         value = cfg['value']
         source = config.load_from_config(cfg['source'], path)
-        print("source", len(source))
 
         return SplitFilter(file, value, source)
 
