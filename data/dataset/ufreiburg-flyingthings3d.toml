@@ -3,9 +3,18 @@ name = "Uni Freiburg FlyingThings3d"
 path = "../../../datasets/ufreiburg-flyingthings3d/data"
 
 [layout]
+type = "multi"
+parameter = "direction"
+
+[layout.instances.forwards]
 type = "generic"
 images = "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png"
 flows = "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm"
+
+[layout.instances.backwards]
+type = "generic-backwards"
+images = "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png"
+flows = "optical_flow/{type}/{abc}/{seq:04d}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm"
 
 [parameters.pass]
 values = ["clean", "final"]

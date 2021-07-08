@@ -3,9 +3,18 @@ name = "Uni Freiburg Monkaa"
 path = "../../../datasets/ufreiburg-monkaa/data"
 
 [layout]
+type = "multi"
+parameter = "direction"
+
+[layout.instances.forwards]
 type = "generic"
 images = "frames_{pass}pass/{scene}/{camera}/{idx:04d}.png"
 flows = "optical_flow/{scene}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm"
+
+[layout.instances.backwards]
+type = "generic-backwards"
+images = "frames_{pass}pass/{scene}/{camera}/{idx:04d}.png"
+flows = "optical_flow/{scene}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm"
 
 [parameters.pass]
 values = ["clean", "final"]
@@ -15,4 +24,3 @@ sub = "pass"
 values = ['left', 'right']
 value.left.sub = { camera = "left", camera_short="L" }
 value.right.sub = { camera = "right", camera_short="R" }
-

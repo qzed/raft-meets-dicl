@@ -164,6 +164,111 @@ class GenericLayout(Layout):
         return files
 
 
+class GenericBackwardsLayout(Layout):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'generic-backwards':
+            raise ValueError(f"invalid layout type '{ty}', expected 'generic'")
+
+        pat_img = cfg['images']
+        pat_flow = cfg['flows']
+
+        return cls(pat_img, pat_flow)
+
+    def __init__(self, pat_img, pat_flow):
+        super().__init__()
+
+        self.pat_img = pat_img
+        self.pat_flow = pat_flow
+
+    def get_config(self):
+        return {
+            'type': 'generic-backwards',
+            'images': self.pat_img,
+            'flows': self.pat_flow,
+        }
+
+    def build_file_list(self, path, param_desc, param_vals):
+        # get image candidates (may include files that don't match pattern)
+        images = path.glob(_pattern_to_glob(self.pat_img))
+
+        # build pattern list (note: this may filter out non-matching files)
+        pat_img = parse.compile(str(path / self.pat_img))
+        ps = [pat_img.parse(str(img)) for img in images]
+        ps = [(r.fixed, r.named) for r in ps if r is not None]
+        ps = [(p, tuple(n[k] for k in pat_img.named_fields if k != 'idx'), n['idx']) for p, n in ps]
+
+        fields = [f for f in pat_img.named_fields if f != 'idx']
+
+        # we expect image sequences, where the last image in sequence may not
+        # have a ground-truth flow, so remove that from the pattern list
+        ps.sort(key=lambda x: (x[0], x[1], -x[2]))
+
+        filtered = []
+        last = None
+        for pos, named, idx in ps:
+            # if we start a new sequence, remove the last image
+            if last is not None and last != (pos, named, idx + 1):
+                del filtered[-1]
+
+            filtered += [(pos, named, idx)]
+            last = (pos, named, idx)
+
+        del filtered[-1]
+
+        # build file list
+        params = param_desc.get_substitutions(param_vals)
+
+        files = []
+        for positional, named_list, idx in filtered:
+            named = {fields[i]: named_list[i] for i in range(len(fields))}
+
+            # filter by selected parameters
+            if any([k in named and named[k] != params[k] for k in params.keys()]):
+                continue
+
+            # some parameters might be missing in the named list
+            named.update(params)
+
+            img1 = self.pat_img.format(*positional, idx=idx, **named)
+            img2 = self.pat_img.format(*positional, idx=idx-1, **named)
+            flow = self.pat_flow.format(*positional, idx=idx, **named)
+
+            files += [(path / img1, path / img2, path / flow)]
+
+        return files
+
+
+class MultiLayout(Layout):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'multi':
+            raise ValueError(f"invalid layout type '{ty}', expected 'multi'")
+
+        layouts = {k: _build_layout(v) for k, v in cfg['instances'].items()}
+
+        return cls(cfg['parameter'], layouts)
+
+    def __init__(self, param, layouts):
+        super().__init__()
+
+        self.param = param
+        self.layouts = layouts
+
+    def get_config(self):
+        return {
+            'type': 'multi',
+            'parameter': self.param,
+            'instances': {k: v.get_config() for (k, v) in self.layouts.items()}
+        }
+
+    def build_file_list(self, path, param_desc, param_vals):
+        instance = param_vals[self.param]
+        layout = self.layouts[instance]
+
+        return layout.build_file_list(path, param_desc, param_vals)
+
+
 class Parameter:
     @classmethod
     def from_config(cls, name, cfg):
@@ -233,14 +338,17 @@ class ParameterDesc:
             raise KeyError(f"unset dataset parameters: {missing}")
 
         for k, v in values.items():
-            subs.update(self.parameters[k].get_substitutions(v))
+            if k in self.parameters:
+                subs.update(self.parameters[k].get_substitutions(v))
 
         return subs
 
 
 def _build_layout(cfg):
     layouts = {
-        'generic': GenericLayout.from_config
+        'generic': GenericLayout.from_config,
+        'generic-backwards': GenericBackwardsLayout.from_config,
+        'multi': MultiLayout.from_config,
     }
 
     ty = cfg['type']

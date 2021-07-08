@@ -2,5 +2,6 @@ type = "dataset"
 spec = "dataset/ufreiburg-monkaa.toml"
 
 [parameters]
+direction = "backwards"
 pass = "clean"
 camera = "right"
