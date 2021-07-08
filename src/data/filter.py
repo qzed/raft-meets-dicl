@@ -31,7 +31,7 @@ class SplitFilter(DataCollection):
     def get_config(self):
         return {
             'type': 'filter-split',
-            'file': self.file,
+            'file': str(self.file),
             'value': self.value,
             'source': self.source_cfg,
         }
