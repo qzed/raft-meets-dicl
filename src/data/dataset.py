@@ -91,20 +91,23 @@ class GenericLayout(Layout):
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
+        pat_key = cfg['key']
 
-        return cls(pat_img, pat_flow)
+        return cls(pat_img, pat_flow, pat_key)
 
-    def __init__(self, pat_img, pat_flow):
+    def __init__(self, pat_img, pat_flow, pat_key):
         super().__init__()
 
         self.pat_img = pat_img
         self.pat_flow = pat_flow
+        self.pat_key = pat_key
 
     def get_config(self):
         return {
             'type': 'generic',
             'images': self.pat_img,
             'flows': self.pat_flow,
+            'key': self.pat_key,
         }
 
     def build_file_list(self, path, param_desc, param_vals):
@@ -152,8 +155,9 @@ class GenericLayout(Layout):
             img1 = self.pat_img.format(*positional, idx=idx, **named)
             img2 = self.pat_img.format(*positional, idx=idx+1, **named)
             flow = self.pat_flow.format(*positional, idx=idx, **named)
+            key = self.pat_key.format(*positional, idx=idx, **named)
 
-            files += [(path / img1, path / img2, path / flow)]
+            files += [(path / img1, path / img2, path / flow, key)]
 
         return files
 
@@ -166,20 +170,23 @@ class GenericBackwardsLayout(Layout):
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
+        pat_key = cfg['key']
 
-        return cls(pat_img, pat_flow)
+        return cls(pat_img, pat_flow, pat_key)
 
-    def __init__(self, pat_img, pat_flow):
+    def __init__(self, pat_img, pat_flow, pat_key):
         super().__init__()
 
         self.pat_img = pat_img
         self.pat_flow = pat_flow
+        self.pat_key = pat_key
 
     def get_config(self):
         return {
             'type': 'generic-backwards',
             'images': self.pat_img,
             'flows': self.pat_flow,
+            'key': self.pat_key,
         }
 
     def build_file_list(self, path, param_desc, param_vals):
@@ -227,8 +234,9 @@ class GenericBackwardsLayout(Layout):
             img1 = self.pat_img.format(*positional, idx=idx, **named)
             img2 = self.pat_img.format(*positional, idx=idx-1, **named)
             flow = self.pat_flow.format(*positional, idx=idx, **named)
+            key = self.pat_key.format(*positional, idx=idx, **named)
 
-            files += [(path / img1, path / img2, path / flow)]
+            files += [(path / img1, path / img2, path / flow, key)]
 
         return files
 

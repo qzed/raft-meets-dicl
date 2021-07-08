@@ -6,6 +6,7 @@ path = "../../../datasets/ufreiburg-chairssdhom/data"
 type = "generic"
 images = "{type}/t{idx:d}/{seq:05d}.png"
 flows = "{type}/flow/{seq:05d}.pfm"
+key = "{type}/{seq:05d}"
 
 [parameters.type]
 values = ["train", "test"]

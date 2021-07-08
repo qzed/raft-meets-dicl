@@ -6,6 +6,7 @@ path = "../../../datasets/kitti-flow-2012/data"
 type = "generic"
 images = "{type}/colored_0/{seq:06d}_{idx:02d}.png"
 flows = "{type}/flow_occ/{seq:06d}_{idx:02d}.png"
+key = "{type}/{seq:06d}_{idx:02d}"
 
 [parameters.type]
 values = ["train", "test"]

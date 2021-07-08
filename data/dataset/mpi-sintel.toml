@@ -6,6 +6,7 @@ path = "../../../datasets/mpi-sintel-flow/data"
 type = "generic"
 images = "{type}/clean/{scene}/frame_{idx:04d}.png"
 flows = "{type}/flow/{scene}/frame_{idx:04d}.flo"
+key = "{type}/{scene}/frame_{idx:04d}"
 
 [parameters.type]
 values = ["train", "test"]

@@ -10,11 +10,13 @@ parameter = "direction"
 type = "generic"
 images = "frames_{pass}pass/{scene}/{camera}/{idx:04d}.png"
 flows = "optical_flow/{scene}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm"
+key = "{scene}/into_future/{camera}/{idx:04d}"
 
 [layout.instances.backwards]
 type = "generic-backwards"
 images = "frames_{pass}pass/{scene}/{camera}/{idx:04d}.png"
 flows = "optical_flow/{scene}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm"
+key = "{scene}/into_past/{camera}/{idx:04d}"
 
 [parameters.pass]
 values = ["clean", "final"]
