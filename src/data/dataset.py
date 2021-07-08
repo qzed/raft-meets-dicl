@@ -3,11 +3,12 @@ import parse
 from pathlib import Path
 
 from .collection import DataCollection
+from .format import build_loader
 from ..utils import config
 
 
 class Dataset(DataCollection):
-    def __init__(self, id, name, path, layout, param_desc, param_vals):
+    def __init__(self, id, name, path, layout, param_desc, param_vals, image_loader, flow_loader):
         if not path.exists():
             raise ValueError("dataset root path does not exist")
 
@@ -17,6 +18,8 @@ class Dataset(DataCollection):
         self.layout = layout
         self.param_desc = param_desc
         self.param_vals = param_vals
+        self.image_loader = image_loader
+        self.flow_loader = flow_loader
         self.files = layout.build_file_list(path, param_desc, param_vals)
 
     def __str__(self):
@@ -31,18 +34,22 @@ class Dataset(DataCollection):
                 'path': str(self.path),
                 'layout': self.layout.get_config(),
                 'parameters': self.param_desc.get_config(),
+                'loader': {
+                    'image': self.image_loader.get_config(),
+                    'flow': self.flow_loader.get_config(),
+                },
             },
             'parameters': self.param_vals,
         }
 
+    def get_image_loader(self):
+        return self.image_loader
+
+    def get_flow_loader(self):
+        return self.flow_loader
+
     def get_files(self):
         return self.files
-
-    def __getitem__(self, index):
-        pass    # TODO load actual files
-
-    def __len__(self):
-        return len(self.files)
 
 
 class Layout:
@@ -369,9 +376,16 @@ def load_dataset_from_config(cfg, path, params=dict()):
     # load parameter options
     param_desc = ParameterDesc.from_config(cfg.get('parameters', dict()))
 
-    # TODO: file format
+    # build file loaders
+    if 'loader' in cfg:
+        image_loader = build_loader(cfg['loader'].get('image', 'generic-image'))
+        flow_loader = build_loader(cfg['loader'].get('flow', 'generic-flow'))
+    else:
+        image_loader = build_loader('generic-image')
+        flow_loader = build_loader('generic-flow')
 
-    return Dataset(ds_id, ds_name, path / ds_path, layout, param_desc, params)
+    return Dataset(ds_id, ds_name, path / ds_path, layout, param_desc, params,
+                   image_loader, flow_loader)
 
 
 def load_dataset(path, params=dict()):

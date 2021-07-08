@@ -17,6 +17,8 @@ class SplitFilter(DataCollection):
         super().__init__()
 
         self.source_cfg = source.get_config()
+        self.image_loader = source.get_image_loader()
+        self.flow_loader = source.get_flow_loader()
         self.file = file
         self.value = value
 
@@ -35,11 +37,11 @@ class SplitFilter(DataCollection):
             'source': self.source_cfg,
         }
 
+    def get_image_loader(self):
+        return self.image_loader
+
+    def get_flow_loader(self):
+        return self.flow_loader
+
     def get_files(self):
         return self.files
-
-    def __getitem__(self, index):
-        raise NotImplementedError
-
-    def __len__(self):
-        return len(self.files)
