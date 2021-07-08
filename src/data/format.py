@@ -113,6 +113,8 @@ class GenericFlowLoader(FileLoader):
         # if not loaded, generate valid mask
         if valid is None:
             valid = (flow[0].abs() < self.max_uv[0]) & (flow[1].abs() < self.max_uv[1])
+        else:
+            valid = torch.from_numpy(valid)
 
         return flow, valid.float()
 
