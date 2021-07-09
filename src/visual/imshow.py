@@ -1,5 +1,7 @@
 import cv2
 
+from . import flow as flowvis
+
 
 class ImageWindow:
     def __init__(self, title):
@@ -19,6 +21,12 @@ class ImageWindow:
                 break
 
 
-def imshow(title, rgb):
+def show_image(title, rgb):
     cv2.imshow(title, rgb[:, :, ::-1])
     return ImageWindow(title)
+
+
+def show_flow(title, flow, *args, **kwargs):
+    flow = flowvis.flow_to_rgb(flow, *args, **kwargs)
+
+    return show_image(title, flow)

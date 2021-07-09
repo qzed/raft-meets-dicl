@@ -1,5 +1,7 @@
 from . import flow
-from . import imshow as _imshow
+from . import imshow
 
 flow_to_rgb = flow.flow_to_rgb
-imshow = _imshow.imshow
+
+show_image = imshow.show_image
+show_flow = imshow.show_flow

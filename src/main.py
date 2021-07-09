@@ -32,8 +32,7 @@ def main():
 
     img1, img2, flow, valid, key = ds[0]
 
-    rgb = visual.flow_to_rgb(flow.permute(1, 2, 0), mask=valid)
-    visual.imshow("flow", rgb).wait()
+    visual.show_flow("flow", flow.permute(1, 2, 0), mask=valid).wait()
 
     dump_full_config(ds)
     print(f"Prepared dataset with {len(ds)} samples")
