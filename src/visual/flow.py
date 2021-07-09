@@ -78,7 +78,6 @@ def flow_to_rgb(uv, mask=None, mrm=None, eps=1e-5):
         mrm = max(np.amax(length * np.asarray(mask) if mask is not None else length), eps)
 
     # normalize
-    u, v = np.clip(u / mrm, 0.0, 1.0), np.clip(v / mrm, 0.0, 1.0)
     length = np.clip(length / mrm, 0.0, 1.0)
 
     # compute color indices for interpolation
