@@ -1,8 +1,10 @@
 import argparse
+import matplotlib.pyplot as plt
 
 from pathlib import Path
 
 from . import data
+from . import visual
 from .utils import config
 
 
@@ -27,6 +29,11 @@ def main():
     args = parser.parse_args()
 
     ds = data.load(args.data)
+
+    img1, img2, flow, valid, key = ds[0]
+
+    rgb = visual.flow_to_rgb(flow.permute(1, 2, 0), mask=valid)
+    visual.imshow("flow", rgb).wait()
 
     dump_full_config(ds)
     print(f"Prepared dataset with {len(ds)} samples")
