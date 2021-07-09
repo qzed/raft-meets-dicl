@@ -62,6 +62,7 @@ def generate_color_wheel():
 def flow_to_rgb(uv, mask=None, mrm=None, eps=1e-5):
     global COLORWHEEL
 
+    uv = np.asarray(uv)
     u, v = uv[..., 0], uv[..., 1]
 
     # lazy-initialize colorwheel
