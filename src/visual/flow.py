@@ -59,7 +59,7 @@ def generate_color_wheel():
     return colorwheel
 
 
-def flow_to_rgb(uv, mask=None, mrm=None, eps=1e-5):
+def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     global COLORWHEEL
 
     uv = np.asarray(uv)
@@ -71,7 +71,7 @@ def flow_to_rgb(uv, mask=None, mrm=None, eps=1e-5):
 
     # calculate polar representation
     angle = np.arctan2(-v, -u) / np.pi
-    length = np.sqrt(np.square(u) + np.square(v))
+    length = np.sqrt(np.square(u) + np.square(v)) ** gamma
 
     # calculate maximum range of motion (maximum radial distance) for normalization
     if mrm is None:
