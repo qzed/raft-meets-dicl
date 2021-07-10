@@ -4,7 +4,7 @@ import torch
 
 from pathlib import Path
 
-from . import format as io
+from . import io
 from .collection import Collection
 from ..utils import config
 
