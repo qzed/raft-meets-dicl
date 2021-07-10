@@ -5,11 +5,11 @@ import torch
 from pathlib import Path
 
 from . import format as io
-from .collection import DataCollection
+from .collection import Collection
 from ..utils import config
 
 
-class Dataset(DataCollection):
+class Dataset(Collection):
     def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
                  flow_loader):
         if not path.exists():
@@ -51,14 +51,28 @@ class Dataset(DataCollection):
             'parameters': self.param_vals,
         }
 
-    def get_image_loader(self):
-        return self.image_loader
+    def __getitem__(self, index):
+        img1, img2, flow, key = self.files[index]
 
-    def get_flow_loader(self):
-        return self.flow_loader
+        img1 = self.image_loader.load(img1)
+        img2 = self.image_loader.load(img2)
+        flow, valid = self.flow_loader.load(flow)
 
-    def get_files(self):
-        return self.files
+        return img1, img2, flow, valid, key
+
+    def __len__(self):
+        return len(self.files)
+
+    def validate_files(self):
+        for img1, img2, flow in self.files:
+            if not img1.exists():
+                return False
+            if not img2.exists():
+                return False
+            if not flow.exists():
+                return False
+
+        return True
 
 
 class Layout:
