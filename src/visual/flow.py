@@ -84,7 +84,7 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     idx = (angle + 1.0) / 2.0 * (COLORWHEEL.shape[0] - 1)
     idx0 = np.floor(idx).astype(np.int32)
     idx1 = idx0 + 1
-    idx1[idx1 == COLORWHEEL.shape[0]] == 0
+    idx1[idx1 == COLORWHEEL.shape[0]] = 0
 
     # interpolate
     alpha = idx - idx0
