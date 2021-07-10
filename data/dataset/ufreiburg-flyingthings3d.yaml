@@ -24,9 +24,9 @@ layout:
 parameters:
   camera:
     values: [ left, right ]
-    value:
-      left: { sub: { camera: left, camera_short: L } }
-      right: { sub: { camera: right, camera_short: R } }
+    sub:
+      left: { camera: left, camera_short: L }
+      right: { camera: right, camera_short: R }
 
   pass:
     values: [ clean, final ]
@@ -34,6 +34,6 @@ parameters:
 
   type:
     values: [ train, test ]
-    value:
-      test: { sub: { type: TEST } }
-      train: { sub: { type: TRAIN } }
+    sub:
+      test: { type: TEST }
+      train: { type: TRAIN }

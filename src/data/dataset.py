@@ -284,47 +284,27 @@ class Parameter:
         values = cfg.get('values')
         sub = cfg.get('sub')
 
-        cfg_value = cfg.get('value')
+        return cls(name, values, sub)
 
-        valsub = dict()
-        if cfg_value is not None:
-            for val, val_cfg in cfg_value.items():
-                valsub[val] = val_cfg.get('sub')
-
-        return cls(name, values, sub, valsub)
-
-    def __init__(self, name, values, sub, valsub):
+    def __init__(self, name, values, sub):
         self.name = name
         self.values = values
         self.sub = sub
-        self.valsub = valsub
 
     def get_config(self):
-        cfg = {
+        return {
             'values': self.values,
             'sub': self.sub,
         }
-
-        if self.valsub:
-            cfg['value'] = dict()
-
-        for val, sub in self.valsub.items():
-            cfg['value'][val] = dict()
-            cfg['value'][val]['sub'] = dict(sub)
-
-        return cfg
 
     def get_substitutions(self, value):
         if self.values is not None and value not in self.values:
             raise KeyError(f"value '{value}'' is not valid for parameter '{self.name}'")
 
-        if self.valsub and value in self.valsub:
-            return self.valsub[value]
-
-        if self.sub:
+        if isinstance(self.sub, str):
             return {self.sub: value}
-
-        return {}
+        else:
+            return dict(self.sub[value])
 
 
 class ParameterDesc:

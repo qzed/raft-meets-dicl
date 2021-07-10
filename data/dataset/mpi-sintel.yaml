@@ -13,6 +13,6 @@ parameters:
   type:
     values: [ train, test ]
 
-    value:
-      test: { sub: { type: test } }
-      train: { sub: { type: training } }
+    sub:
+      test: { type: test }
+      train: { type: training }
