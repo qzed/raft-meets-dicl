@@ -8,7 +8,8 @@ from ..utils import config
 
 
 class Dataset(DataCollection):
-    def __init__(self, id, name, path, layout, param_desc, param_vals, image_loader, flow_loader):
+    def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
+                 flow_loader):
         if not path.exists():
             raise ValueError("dataset root path does not exist")
 
@@ -16,11 +17,16 @@ class Dataset(DataCollection):
         self.name = name
         self.path = path
         self.layout = layout
+        self.split = split
         self.param_desc = param_desc
         self.param_vals = param_vals
         self.image_loader = image_loader
         self.flow_loader = flow_loader
+
         self.files = layout.build_file_list(path, param_desc, param_vals)
+
+        if self.split:
+            self.files = self.split.filter(self.files, param_vals)
 
     def __str__(self):
         return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
@@ -33,6 +39,7 @@ class Dataset(DataCollection):
                 'name': self.name,
                 'path': str(self.path),
                 'layout': self.layout.get_config(),
+                'split': self.split.get_config() if self.split is not None else None,
                 'parameters': self.param_desc.get_config(),
                 'loader': {
                     'image': self.image_loader.get_config(),
@@ -328,6 +335,42 @@ class ParameterDesc:
         return subs
 
 
+class Split:
+    @classmethod
+    def from_config(cls, path, cfg):
+        file = path / cfg['file']
+        values = dict(cfg['values'])
+        parameter = cfg['parameter']
+
+        return cls(file, values, parameter)
+
+    def __init__(self, file, values, parameter):
+        self.file = file
+        self.values = values
+        self.parameter = parameter
+
+    def get_config(self):
+        return {
+            'file': str(self.file),
+            'values': self.values,
+            'parameter': self.parameter,
+        }
+
+    def filter(self, files, params):
+        selection = params.get(self.parameter)
+
+        # if no selection has been made, don't filter and use all splits
+        if selection is None:
+            return files
+
+        value = self.values[selection]
+
+        with open(self.file) as fd:
+            split = fd.read().split()
+
+        return [f for f, v in zip(files, split) if v == value]
+
+
 def _build_layout(cfg):
     layouts = {
         'generic': GenericLayout.from_config,
@@ -356,6 +399,11 @@ def load_dataset_from_config(cfg, path, params=dict()):
     # load parameter options
     param_desc = ParameterDesc.from_config(cfg.get('parameters', dict()))
 
+    # split config
+    split = cfg.get('split')
+    if split is not None:
+        split = Split.from_config(path, split)
+
     # build file loaders
     if 'loader' in cfg:
         image_loader = build_loader(cfg['loader'].get('image', 'generic-image'))
@@ -364,7 +412,7 @@ def load_dataset_from_config(cfg, path, params=dict()):
         image_loader = build_loader('generic-image')
         flow_loader = build_loader('generic-flow')
 
-    return Dataset(ds_id, ds_name, path / ds_path, layout, param_desc, params,
+    return Dataset(ds_id, ds_name, path / ds_path, layout, split, param_desc, params,
                    image_loader, flow_loader)
 
 

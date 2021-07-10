@@ -1,8 +1,6 @@
 from pathlib import Path
 
 from . import dataset
-from . import filter
-
 from ..utils import config
 
 
@@ -11,7 +9,6 @@ def load_from_config(cfg, path):
 
     types = {
         'dataset': dataset.load_instance_from_config,
-        'filter-split': filter.SplitFilter.from_config,
     }
 
     ty = cfg['type']
