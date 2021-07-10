@@ -1,9 +1,11 @@
+import numpy as np
 import parse
+import torch
 
 from pathlib import Path
 
+from . import format as io
 from .collection import DataCollection
-from .format import build_loader
 from ..utils import config
 
 
@@ -371,6 +373,125 @@ class Split:
         return [f for f, v in zip(files, split) if v == value]
 
 
+# Note: Tensors returned by loaders are are in shape (channels, height,
+# width). Values are floats in range [0, 1].
+class FileLoader:
+    def __init__(self):
+        pass
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def load(self, file):
+        raise NotImplementedError
+
+
+class GenericImageLoader(FileLoader):
+    @classmethod
+    def from_config(cls, cfg):
+        return cls()
+
+    def __init__(self):
+        super().__init__()
+
+    def get_config(self):
+        return 'generic-image'
+
+    def load(self, file):
+        if file is None:
+            return None, None
+
+        if file.suffix == '.pfm':
+            img = io.read_pfm(file)
+        else:
+            img = io.read_image_generic(file)
+
+        # normalize grayscale image shape
+        if len(img.shape) == 2:
+            img.reshape((*img.shape, 1))
+
+        # convert grayscale images to RGB
+        if img.shape[2] == 1:
+            img = np.tile(img, (1, 1, 3))
+
+        # convert to torch tensors (channels/rgb, height, width)
+        return torch.from_numpy(img).permute(2, 0, 1).float()
+
+
+class GenericFlowLoader(FileLoader):
+    @classmethod
+    def from_config(cls, cfg):
+        uvmax = None
+
+        if isinstance(cfg, dict):
+            uvmax = cfg.get('uvmax')
+
+        if uvmax is not None:
+            if isinstance(uvmax, list):
+                uvmax = (*map(float, uvmax),)
+
+                if len(uvmax) != 2:
+                    raise ValueError("uvmax key must be either float or list of two floats")
+            else:
+                uvmax = (float(uvmax), float(uvmax))
+        else:
+            uvmax = (1e3, 1e3)
+
+        return cls(uvmax)
+
+    def __init__(self, max_uv):
+        super().__init__()
+        self.max_uv = max_uv
+
+    def get_config(self):
+        return {
+            'type': 'generic-flow',
+            'uvmax': self.max_uv,
+        }
+
+    def load(self, file):
+        if file is None:
+            return None, None
+
+        file = Path(file)
+        valid = None
+
+        # load flow and valid mask (if available)
+        if file.suffix == '.pfm':
+            flow = io.read_pfm(file)[:, :, :2]     # only the first two channels are used
+        elif file.suffix == '.flo':
+            flow = io.read_flow_mb(file)
+        elif file.suffix == '.png':
+            flow, valid = io.read_flow_kitti(file)
+        else:
+            raise ValueError(f"Unsupported flow file format {file.suffix}")
+
+        # convert to torch tensors (channels/uv, height, width)
+        flow = flow.astype(np.float32)
+        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
+
+        # if not loaded, generate valid mask
+        if valid is None:
+            valid = (flow[0].abs() < self.max_uv[0]) & (flow[1].abs() < self.max_uv[1])
+        else:
+            valid = torch.from_numpy(valid)
+
+        return flow, valid.float()
+
+
+def _build_loader(cfg):
+    loaders = {
+        'generic-image': GenericImageLoader.from_config,
+        'generic-flow': GenericFlowLoader.from_config,
+    }
+
+    ty = cfg['type'] if isinstance(cfg, dict) else cfg
+    if ty not in loaders.keys():
+        raise ValueError(f"unknown layout type '{ty}'")
+
+    return loaders[ty](cfg)
+
+
 def _build_layout(cfg):
     layouts = {
         'generic': GenericLayout.from_config,
@@ -406,11 +527,11 @@ def load_dataset_from_config(cfg, path, params=dict()):
 
     # build file loaders
     if 'loader' in cfg:
-        image_loader = build_loader(cfg['loader'].get('image', 'generic-image'))
-        flow_loader = build_loader(cfg['loader'].get('flow', 'generic-flow'))
+        image_loader = _build_loader(cfg['loader'].get('image', 'generic-image'))
+        flow_loader = _build_loader(cfg['loader'].get('flow', 'generic-flow'))
     else:
-        image_loader = build_loader('generic-image')
-        flow_loader = build_loader('generic-flow')
+        image_loader = _build_loader('generic-image')
+        flow_loader = _build_loader('generic-flow')
 
     return Dataset(ds_id, ds_name, path / ds_path, layout, split, param_desc, params,
                    image_loader, flow_loader)
