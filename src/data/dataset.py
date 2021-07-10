@@ -117,7 +117,7 @@ class GenericLayout(Layout):
     @classmethod
     def from_config(cls, cfg):
         if cfg['type'] != 'generic':
-            raise ValueError(f"invalid layout type '{ty}', expected 'generic'")
+            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'generic'")
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
@@ -196,7 +196,7 @@ class GenericBackwardsLayout(Layout):
     @classmethod
     def from_config(cls, cfg):
         if cfg['type'] != 'generic-backwards':
-            raise ValueError(f"invalid layout type '{ty}', expected 'generic'")
+            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'generic'")
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
