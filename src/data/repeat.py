@@ -34,9 +34,4 @@ def load_from_config(path, cfg):
     times = cfg['times']
     source = cfg['source']
 
-    if isinstance(source, dict):
-        source = config.load_from_config(path, source)
-    else:
-        source = config.load(path / source)
-
-    return Repeat(times, source)
+    return Repeat(times, config.load(path, source))
