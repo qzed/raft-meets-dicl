@@ -32,7 +32,7 @@ def main():
 
     img1, img2, flow, valid, key = ds[0]
 
-    visual.show_flow("flow", flow.permute(1, 2, 0), mask=valid).wait()
+    visual.show_flow("flow", flow, mask=valid).wait()
 
     dump_full_config(ds)
     print(f"Prepared dataset with {len(ds)} samples")

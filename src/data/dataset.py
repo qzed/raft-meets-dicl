@@ -1,6 +1,5 @@
 import numpy as np
 import parse
-import torch
 
 from pathlib import Path
 
@@ -389,8 +388,8 @@ class Split:
         return [f for f, v in zip(files, split) if v == value]
 
 
-# Note: Tensors returned by loaders are are in shape (channels, height,
-# width). Values are floats in range [0, 1].
+# Note: Tensors returned by loaders are numpy arrays in shape (height, width,
+# channels). Values are floats in range [0, 1].
 class FileLoader:
     def __init__(self):
         pass
@@ -430,8 +429,7 @@ class GenericImageLoader(FileLoader):
         if img.shape[2] == 1:
             img = np.tile(img, (1, 1, 3))
 
-        # convert to torch tensors (channels/rgb, height, width)
-        return torch.from_numpy(img).permute(2, 0, 1).float()
+        return img
 
 
 class GenericFlowLoader(FileLoader):
@@ -482,17 +480,14 @@ class GenericFlowLoader(FileLoader):
         else:
             raise ValueError(f"Unsupported flow file format {file.suffix}")
 
-        # convert to torch tensors (channels/uv, height, width)
         flow = flow.astype(np.float32)
-        flow = torch.from_numpy(flow).permute(2, 0, 1).float()
 
         # if not loaded, generate valid mask
         if valid is None:
-            valid = (flow[0].abs() < self.max_uv[0]) & (flow[1].abs() < self.max_uv[1])
-        else:
-            valid = torch.from_numpy(valid)
+            fabs = np.abs(flow)
+            valid = (fabs[:, :, 0] < self.max_uv[0]) & (fabs[:, :, 1] < self.max_uv[1])
 
-        return flow, valid.float()
+        return flow, valid
 
 
 def _build_loader(cfg):
