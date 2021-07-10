@@ -4,6 +4,7 @@ from .collection import Collection
 
 class Repeat(Collection):
     def __init__(self, times, source):
+        super().__init__()
         self.times = times
         self.source = source
 

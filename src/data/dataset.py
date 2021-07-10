@@ -12,6 +12,8 @@ from ..utils import config
 class Dataset(Collection):
     def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
                  flow_loader):
+        super().__init__()
+
         if not path.exists():
             raise ValueError("dataset root path does not exist")
 
