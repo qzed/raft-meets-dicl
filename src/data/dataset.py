@@ -551,12 +551,6 @@ def load_dataset_from_config(path, cfg, params=dict()):
                    image_loader, flow_loader)
 
 
-def load_dataset(path, params=dict()):
-    path = Path(path)
-
-    return load_dataset_from_config(path.parent, config.load(path), params)
-
-
 def load_instance_from_config(path, cfg):
     path = Path(path)
 
@@ -568,9 +562,3 @@ def load_instance_from_config(path, cfg):
         path = (path / specfile).parent
 
     return load_dataset_from_config(path, spec, params)
-
-
-def load_instance(path):
-    path = Path(path)
-
-    return load_instance_from_config(path.parent, config.load(path))
