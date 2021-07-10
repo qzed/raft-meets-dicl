@@ -4,14 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+gitpython = "*"
 numpy = "*"
 opencv-python = "*"
 parse = "*"
+pyyaml = "*"
 tensorboardx = "*"
 torch = "*"
 torchvision = "*"
 tqdm = "*"
-pyyaml = "*"
 
 [dev-packages]
 pycodestyle = "*"

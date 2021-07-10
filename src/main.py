@@ -1,4 +1,5 @@
 import argparse
+import git
 import matplotlib.pyplot as plt
 
 from pathlib import Path
@@ -9,12 +10,18 @@ from .utils import config
 from .utils import seeds
 
 
+def get_git_head_hash():
+    repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
+    return repo.head.object.hexsha
+
+
 def dump_full_config(seeds, data):
     """
     Dump full conifg. This should dump everything needed to reproduce a run.
     """
 
     cfg = {
+        'commit': get_git_head_hash(),
         'cwd': str(Path.cwd()),
         'seeds': seeds.get_config(),
         'dataset': data.get_config(),
