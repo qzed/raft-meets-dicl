@@ -1,13 +1,16 @@
 from pathlib import Path
 
 from ..utils import config
+
 from . import dataset
+from . import augment
 from . import repeat
 
 
 def _load(path, cfg):
     types = {
         'dataset': dataset.load_instance_from_config,
+        'augment': augment.load_from_config,
         'repeat': repeat.load_from_config,
     }
 
