@@ -520,7 +520,7 @@ def _build_layout(cfg):
     return layouts[ty](cfg)
 
 
-def load_dataset_from_config(cfg, path, params=dict()):
+def load_dataset_from_config(path, cfg, params=dict()):
     path = Path(path)
 
     # load base dataset config
@@ -554,10 +554,10 @@ def load_dataset_from_config(cfg, path, params=dict()):
 def load_dataset(path, params=dict()):
     path = Path(path)
 
-    return load_dataset_from_config(config.load(path), path.parent, params)
+    return load_dataset_from_config(path.parent, config.load(path), params)
 
 
-def load_instance_from_config(cfg, path):
+def load_instance_from_config(path, cfg):
     path = Path(path)
 
     spec = cfg['spec']
@@ -567,10 +567,10 @@ def load_instance_from_config(cfg, path):
         specfile, spec = spec, config.load(path / spec)
         path = (path / specfile).parent
 
-    return load_dataset_from_config(spec, path, params)
+    return load_dataset_from_config(path, spec, params)
 
 
 def load_instance(path):
     path = Path(path)
 
-    return load_instance_from_config(config.load(path), path.parent)
+    return load_instance_from_config(path.parent, config.load(path))

@@ -4,7 +4,7 @@ from . import dataset
 from ..utils import config
 
 
-def load_from_config(cfg, path):
+def load_from_config(path, cfg):
     path = Path(path)
 
     types = {
@@ -15,10 +15,10 @@ def load_from_config(cfg, path):
     if ty not in types.keys():
         raise ValueError(f"unknown data collection type '{ty}'")
 
-    return types[ty](cfg, path)
+    return types[ty](path, cfg)
 
 
 def load(path):
     path = Path(path)
 
-    return load_from_config(config.load(path), path.parent)
+    return load_from_config(path.parent, config.load(path))
