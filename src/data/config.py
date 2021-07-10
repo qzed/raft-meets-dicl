@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from . import dataset
 from ..utils import config
+from . import dataset
+from . import repeat
 
 
 def load_from_config(path, cfg):
@@ -9,6 +10,7 @@ def load_from_config(path, cfg):
 
     types = {
         'dataset': dataset.load_instance_from_config,
+        'repeat': repeat.load_from_config,
     }
 
     ty = cfg['type']
