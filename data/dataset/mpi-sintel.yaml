@@ -1,0 +1,18 @@
+name: MPI Sintel (clean)
+id: mpi-sintel-clean
+path: '../../../datasets/mpi-sintel-flow/data'
+
+layout:
+  type: generic
+
+  images: '{type}/clean/{scene}/frame_{idx:04d}.png'
+  flows: '{type}/flow/{scene}/frame_{idx:04d}.flo'
+  key: '{type}/{scene}/frame_{idx:04d}'
+
+parameters:
+  type:
+    values: [ train, test ]
+
+    value:
+      test: { sub: { type: test } }
+      train: { sub: { type: training } }

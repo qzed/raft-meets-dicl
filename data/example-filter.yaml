@@ -1,0 +1,7 @@
+type: filter-split
+file: ../../datasets/ufreiburg-flyingchairs/train_val.txt
+value: '1'
+
+source:
+  type: dataset
+  spec: dataset/ufreiburg-flyingchairs.yaml

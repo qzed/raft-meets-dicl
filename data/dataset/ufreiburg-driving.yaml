@@ -1,0 +1,41 @@
+name: Uni Freiburg Driving
+id: ufreiburg-driving
+path: '../../../datasets/ufreiburg-driving/data'
+
+layout:
+  type: multi
+  parameter: direction
+
+  instances:
+    forwards:
+      type: generic
+
+      images: 'frames_{pass}pass/{focallength}_focallength/{scene}/{speed}/{camera}/{idx:04d}.png'
+      flows: 'optical_flow/{focallength}_focallength/{scene}/{speed}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm'
+      key: '{pass}/{focallength}/{scene}/{speed}/into_future/{camera}/{idx:04d}'
+
+    backwards:
+      type: generic-backwards
+
+      images: 'frames_{pass}pass/{focallength}_focallength/{scene}/{speed}/{camera}/{idx:04d}.png'
+      flows: 'optical_flow/{focallength}_focallength/{scene}/{speed}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm'
+      key: '{pass}/{focallength}/{scene}/{speed}/into_past/{camera}/{idx:04d}'
+
+parameters:
+  camera:
+    values: [ left, right ]
+    value:
+      left: { sub: { camera: left, camera_short: L } }
+      right: { sub: { camera: right, camera_short: R } }
+
+  focallength:
+    values: [ 15mm, 35mm ]
+    sub: focallength
+
+  pass:
+    values: [ clean, final ]
+    sub: pass
+
+  speed:
+    values: [ slow, fast ]
+    sub: speed

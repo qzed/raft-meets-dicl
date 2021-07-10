@@ -1,0 +1,18 @@
+name: Uni Freiburg FlyingChairs2
+id: ufreiburg-flyingchairs2
+path: '../../../datasets/ufreiburg-flyingchairs2/data'
+
+layout:
+  type: generic
+
+  images: '{type}/{seq:07d}-img_{idx:d}.png'
+  flows: '{type}/{seq:07d}-flow_01.flo'
+  key: '{type}/{seq:07d}'
+
+parameters:
+  type:
+    values: [ train, test ]
+
+    value:
+      test: { sub: { type: val } }
+      train: { sub: { type: train } }

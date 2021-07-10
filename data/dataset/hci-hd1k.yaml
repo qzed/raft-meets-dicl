@@ -1,0 +1,10 @@
+name: HCI HD1K
+id: hci-hd1k
+path: '../../../datasets/hci-hd1k/data/'
+
+layout:
+  type: generic
+
+  images: 'hd1k_input/image_2/{seq:06d}_{idx:04d}.png'
+  flows: 'hd1k_flow_gt/flow_occ/{seq:06d}_{idx:04d}.png'
+  key: '{seq:06d}_{idx:04d}'

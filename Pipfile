@@ -8,10 +8,10 @@ numpy = "*"
 opencv-python = "*"
 parse = "*"
 tensorboardx = "*"
-toml = "*"
 torch = "*"
 torchvision = "*"
 tqdm = "*"
+pyyaml = "*"
 
 [dev-packages]
 pycodestyle = "*"

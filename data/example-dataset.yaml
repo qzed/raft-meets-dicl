@@ -1,0 +1,8 @@
+type: dataset
+spec: dataset/ufreiburg-driving.yaml
+
+parameters:
+  camera: left
+  direction: forwards
+  focallength: 15mm
+  pass: clean

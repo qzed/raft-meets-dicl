@@ -1,0 +1,18 @@
+name: KITTI 2012
+id: kitti-2012
+path: '../../../datasets/kitti-flow-2012/data'
+
+layout:
+  type: generic
+
+  images: '{type}/colored_0/{seq:06d}_{idx:02d}.png'
+  flows: '{type}/flow_occ/{seq:06d}_{idx:02d}.png'
+  key: '{type}/{seq:06d}_{idx:02d}'
+
+parameters:
+  type:
+    values: [ train, test ]
+
+    value:
+      test: { sub: { type: testing } }
+      train: { sub: { type: training } }

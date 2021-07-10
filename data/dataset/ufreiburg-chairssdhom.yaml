@@ -1,0 +1,14 @@
+name: Uni Freiburg ChairsSDHom
+id: ufreiburg-chairssdhom
+path: '../../../datasets/ufreiburg-chairssdhom/data'
+
+layout:
+  flows: '{type}/flow/{seq:05d}.pfm'
+  images: '{type}/t{idx:d}/{seq:05d}.png'
+  key: '{type}/{seq:05d}'
+  type: generic
+
+parameters:
+  type:
+    values: [ train, test ]
+    sub: type
