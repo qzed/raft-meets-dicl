@@ -60,7 +60,7 @@ class Dataset(Collection):
         img2 = self.image_loader.load(img2)
         flow, valid = self.flow_loader.load(flow)
 
-        return img1, img2, flow, valid, key
+        return img1, img2, flow, valid, (self.id, key)
 
     def __len__(self):
         return len(self.files)
