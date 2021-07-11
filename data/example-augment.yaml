@@ -1,10 +1,22 @@
 type: augment
 
 augmentations:
+  - type: scale-sparse
+    min-size: &img_size [496, 368]
+    min-scale: [0.5, 0.5]
+    max-scale: [2.0, 2.0]
+    mode: linear
+
   - type: crop
-    size: [496, 368]
+    size: *img_size
 
   - type: flip
     probability: [0.5, 0.5]
 
-source: example-dataset2.yaml
+source:
+  type: dataset
+  spec: dataset/kitti-2015.yaml
+
+  parameters:
+    type: train
+
