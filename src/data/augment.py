@@ -4,6 +4,12 @@ import cv2
 from . import config
 from .collection import Collection
 
+# The types of augmentations as well as implementations for occlusion (eraser
+# transform) and sparse flow scaling as implemented here are based on "RAFT:
+# Recurrent All Pairs Field Transforms for Optical Flow" by Teed and Deng.
+#
+# Link: https://github.com/princeton-vl/RAFT/blob/master/core/utils/augmentor.py
+
 
 class Augment(Collection):
     def __init__(self, augmentations, source):
@@ -124,6 +130,115 @@ class Flip(Augmentation):
             valid = valid[::-1, :]
 
         return img1, img2, flow, valid
+
+
+class Occlusion(Augmentation):
+    @classmethod
+    def _from_config(cls, cfg):
+        probability = cfg['probability']
+
+        num = cfg['num']
+        if isinstance(num, list):
+            if len(num) > 2:
+                raise ValueError('invalid num value, expected integer or tuple with two elements')
+        else:
+            num = [int(num), int(num)]
+
+        if num[0] > num[1]:
+            raise ValueError('invalid num value, expected num[0] <= num[1]')
+
+        min_size = list(cfg['min-size'])
+        if len(min_size) != 2:
+            raise ValueError('invalid min-size, expected list or tuple with two elements')
+
+        max_size = list(cfg['max-size'])
+        if len(max_size) != 2:
+            raise ValueError('invalid max-size, expected list or tuple with two elements')
+
+        return cls(probability, num, min_size, max_size)
+
+    def __init__(self, probability, num, min_size, max_size):
+        self.probability = probability
+        self.num = num
+        self.min_size = min_size
+        self.max_size = max_size
+
+    def _get_config(self, ty):
+        return {
+            'type': ty,
+            'probability': self.probability,
+            'num': self.num,
+            'min-size': self.min_size,
+            'max-size': self.max_size,
+        }
+
+    def _patch(self, img):
+        # decide if we apply this augmentation
+        if np.random.rand() >= self.probability:
+            return img
+
+        # draw number of patches
+        if self.num[0] == self.num[1]:
+            num = self.num[0]
+        else:
+            num = np.random.randint(self.num[0], self.num[1])
+
+        # patch is filled with mean value
+        color = np.mean(img, axis=(0, 1))
+
+        # draw and apply patches
+        for _ in range(num):
+            dx, dy = np.random.randint(self.min_size, self.max_size)
+
+            # allow drawing accross border to not skew distribution
+            y0, x0 = np.random.randint((-dy, -dx), np.array(img.shape[:2]))
+
+            # clip to borders
+            y0, x0 = np.clip([y0, x0], [0, 0], img.shape[:2])
+            y1, x1 = np.clip([y0 + dy, x0 + dy], [0, 0], img.shape[:2])
+
+            # apply patch
+            img[y0:y1, x0:x1, :] = color
+
+        return img
+
+
+class OcclusionForward(Occlusion):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'occlusion-forward':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected "
+                             "'occlusion-forward'")
+
+        return cls._from_config(cfg)
+
+    def __init__(self, probability, num, min_size, max_size):
+        super().__init__(probability, num, min_size, max_size)
+
+    def get_config(self):
+        return self._get_config('occlusion-forward')
+
+    def process(self, img1, img2, flow, valid):
+        return img1, self._patch(img2), flow, valid
+
+
+class OcclusionBackward(Occlusion):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'occlusion-backward':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected "
+                             "'occlusion-backward'")
+
+        return cls._from_config(cfg)
+
+    def __init__(self, probability, num, min_size, max_size):
+        super().__init__(probability, num, min_size, max_size)
+
+    def get_config(self):
+        return self._get_config('occlusion-backward')
+
+    def process(self, img1, img2, flow, valid):
+        return self._patch(img1), img2, flow, valid
 
 
 class Scale(Augmentation):
@@ -269,9 +384,6 @@ class ScaleSparse(Augmentation):
         img1 = cv2.resize(img1, new_size, interpolation=cv2.INTER_LINEAR)
         img2 = cv2.resize(img2, new_size, interpolation=cv2.INTER_LINEAR)
 
-        # scale sparse flow map (based on RAFT by Teed and Deng)
-        # link: https://github.com/princeton-vl/RAFT/blob/master/core/utils/augmentor.py
-
         # buil grid of coordinates
         coords = np.meshgrid(np.arange(flow.shape[1]), np.arange(flow.shape[0]))
         coords = np.stack(coords, axis=-1).astype(np.float32)
@@ -308,6 +420,8 @@ def _build_augmentation(cfg):
     types = {
         'crop': Crop.from_config,
         'flip': Flip.from_config,
+        'occlusion-forward': OcclusionForward.from_config,
+        'occlusion-backward': OcclusionBackward.from_config,
         'scale': Scale.from_config,
         'scale-sparse': ScaleSparse.from_config,
     }
