@@ -192,6 +192,47 @@ class Flip(Augmentation):
         return img1, img2, flow, valid
 
 
+class NoiseNormal(Augmentation):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'noise-normal':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'noise'")
+
+        stddev = cfg['stddev']
+        if isinstance(stddev, list):
+            if len(stddev) > 2:
+                raise ValueError('invalid num value, expected float or tuple with two floats')
+        else:
+            stddev = [float(stddev), float(stddev)]
+
+        return cls(stddev)
+
+    def __init__(self, stddev):
+        super().__init__()
+
+        self.stddev = stddev
+
+    def get_config(self):
+        return {
+            'type': 'noise-normal',
+            'stddev': self.stddev,
+        }
+
+    def process(self, img1, img2, flow, valid):
+        if self.stddev[0] < self.stddev[1]:
+            stddev = np.random.uniform(self.stddev[0], self.stddev[1])
+        else:
+            stddev = self.stddev[0]
+
+        n1 = np.random.normal(0.0, stddev, img1.shape)
+        n2 = np.random.normal(0.0, stddev, img2.shape)
+
+        img1 = np.clip(img1 + n1, 0.0, 1.0)
+        img2 = np.clip(img2 + n2, 0.0, 1.0)
+
+        return img1, img2, flow, valid
+
+
 class Occlusion(Augmentation):
     @classmethod
     def _from_config(cls, cfg):
@@ -455,6 +496,7 @@ def _build_augmentation(cfg):
         'color-jitter': ColorJitter.from_config,
         'crop': Crop.from_config,
         'flip': Flip.from_config,
+        'noise-normal': NoiseNormal.from_config,
         'occlusion-forward': OcclusionForward.from_config,
         'occlusion-backward': OcclusionBackward.from_config,
         'scale': Scale.from_config,

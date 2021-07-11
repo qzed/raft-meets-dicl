@@ -32,10 +32,12 @@ augmentations:
     saturation: 0.4
     hue: 0.1274
 
+  - type: noise-normal
+    stddev: 0.002
+
 source:
   type: dataset
   spec: dataset/kitti-2015.yaml
 
   parameters:
     type: train
-
