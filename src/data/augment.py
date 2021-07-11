@@ -64,7 +64,7 @@ class Crop(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid):
-        assert img1.shape == img2.shape
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
 
         # draw new upper-right corner coordinate randomly
         mx, my = img1.shape[1] - self.size[0], img1.shape[0] - self.size[1]
@@ -171,7 +171,7 @@ class Scale(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid):
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2]
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
         assert np.all(valid)        # full flows only!
 
         # draw random scale candidates
