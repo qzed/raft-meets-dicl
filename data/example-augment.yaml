@@ -25,6 +25,13 @@ augmentations:
     min-size: [1, 1]
     max-size: [100, 50]
 
+  - type: color-jitter
+    prob-asymmetric: 0.5
+    brightness: 0.4
+    contrast: 0.4
+    saturation: 0.4
+    hue: 0.1274
+
 source:
   type: dataset
   spec: dataset/kitti-2015.yaml

@@ -1,5 +1,8 @@
-import numpy as np
 import cv2
+import numpy as np
+
+import torch
+import torchvision.transforms as T
 
 from . import config
 from .collection import Collection
@@ -53,6 +56,59 @@ class Augmentation:
 
     def process(self, img1, img2, flow, valid):
         raise NotImplementedError
+
+
+class ColorJitter(Augmentation):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'color-jitter':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'color-jitter'")
+
+        prob_asymmetric = cfg['prob-asymmetric']
+        brightness = cfg['brightness']
+        contrast = cfg['contrast']
+        saturation = cfg['saturation']
+        hue = cfg['hue']
+
+        return cls(prob_asymmetric, brightness, contrast, saturation, hue)
+
+    def __init__(self, prob_asymmetric, brightness, contrast, saturation, hue):
+        super().__init__()
+
+        self.prob_asymmetric = prob_asymmetric
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+        self.transform = T.ColorJitter(brightness, contrast, saturation, hue)
+
+    def get_config(self):
+        return {
+            'type': 'color-jitter',
+            'prob-asymmetric': self.prob_asymmetric,
+            'brightness': self.brightness,
+            'contrast': self.contrast,
+            'saturation': self.saturation,
+            'hue': self.hue,
+        }
+
+    def process(self, img1, img2, flow, valid):
+        # convert to torch tensors
+        img1 = torch.from_numpy(np.ascontiguousarray(img1)).permute(2, 0, 1)
+        img2 = torch.from_numpy(np.ascontiguousarray(img2)).permute(2, 0, 1)
+
+        # apply color transform
+        if np.random.rand() < self.prob_asymmetric:     # asymmetric
+            img1 = np.array(self.transform(img1).permute(1, 2, 0))
+            img2 = np.array(self.transform(img2).permute(1, 2, 0))
+        else:                                           # symmetric
+            # stack images height-wise and apply transform to combined image
+            stack = torch.cat((img1, img2), dim=-2)
+            stack = np.array(self.transform(stack).permute(1, 2, 0))
+            img1, img2 = np.split(stack, 2, axis=0)
+
+        return img1, img2, flow, valid
 
 
 class Crop(Augmentation):
@@ -396,6 +452,7 @@ class ScaleSparse(Scale):
 
 def _build_augmentation(cfg):
     types = {
+        'color-jitter': ColorJitter.from_config,
         'crop': Crop.from_config,
         'flip': Flip.from_config,
         'occlusion-forward': OcclusionForward.from_config,
