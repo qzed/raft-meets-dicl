@@ -40,6 +40,8 @@ def main():
     ds = data.load(args.data)
     img1, img2, flow, valid, key = ds[0]
 
+    visual.show_image("img1", img1)
+    visual.show_image("img2", img2)
     visual.show_flow("flow", flow, mask=valid).wait()
 
     dump_full_config(s, ds)
