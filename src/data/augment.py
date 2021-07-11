@@ -66,8 +66,9 @@ class Crop(Augmentation):
         assert img1.shape == img2.shape
 
         # draw new upper-right corner coordinate randomly
-        x0 = np.random.randint(0, img1.shape[1] - self.size[0])
-        y0 = np.random.randint(0, img1.shape[0] - self.size[1])
+        mx, my = img1.shape[1] - self.size[0], img1.shape[0] - self.size[1]
+        x0 = np.random.randint(0, mx) if mx > 0 else 0
+        y0 = np.random.randint(0, my) if my > 0 else 0
 
         # perform crop
         img1 = img1[y0:y0+self.size[1], x0:x0+self.size[0]]
