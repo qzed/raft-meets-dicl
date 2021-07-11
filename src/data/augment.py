@@ -22,8 +22,15 @@ class Augment(Collection):
     def __getitem__(self, index):
         img1, img2, flow, valid, key = self.source[index]
 
+        # perform augmentations
         for aug in self.augmentations:
             img1, img2, flow, valid = aug.process(img1, img2, flow, valid)
+
+        # ensure that we have contiguous memory for torch later on
+        img1 = np.ascontiguousarray(img1)
+        img2 = np.ascontiguousarray(img2)
+        flow = np.ascontiguousarray(flow)
+        valid = np.ascontiguousarray(valid)
 
         return img1, img2, flow, valid, key
 
