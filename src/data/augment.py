@@ -41,6 +41,43 @@ class Augmentation:
         raise NotImplementedError
 
 
+class Crop(Augmentation):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'crop':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'crop'")
+
+        size = list(cfg['size'])
+        if len(size) != 2:
+            raise ValueError('invalid crop size, expected list or tuple with two elements')
+
+        return cls(size)
+
+    def __init__(self, size):
+        self.size = size
+
+    def get_config(self):
+        return {
+            'type': 'crop',
+            'size': self.size,
+        }
+
+    def process(self, img1, img2, flow, valid):
+        assert img1.shape == img2.shape
+
+        # draw new upper-right corner coordinate randomly
+        x0 = np.random.randint(0, img1.shape[1] - self.size[0])
+        y0 = np.random.randint(0, img1.shape[0] - self.size[1])
+
+        # perform crop
+        img1 = img1[y0:y0+self.size[1], x0:x0+self.size[0]]
+        img2 = img2[y0:y0+self.size[1], x0:x0+self.size[0]]
+        flow = flow[y0:y0+self.size[1], x0:x0+self.size[0]]
+        valid = valid[y0:y0+self.size[1], x0:x0+self.size[0]]
+
+        return img1, img2, flow, valid
+
+
 class Flip(Augmentation):
     @classmethod
     def from_config(cls, cfg):
@@ -82,6 +119,7 @@ class Flip(Augmentation):
 
 def _build_augmentation(cfg):
     types = {
+        'crop': Crop.from_config,
         'flip': Flip.from_config,
     }
 
