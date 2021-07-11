@@ -68,6 +68,8 @@ class Crop(Augmentation):
         return cls(size)
 
     def __init__(self, size):
+        super().__init__()
+
         self.size = size
 
     def get_config(self):
@@ -106,6 +108,8 @@ class Flip(Augmentation):
         return cls(prob)
 
     def __init__(self, probability):
+        super().__init__()
+
         self.probability = probability
 
     def get_config(self):
@@ -158,6 +162,8 @@ class Occlusion(Augmentation):
         return cls(probability, num, min_size, max_size)
 
     def __init__(self, probability, num, min_size, max_size):
+        super().__init__()
+
         self.probability = probability
         self.num = num
         self.min_size = min_size
@@ -271,6 +277,8 @@ class Scale(Augmentation):
         return cls._from_config(cfg)
 
     def __init__(self, min_size, min_scale, max_scale, mode):
+        super().__init__()
+
         self.min_size = min_size
         self.min_scale = min_scale
         self.max_scale = max_scale
