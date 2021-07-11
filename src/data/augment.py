@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 from . import config
 from .collection import Collection
@@ -118,10 +119,87 @@ class Flip(Augmentation):
         return img1, img2, flow, valid
 
 
+class Scale(Augmentation):
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'scale':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale'")
+
+        min_size = list(cfg.get('min-size', [0, 0]))
+        if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
+            raise ValueError('invalid min-size, expected list with two unsigned integers')
+
+        min_scale = list(cfg['min-scale'])
+        if len(min_scale) != 2 or min_scale[0] < 0 or min_scale[1] < 0:
+            raise ValueError('invalid min-scale, expected list with two unsigned floats')
+
+        max_scale = list(cfg['max-scale'])
+        if len(max_scale) != 2 or max_scale[0] < 0 or max_scale[1] < 0:
+            raise ValueError('invalid max-scale, expected list with two unsigned floats')
+
+        if min_scale[0] > max_scale[0] or min_scale[1] > max_scale[1]:
+            raise ValueError('min-scale must be smaller than or equal to max-scale')
+
+        mode = cfg.get('mode', 'linear')
+
+        return cls(min_size, min_scale, max_scale, mode)
+
+    def __init__(self, min_size, min_scale, max_scale, mode):
+        self.min_size = min_size
+        self.min_scale = min_scale
+        self.max_scale = max_scale
+        self.mode = mode
+
+        if mode == 'nearest':
+            self.modenum = cv2.INTER_NEAREST
+        elif mode == 'linear':
+            self.modenum = cv2.INTER_LINEAR
+        elif mode == 'cubic':
+            self.modenum = cv2.INTER_CUBIC
+        elif mode == 'area':
+            self.modenum = cv2.INTER_AREA
+        else:
+            raise ValueError(f"invalid scaling mode '{mode}'")
+
+    def get_config(self):
+        return {
+            'type': 'scale',
+            'min-size': self.min_size,
+            'min-scale': self.min_scale,
+            'max-scale': self.max_scale,
+            'mode': self.mode,
+        }
+
+    def process(self, img1, img2, flow, valid):
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2]
+        assert np.all(valid)        # full flows only!
+
+        # draw random scale candidates
+        sx = np.random.uniform(self.min_scale[0], self.max_scale[0])
+        sy = np.random.uniform(self.min_scale[1], self.max_scale[1])
+
+        # calculate new size and actual/clipped scale (store as width, height)
+        old_size = np.array(img1.shape[:2])[::-1]
+        new_size = np.clip(np.ceil(old_size * [sx, sy]).astype(np.int32), self.min_size, None)
+        scale = new_size / old_size
+
+        # scale images
+        img1 = cv2.resize(img1, new_size, interpolation=cv2.INTER_LINEAR)
+        img2 = cv2.resize(img2, new_size, interpolation=cv2.INTER_LINEAR)
+        flow = cv2.resize(flow, new_size, interpolation=cv2.INTER_LINEAR)
+        flow *= scale
+
+        # this is for full/non-sparse flows only...
+        valid = np.ones(img1.shape[:2], dtype=np.bool)
+
+        return img1, img2, flow, valid
+
+
 def _build_augmentation(cfg):
     types = {
         'crop': Crop.from_config,
         'flip': Flip.from_config,
+        'scale': Scale.from_config,
     }
 
     ty = cfg['type']
