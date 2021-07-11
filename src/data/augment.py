@@ -96,7 +96,7 @@ class Flip(Augmentation):
     def get_config(self):
         return {
             'type': 'flip',
-            'size': self.probability,
+            'probability': self.probability,
         }
 
     def process(self, img1, img2, flow, valid):
