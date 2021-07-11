@@ -243,10 +243,7 @@ class OcclusionBackward(Occlusion):
 
 class Scale(Augmentation):
     @classmethod
-    def from_config(cls, cfg):
-        if cfg['type'] != 'scale':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale'")
-
+    def _from_config(cls, cfg):
         min_size = list(cfg.get('min-size', [0, 0]))
         if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
             raise ValueError('invalid min-size, expected list with two unsigned integers')
@@ -266,6 +263,13 @@ class Scale(Augmentation):
 
         return cls(min_size, min_scale, max_scale, mode)
 
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != 'scale':
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale'")
+
+        return cls._from_config(cfg)
+
     def __init__(self, min_size, min_scale, max_scale, mode):
         self.min_size = min_size
         self.min_scale = min_scale
@@ -283,14 +287,17 @@ class Scale(Augmentation):
         else:
             raise ValueError(f"invalid scaling mode '{mode}'")
 
-    def get_config(self):
+    def _get_config(self, ty):
         return {
-            'type': 'scale',
+            'type': ty,
             'min-size': self.min_size,
             'min-scale': self.min_scale,
             'max-scale': self.max_scale,
             'mode': self.mode,
         }
+
+    def get_config(self):
+        return self._get-config('scale')
 
     def process(self, img1, img2, flow, valid):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
@@ -317,56 +324,19 @@ class Scale(Augmentation):
         return img1, img2, flow, valid
 
 
-class ScaleSparse(Augmentation):
+class ScaleSparse(Scale):
     @classmethod
     def from_config(cls, cfg):
         if cfg['type'] != 'scale-sparse':
             raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale-sparse'")
 
-        min_size = list(cfg.get('min-size', [0, 0]))
-        if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
-            raise ValueError('invalid min-size, expected list with two unsigned integers')
-
-        min_scale = list(cfg['min-scale'])
-        if len(min_scale) != 2 or min_scale[0] < 0 or min_scale[1] < 0:
-            raise ValueError('invalid min-scale, expected list with two unsigned floats')
-
-        max_scale = list(cfg['max-scale'])
-        if len(max_scale) != 2 or max_scale[0] < 0 or max_scale[1] < 0:
-            raise ValueError('invalid max-scale, expected list with two unsigned floats')
-
-        if min_scale[0] > max_scale[0] or min_scale[1] > max_scale[1]:
-            raise ValueError('min-scale must be smaller than or equal to max-scale')
-
-        mode = cfg.get('mode', 'linear')
-
-        return cls(min_size, min_scale, max_scale, mode)
+        return cls._from_config(cfg)
 
     def __init__(self, min_size, min_scale, max_scale, mode):
-        self.min_size = min_size
-        self.min_scale = min_scale
-        self.max_scale = max_scale
-        self.mode = mode
-
-        if mode == 'nearest':
-            self.modenum = cv2.INTER_NEAREST
-        elif mode == 'linear':
-            self.modenum = cv2.INTER_LINEAR
-        elif mode == 'cubic':
-            self.modenum = cv2.INTER_CUBIC
-        elif mode == 'area':
-            self.modenum = cv2.INTER_AREA
-        else:
-            raise ValueError(f"invalid scaling mode '{mode}'")
+        super().__init__(min_size, min_scale, max_scale, mode)
 
     def get_config(self):
-        return {
-            'type': 'scale-sparse',
-            'min-size': self.min_size,
-            'min-scale': self.min_scale,
-            'max-scale': self.max_scale,
-            'mode': self.mode,
-        }
+        return self._get_config('scale-sparse')
 
     def process(self, img1, img2, flow, valid):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
