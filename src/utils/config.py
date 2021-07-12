@@ -13,6 +13,20 @@ def to_string(cfg, fmt='json'):
         raise ValueError(f"unsupported config format '{fmt}'")
 
 
+def store(path, cfg, fmt='json'):
+    path = Path(path)
+
+    if path.suffix == '.json':
+        lib, args = json, {'indent': 4}
+    elif path.suffix == '.yaml' or fmt == '.yml':
+        lib, args = yaml, {}
+    else:
+        raise ValueError(f"unsupported config format '{fmt}'")
+
+    with open(path, 'w') as fd:
+        lib.dump(cfg, fd, **args)
+
+
 def load(path):
     path = Path(path)
 
@@ -23,7 +37,7 @@ def load(path):
     else:
         raise ValueError(f"unsupported config file format '{path.suffix}'")
 
-    with open(path) as fd:
+    with open(path, 'r') as fd:
         cfg = lib.load(fd, **args)
 
     return cfg

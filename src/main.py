@@ -37,8 +37,7 @@ class Context:
             'dataset': data.get_config(),
         }
 
-        with open(self.dir_out / 'config.json', 'w') as fd:
-            fd.write(utils.config.to_string(cfg, fmt='json'))
+        utils.config.store(self.dir_out / 'config.json', cfg)
 
 
 def setup(dir_base='logs', timestamp=datetime.datetime.now()):
