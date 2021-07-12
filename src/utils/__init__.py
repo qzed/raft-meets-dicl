@@ -1,2 +1,2 @@
-from . import seeds
 from . import config
+from . import seeds
