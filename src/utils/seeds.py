@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import os
 import random
@@ -21,6 +22,8 @@ class Seeds:
         }
 
     def apply(self):
+        logging.info(f"seeding: python={self.python}, numpy={self.numpy}, torch={self.torch}")
+
         random.seed(self.python)
         np.random.seed(self.numpy)
         torch.manual_seed(self.torch)

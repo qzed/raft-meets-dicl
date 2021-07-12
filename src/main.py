@@ -1,5 +1,6 @@
 import argparse
 import git
+import logging
 import matplotlib.pyplot as plt
 
 from pathlib import Path
@@ -8,6 +9,13 @@ from . import data
 from . import visual
 from .utils import config
 from .utils import seeds
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(message)s',
+    datefmt='%H:%M:%S'
+)
 
 
 def get_git_head_hash():
@@ -35,9 +43,15 @@ def main():
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
     args = parser.parse_args()
 
+    logging.info('starting...')
+
     s = seeds.random_seeds().apply()
 
+    logging.info(f"loading data from file: file={args.data}")
     ds = data.load(args.data)
+
+    logging.info(f"dataset loaded: have {len(ds)} samples")
+
     img1, img2, flow, valid, key = ds[0]
 
     visual.show_image("img1", img1)
@@ -45,4 +59,3 @@ def main():
     visual.show_flow("flow", flow, mask=valid).wait()
 
     dump_full_config(s, ds)
-    print(f"Prepared dataset with {len(ds)} samples")
