@@ -1,66 +1,89 @@
 import argparse
+import datetime
 import git
 import logging
 import matplotlib.pyplot as plt
+import os
 
 from pathlib import Path
 
 from . import data
 from . import visual
-from .utils import config
-from .utils import seeds
+from . import utils
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(message)s',
-    datefmt='%H:%M:%S'
-)
+class Context:
+    def __init__(self, timestamp, dir_out):
+        self.timestamp = timestamp
+        self.dir_out = dir_out
+
+    def _get_git_head_hash(self):
+        try:
+            repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
+            return repo.head.object.hexsha
+        except git.exc.InvalidGitRepositoryError:
+            return '<out-of-tree>'
+
+    def dump_config(self, seeds, data):
+        """
+        Dump full conifg. This should dump everything needed to reproduce a run.
+        """
+
+        cfg = {
+            'timestamp': self.timestamp.isoformat(),
+            'commit': self._get_git_head_hash(),
+            'cwd': str(Path.cwd()),
+            'seeds': seeds.get_config(),
+            'dataset': data.get_config(),
+        }
+
+        with open(self.dir_out / 'config.json', 'w') as fd:
+            fd.write(utils.config.to_string(cfg, fmt='json'))
 
 
-def get_git_head_hash():
-    try:
-        repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
-        return repo.head.object.hexsha
-    except git.exc.InvalidGitRepositoryError:
-        return '<out-of-tree>'
+def setup(dir_base='logs', timestamp=datetime.datetime.now()):
+    # setup paths
+    dir_out = Path(dir_base) / Path(timestamp.strftime('%G.%m.%d-%H.%M.%S'))
+    file_log = dir_out / 'main.log'
 
+    # create output directory
+    os.makedirs(dir_out, exist_ok=True)
 
-def dump_full_config(timestamp, seeds, data):
-    """
-    Dump full conifg. This should dump everything needed to reproduce a run.
-    """
+    # setup logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(message)s',
+        datefmt='%H:%M:%S',
+        handlers=[
+            logging.FileHandler(file_log),
+            logging.StreamHandler(),
+        ],
+    )
 
-    cfg = {
-        'timestamp': timestamp.isoformat(),
-        'commit': get_git_head_hash(),
-        'cwd': str(Path.cwd()),
-        'seeds': seeds.get_config(),
-        'dataset': data.get_config(),
-    }
-
-    print(config.to_string(cfg, fmt='json'))
+    return Context(timestamp, dir_out)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
+    parser.add_argument('-o', '--output', default='runs', help='The base output directory to use')
     args = parser.parse_args()
 
-    ts = datetime.datetime.now()
-    logging.info(f"starting, time is {ts}")
+    ctx = setup(dir_base=args.output)
 
-    s = seeds.random_seeds().apply()
+    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
 
-    logging.info(f"loading data from file: file={args.data}")
-    ds = data.load(args.data)
+    seeds = utils.seeds.random_seeds().apply()
 
-    logging.info(f"dataset loaded: have {len(ds)} samples")
+    logging.info(f"loading data from configuration: file='{args.data}'")
+    dataset = data.load(args.data)
 
-    img1, img2, flow, valid, key = ds[0]
+    logging.info(f"dataset loaded: have {len(dataset)} samples")
+
+    ctx.dump_config(seeds, dataset)
+
+    img1, img2, flow, valid, key = dataset[0]
 
     visual.show_image("img1", img1)
     visual.show_image("img2", img2)
     visual.show_flow("flow", flow, mask=valid).wait()
-
-    dump_full_config(ts, s, ds)
