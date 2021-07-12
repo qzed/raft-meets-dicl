@@ -19,8 +19,11 @@ logging.basicConfig(
 
 
 def get_git_head_hash():
-    repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
-    return repo.head.object.hexsha
+    try:
+        repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
+        return repo.head.object.hexsha
+    except git.exc.InvalidGitRepositoryError:
+        return '<out-of-tree>'
 
 
 def dump_full_config(seeds, data):
