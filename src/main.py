@@ -26,12 +26,13 @@ def get_git_head_hash():
         return '<out-of-tree>'
 
 
-def dump_full_config(seeds, data):
+def dump_full_config(timestamp, seeds, data):
     """
     Dump full conifg. This should dump everything needed to reproduce a run.
     """
 
     cfg = {
+        'timestamp': timestamp.isoformat(),
         'commit': get_git_head_hash(),
         'cwd': str(Path.cwd()),
         'seeds': seeds.get_config(),
@@ -46,7 +47,8 @@ def main():
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
     args = parser.parse_args()
 
-    logging.info('starting...')
+    ts = datetime.datetime.now()
+    logging.info(f"starting, time is {ts}")
 
     s = seeds.random_seeds().apply()
 
@@ -61,4 +63,4 @@ def main():
     visual.show_image("img2", img2)
     visual.show_flow("flow", flow, mask=valid).wait()
 
-    dump_full_config(s, ds)
+    dump_full_config(ts, s, ds)
