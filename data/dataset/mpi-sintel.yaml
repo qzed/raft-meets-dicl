@@ -5,7 +5,7 @@ path: '../../../datasets/mpi-sintel-flow/data'
 layout:
   type: generic
 
-  images: '{type}/clean/{scene}/frame_{idx:04d}.png'
+  images: '{type}/{pass}/{scene}/frame_{idx:04d}.png'
   flows: '{type}/flow/{scene}/frame_{idx:04d}.flo'
   key: '{type}/{scene}/frame_{idx:04d}'
 
@@ -16,3 +16,7 @@ parameters:
     sub:
       test: { type: test }
       train: { type: training }
+
+  pass:
+    values: [ clean, final ]
+    sub: pass

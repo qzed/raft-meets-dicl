@@ -6,3 +6,4 @@ source:
   spec: dataset/mpi-sintel.yaml
   parameters:
     type: train
+    pass: clean
