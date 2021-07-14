@@ -402,7 +402,7 @@ class Scale(Augmentation):
         }
 
     def get_config(self):
-        return self._get-config('scale')
+        return self._get_config('scale')
 
     def process(self, img1, img2, flow, valid):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
