@@ -137,7 +137,7 @@ def main():
     # setup model
     logging.info(f"setting up model")
 
-    model = nn.DataParallel(models.raft.Raft(dropout=0.0, mixed_precision=mixed_precision))
+    model = nn.DataParallel(models.Raft(dropout=0.0, mixed_precision=mixed_precision))
     model.cuda()
     model.train()
     model.module.freeze_batchnorm()
