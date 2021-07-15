@@ -351,13 +351,11 @@ class Raft(nn.Module):
         cy = torch.arange(h // 8, device=img.device)
         cx = torch.arange(w // 8, device=img.device)
 
-        coords0 = torch.meshgrid(cy, cx)[::-1]              # build transposed grid (h/8, w/8) x 2
-        coords0 = torch.stack(coords0, dim=0).float()       # combine coordinates (2, h/8, w/8)
-        coords0 = coords0[None].repeat(batch, 1, 1, 1)      # copy to batch (batch, 2, h/8, w/8)
+        coords = torch.meshgrid(cy, cx)[::-1]               # build transposed grid (h/8, w/8) x 2
+        coords = torch.stack(coords, dim=0).float()         # combine coordinates (2, h/8, w/8)
+        coords = coords[None].repeat(batch, 1, 1, 1)        # copy to batch (batch, 2, h/8, w/8)
 
-        coords1 = coords0.detach().clone()
-
-        return coords0, coords1
+        return coords, coords.clone()
 
     def upsample_flow(self, flow, mask):
         batch, c, h, w = flow.shape
