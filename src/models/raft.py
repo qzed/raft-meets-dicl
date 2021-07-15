@@ -353,7 +353,7 @@ class Raft(nn.Module):
 
         coords = torch.meshgrid(cy, cx)[::-1]               # build transposed grid (h/8, w/8) x 2
         coords = torch.stack(coords, dim=0).float()         # combine coordinates (2, h/8, w/8)
-        coords = coords[None].repeat(batch, 1, 1, 1)        # copy to batch (batch, 2, h/8, w/8)
+        coords = coords.expand(batch, -1, -1, -1)           # expand to batch (batch, 2, h/8, w/8)
 
         return coords, coords.clone()
 
