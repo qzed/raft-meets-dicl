@@ -166,10 +166,9 @@ class CorrBlock:
         batch, h, w, _c = coords.shape
 
         # build lookup kernel
-        dx = torch.linspace(-r, r, 2 * r + 1)
-        dy = torch.linspace(-r, r, 2 * r + 1)
+        dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
+        dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
         delta = torch.stack(torch.meshgrid(dx, dy), axis=-1)    # change dims to (ry, rx, dx/dy)
-        delta = delta.to(coords.device)
 
         # lookup over pyramid levels
         out = []
@@ -349,13 +348,16 @@ class Raft(nn.Module):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
         batch, _c, h, w = img.shape
 
-        coords0 = torch.meshgrid(torch.arange(h // 8), torch.arange(w // 8))
-        coords0 = torch.stack(coords0[::-1], dim=0).float()
-        coords0 = coords0[None].repeat(batch, 1, 1, 1)
+        cy = torch.arange(h // 8, device=img.device)
+        cx = torch.arange(w // 8, device=img.device)
+
+        coords0 = torch.meshgrid(cy, cx)[::-1]              # build transposed grid (h/8, w/8) x 2
+        coords0 = torch.stack(coords0, dim=0).float()       # combine coordinates (2, h/8, w/8)
+        coords0 = coords0[None].repeat(batch, 1, 1, 1)      # copy to batch (batch, 2, h/8, w/8)
 
         coords1 = coords0.detach().clone()
 
-        return coords0.to(img.device), coords1.to(img.device)
+        return coords0, coords1
 
     def upsample_flow(self, flow, mask):
         batch, c, h, w = flow.shape
