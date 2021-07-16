@@ -182,8 +182,8 @@ class CorrBlock:
             centroids = centroids / 2**i + delta                # broadcasts to (..., 2r+1, 2r+1, 2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
-            centroids[:, :, :, :, :, 0] = 2 * centroids[:, :, :, :, :, 0] / (w2 - 1) - 1
-            centroids[:, :, :, :, :, 1] = 2 * centroids[:, :, :, :, :, 1] / (h2 - 1) - 1
+            centroids[..., 0] = 2 * centroids[..., 0] / (w2 - 1) - 1
+            centroids[..., 1] = 2 * centroids[..., 1] / (h2 - 1) - 1
 
             # reshape coordinates for sampling to (n, h_out, w_out, x/y=2)
             centroids = centroids.reshape(batch * h * w, 2 * r + 1, 2 * r + 1, 2)
