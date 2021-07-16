@@ -3,6 +3,7 @@ import datetime
 import git
 import logging
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 
 from tqdm import tqdm
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.data as td
 import torch.optim as optim
 
@@ -81,7 +83,9 @@ def sequence_loss(flow_est, flow_gt, valid, gamma=0.8, max_flow=400):
 
     # compute weighted L1 loss over layer estimates
     for i, est in enumerate(flow_est):
-        lvl_loss = (est - flow_gt).abs() * valid[:, None]           # L1 loss
+        # FIXME: should we discard invalid pixels from mean completely and not
+        # just count them as zeros?
+        lvl_loss = (est - flow_gt).abs() * valid[:, None]           # L1 loss   # FIXME: this is not a L1 norm...
         loss += gamma**(n_predictions - i - 1) * lvl_loss.mean()    # add level mean mult. by weight
 
     # compute end-point error metrics of final result
@@ -98,6 +102,53 @@ def sequence_loss(flow_est, flow_gt, valid, gamma=0.8, max_flow=400):
     return loss, metrics
 
 
+def multiscale_up(flow_est, target, valid, max_flow=400):
+    batch, _c, h, w = target.shape
+
+    weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
+
+    loss = 0.0
+    metrics = {}
+
+    # exclude invalid pixels and extremely large displacements
+    target_mag = torch.norm(target, p=2, dim=1)
+    vaild = valid & (target_mag < max_flow)
+
+    # compute combined loss
+    for i, est in enumerate(flow_est):
+        _b, _c, eh, ew = est.shape
+
+        # scale-up output to target
+        est = F.interpolate(est, (h, w), mode='bilinear', align_corners=True)
+        est[:, 0, :, :] = est[:, 0, :, :] * (w / ew)
+        est[:, 1, :, :] = est[:, 1, :, :] * (h / eh)
+
+        # compute error vectors and distance to actual endpoints (end-point error)
+        epe = (est - target) * valid[:, None]
+        epe = torch.norm(epe, p=2, dim=1)
+
+        # FIXME: should we discard invalid pixels from mean completely and not
+        # just count them as zeros?
+
+        # update sum of L2 losses
+        loss = loss + epe.mean() * weights[i]
+
+        # compute end-point error and metrics for top-level output
+        if i == 0:
+            with torch.no_grad():
+                # properly filter valid pixels for metrics
+                epe = epe.view(-1)[valid.view(-1)]
+
+                metrics = {
+                    'epe': epe.mean().item(),
+                    '1px': (epe < 1.0).float().mean().item(),
+                    '3px': (epe < 3.0).float().mean().item(),
+                    '5px': (epe < 5.0).float().mean().item(),
+                }
+
+    return loss / len(flow_est), metrics
+
+
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
@@ -106,8 +157,8 @@ def main():
 
     # parameters        # FIXME: put those in config...
     batch_size = 1
-    mixed_precision = True
-    lr = 0.0001
+    mixed_precision = False
+    lr = 0.001
     wdecay = 0.00001
     eps = 1e-8
     num_iters = 12
@@ -137,12 +188,29 @@ def main():
     # setup model
     logging.info(f"setting up model")
 
-    model = nn.DataParallel(models.Raft(dropout=0.0, mixed_precision=mixed_precision))
+    disp_ranges = {
+        6: (3, 3),
+        5: (3, 3),
+        4: (3, 3),
+        3: (3, 3),
+        2: (3, 3),
+    }
+
+    ctx_scale = {
+        6: 0.03125,
+        5: 0.0625,
+        4: 0.125,
+        3: 0.25,
+        2: 0.5,
+    }
+
+    model = nn.DataParallel(models.Dicl(disp_ranges, ctx_scale, dap_init_ident=True))
     model.cuda()
     model.train()
-    model.module.freeze_batchnorm()
 
-    scaler = torch.cuda.amp.GradScaler(enabled=mixed_precision)
+    n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    logging.info(f"set up model with {n_params} parameters")
+    logging.info(f"model:\n{model}")
 
     # setup optimizer
     logging.info(f"setting up optimizer")
@@ -164,15 +232,28 @@ def main():
         flow = flow.float().permute(0, 3, 1, 2).cuda()
         valid = valid.cuda()
 
-        flow_est = model(img1, img2, num_iters=num_iters)
+        # TODO: for DICL images need to be of size % 128 == 0
 
-        loss, metrics = sequence_loss(flow_est, flow, valid, gamma)
-        scaler.scale(loss).backward()
-        scaler.unscale_(opt)
+        flow_est = model(img1, img2, raw=True)
+
+        if i % 100 == 0:
+            ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
+            ft = visual.flow_to_rgb(ft)
+
+            fe = flow_est[0][0].detach().cpu().permute(1, 2, 0).numpy()
+            fe = visual.flow_to_rgb(fe)
+
+            writer.add_image('img1', img1[0].detach().cpu(), i, dataformats='CHW')
+            writer.add_image('img2', img2[0].detach().cpu(), i, dataformats='CHW')
+            writer.add_image('flow', ft, i, dataformats='HWC')
+            writer.add_image('flow-est', fe, i, dataformats='HWC')
+
+        loss, metrics = multiscale_up(flow_est, flow, valid)
+        loss.backward()
+
         nn.utils.clip_grad_norm_(model.parameters(), clip)
 
-        scaler.step(opt)
-        scaler.update()
+        opt.step()
         sched.step()
 
         for k, v in metrics.items():
