@@ -2,7 +2,7 @@ type: augment
 
 augmentations:
   - type: scale
-    min-size: &img_size [768, 496]
+    min-size: &img_size [768, 384]
     min-scale: [0.5, 0.5]
     max-scale: [2.0, 2.0]
     mode: linear
