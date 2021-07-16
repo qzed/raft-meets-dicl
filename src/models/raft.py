@@ -173,13 +173,13 @@ class CorrBlock:
         # lookup over pyramid levels
         out = []
         for i, corr in enumerate(self.corr_pyramid):
-            # build interpolation map for grid-sampling
-            centroids = coords.view(batch, h, w, 1, 1, 2)       # reshape for broadcasting
-            centroids = centroids / 2**i + delta                # broadcasts to (..., 2r+1, 2r+1, 2)
-
             # reshape correlation volume for sampling
             batch, h1, w1, dim, h2, w2 = corr.shape             # reshape to (n, c, h_in, w_in)
             corr = corr.reshape(batch * h1 * w1, dim, h2, w2)
+
+            # build interpolation map for grid-sampling
+            centroids = coords.view(batch, h, w, 1, 1, 2)       # reshape for broadcasting
+            centroids = centroids / 2**i + delta                # broadcasts to (..., 2r+1, 2r+1, 2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
             centroids[:, :, :, :, :, 0] = 2 * centroids[:, :, :, :, :, 0] / (w2 - 1) - 1
