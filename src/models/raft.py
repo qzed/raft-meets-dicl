@@ -175,7 +175,7 @@ class CorrBlock:
         for i, corr in enumerate(self.corr_pyramid):
             # reshape correlation volume for sampling
             batch, h1, w1, dim, h2, w2 = corr.shape             # reshape to (n, c, h_in, w_in)
-            corr = corr.reshape(batch * h1 * w1, dim, h2, w2)
+            corr = corr.view(batch * h1 * w1, dim, h2, w2)
 
             # build interpolation map for grid-sampling
             centroids = coords.view(batch, h, w, 1, 1, 2)       # reshape for broadcasting
