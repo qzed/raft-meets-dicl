@@ -182,10 +182,8 @@ class CorrBlock:
             corr = corr.reshape(batch * h1 * w1, dim, h2, w2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
-            cx, cy = centroids.split((1, 1), dim=-1)            # separate x/y coordinate values
-            cx = 2 * cx / (w2 - 1) - 1                          # rescale x to [-1, 1]
-            cy = 2 * cy / (h2 - 1) - 1                          # rescale y to [-1, 1]
-            centroids = torch.cat((cx, cy), dim=-1)             # combine back to (..., x/y)
+            centroids[:, :, :, :, :, 0] = 2 * centroids[:, :, :, :, :, 0] / (w2 - 1) - 1
+            centroids[:, :, :, :, :, 1] = 2 * centroids[:, :, :, :, :, 1] / (h2 - 1) - 1
 
             # reshape coordinates for sampling to (n, h_out, w_out, x/y=2)
             centroids = centroids.reshape(batch * h * w, 2 * r + 1, 2 * r + 1, 2)
