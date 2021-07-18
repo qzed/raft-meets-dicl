@@ -1,6 +1,7 @@
 import torch
 
 from collections import OrderedDict
+from typing import List
 
 
 class Metric:
@@ -22,7 +23,7 @@ class Metric:
 
 
 class EndPointError(Metric):
-    def __init__(self, distances=[1, 3, 5], prefix='EndPointError/'):
+    def __init__(self, distances: List[float] = [1, 3, 5], prefix: str = 'EndPointError/'):
         super().__init__()
 
         self.distances = distances
