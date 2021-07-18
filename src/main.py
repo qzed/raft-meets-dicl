@@ -21,6 +21,7 @@ from . import data
 from . import models
 from . import utils
 from . import visual
+from . import loss as L
 
 
 class Context:
@@ -89,15 +90,8 @@ def sequence_loss(flow_est, flow_gt, valid, gamma=0.8, max_flow=400):
         loss += gamma**(n_predictions - i - 1) * lvl_loss.mean()    # add level mean mult. by weight
 
     # compute end-point error metrics of final result
-    epe = torch.sum((flow_est[-1] - flow_gt)**2, dim=1).sqrt()      # compute end-point error
-    epe = epe.view(-1)[valid.view(-1)]                              # filter for valid pixels
-
-    metrics = {
-        'epe': epe.mean().item(),
-        '1px': (epe < 1.0).float().mean().item(),
-        '3px': (epe < 3.0).float().mean().item(),
-        '5px': (epe < 5.0).float().mean().item(),
-    }
+    epe = L.metrics.EndPointError(distances=[1, 3, 5])
+    metrics = epe(flow_est[-1], flow_gt, valid)
 
     return loss, metrics
 
@@ -136,15 +130,8 @@ def multiscale_up(flow_est, target, valid, max_flow=400):
         # compute end-point error and metrics for top-level output
         if i == 0:
             with torch.no_grad():
-                # properly filter valid pixels for metrics
-                epe = epe.view(-1)[valid.view(-1)]
-
-                metrics = {
-                    'epe': epe.mean().item(),
-                    '1px': (epe < 1.0).float().mean().item(),
-                    '3px': (epe < 3.0).float().mean().item(),
-                    '5px': (epe < 5.0).float().mean().item(),
-                }
+                epe = L.metrics.EndPointError(distances=[1, 3, 5])
+                metrics = epe(est, target, valid)
 
     return loss / len(flow_est), metrics
 
