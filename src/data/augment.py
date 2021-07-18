@@ -33,7 +33,7 @@ class Augment(Collection):
 
         # perform augmentations
         for aug in self.augmentations:
-            img1, img2, flow, valid = aug.process(img1, img2, flow, valid)
+            img1, img2, flow, valid = aug(img1, img2, flow, valid)
 
         # ensure that we have contiguous memory for torch later on
         img1 = np.ascontiguousarray(img1)
@@ -56,6 +56,9 @@ class Augmentation:
 
     def process(self, img1, img2, flow, valid):
         raise NotImplementedError
+
+    def __call__(self, img1, img2, flow, valid):
+        return self.process(img1, img2, flow, valid)
 
 
 class ColorJitter(Augmentation):
