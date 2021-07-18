@@ -276,7 +276,7 @@ class MultiLayout(Layout):
     @classmethod
     def from_config(cls, cfg):
         if cfg['type'] != 'multi':
-            raise ValueError(f"invalid layout type '{ty}', expected 'multi'")
+            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'multi'")
 
         layouts = {k: _build_layout(v) for k, v in cfg['instances'].items()}
 
