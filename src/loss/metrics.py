@@ -22,6 +22,32 @@ class Metric:
         return self.compute(estimate, target, valid)
 
 
+class Collection(Metric):
+    def __init__(self, metrics: List[Metric], prefix: str = ''):
+        super().__init__()
+
+        self.metrics = metrics
+        self.prefix = prefix
+
+    def get_config(self):
+        return {
+            'type': 'collection',
+            'prefix': self.prefix,
+            'metrics': [m.get_config() for m in self.metrics],
+        }
+
+    def compute(self, estimate, target, valid):
+        result = OrderedDict()
+
+        for metric in self.metrics:
+            partial = metric(estimate, target, valid)
+
+            for k, v in partial.items():
+                result[f'{self.prefix}{k}'] = v
+
+        return result
+
+
 class EndPointError(Metric):
     def __init__(self, distances: List[float] = [1, 3, 5], prefix: str = 'EndPointError/'):
         super().__init__()
