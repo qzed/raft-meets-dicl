@@ -112,7 +112,7 @@ def multiscale_up(flow_est, target, valid, max_flow=400):
 
     # exclude invalid pixels and extremely large displacements
     target_mag = torch.norm(target, p=2, dim=1)
-    vaild = valid & (target_mag < max_flow)
+    valid = valid & (target_mag < max_flow)
 
     # compute combined loss
     for i, est in enumerate(flow_est):
