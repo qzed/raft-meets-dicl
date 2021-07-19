@@ -495,9 +495,6 @@ class Dicl(nn.Module):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2, raw=False):
-        # convert images from range [0, 1] to range [-1, 1]
-        img1, img2 = 2.0 * img1 - 1.0, 2.0 * img2 - 1.0
-
         # perform feature extraction
         i1f2, i1f3, i1f4, i1f5, i1f6 = self.feature(img1)
         i2f2, i2f3, i2f4, i2f5, i2f6 = self.feature(img2)

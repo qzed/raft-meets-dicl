@@ -163,6 +163,9 @@ def main():
         flow = flow.float().permute(0, 3, 1, 2).cuda()
         valid = valid.cuda()
 
+        # convert images from range [0, 1] to range [-1, 1]
+        img1, img2 = 2.0 * img1 - 1.0, 2.0 * img2 - 1.0
+
         # TODO: for DICL images need to be of size % 128 == 0
 
         result = model(img1, img2, raw=True)

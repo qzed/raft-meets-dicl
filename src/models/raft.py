@@ -380,9 +380,6 @@ class Raft(nn.Module):
     def forward(self, img1, img2, num_iters=12, flow_init=None, upsample=True):
         hdim, cdim = self.hidden_dim, self.context_dim
 
-        # convert images from range [0, 1] to range [-1, 1]
-        img1, img2 = 2.0 * img1 - 1.0, 2.0 * img2 - 1.0
-
         # run feature network
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
             fmap1, fmap2 = self.fnet((img1, img2))
