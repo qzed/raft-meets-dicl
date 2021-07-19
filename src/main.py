@@ -105,14 +105,14 @@ def multiscale_up(flow_est, target, valid, max_flow=400):
     metrics = {}
 
     # exclude invalid pixels and extremely large displacements
-    target_mag = torch.norm(target, p=2, dim=1)
+    target_mag = torch.linalg.vector_norm(target, ord=2, dim=1)
     valid = valid & (target_mag < max_flow)
 
     # compute combined loss
     for i, est in enumerate(flow_est):
         # compute error vectors and distance to actual endpoints (end-point error)
         epe = (est - target) * valid[:, None]
-        epe = torch.norm(epe, p=2, dim=1)
+        epe = torch.linalg.vector_norm(epe, ord=2, dim=1)
 
         # FIXME: should we discard invalid pixels from mean completely and not
         # just count them as zeros?

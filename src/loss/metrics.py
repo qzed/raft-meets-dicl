@@ -65,7 +65,7 @@ class EndPointError(Metric):
     def compute(self, estimate, target, valid):
         # end-point error for each individual pixel
         # note: input may be batch or single instance, thus use dim=-3
-        epe = torch.norm(estimate - target, p=2, dim=-3)
+        epe = torch.linalg.vector_norm(estimate - target, ord=2, dim=-3)
 
         # filter out invalid pixels (yields list of valid pixels)
         epe = epe[valid]
