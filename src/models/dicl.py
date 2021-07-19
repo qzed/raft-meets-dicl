@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..loss import Loss
+from .common import Result
 
 
 class ConvBlock(nn.Sequential):
@@ -518,14 +519,29 @@ class Dicl(nn.Module):
             flow5, flow5_raw,
             flow6, flow6_raw,
         ]
+        flow = [f for f in flow if f is not None]
 
-        return [self.upsample(f, img1.shape) for f in flow if f is not None]
+        return DiclResult(flow, img1.shape)
 
-    def upsample(self, flow, shape):
+
+class DiclResult(Result):
+    def __init__(self, output, target_shape):
+        super().__init__()
+
+        self.result = output
+        self.shape = target_shape
+        self.mode = 'bilinear'
+
+    def output(self):
+        return self.result
+
+    def final(self):
+        flow = self.result[0]
+
         _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = shape
+        _b, _c, th, tw = self.shape
 
-        flow = F.interpolate(flow, (th, tw), mode='bilinear', align_corners=True)
+        flow = F.interpolate(flow.detach(), (th, tw), mode=self.mode, align_corners=True)
         flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
@@ -533,23 +549,27 @@ class Dicl(nn.Module):
 
 
 class MultiscaleLoss(Loss):
-    def __init__(self, ord: Union[str, float], weights: List[float]):
+    def __init__(self, ord: Union[str, float], weights: List[float], mode: str = 'bilinear'):
         super().__init__()
 
         self.ord = ord if ord == 'robust' else float(ord)
         self.weights = weights
+        self.mode = mode
 
     def get_config(self):
         return {
             'type': 'dicl/multiscale',
             'ord': str(self.ord) if self.ord in (np.inf, -np.inf) else self.ord,
             'weights': self.weights,
+            'mode': self.mode,
         }
 
     def compute(self, result, target, valid):
         loss = 0.0
 
         for i, flow in enumerate(result):
+            flow = self.upsample(flow, target.shape)
+
             # compute flow distance according to specified norm
             if self.ord == 'robust':    # robust norm as defined in original DICL implementation
                 dist = ((flow - target).abs().sum(dim=-3) + 1e-8)**0.4
@@ -564,3 +584,13 @@ class MultiscaleLoss(Loss):
 
         # normalize for our convenience
         return loss / len(result)
+
+    def upsample(self, flow, shape):
+        _b, _c, fh, fw = flow.shape
+        _b, _c, th, tw = shape
+
+        flow = F.interpolate(flow, (th, tw), mode=self.mode, align_corners=True)
+        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
+        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
+
+        return flow

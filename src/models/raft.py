@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from ..loss import Loss
+from .common import Result
 
 
 def _make_norm2d(ty, num_channels, num_groups):
@@ -424,6 +425,19 @@ class Raft(nn.Module):
             out.append(flow_up)
 
         return out
+
+
+class RaftResult(Result):
+    def __init__(self, output):
+        super().__init__()
+
+        self.result = output
+
+    def output(self):
+        return self.result
+
+    def final(self):
+        return self.result[-1]
 
 
 class SequenceLoss(Loss):
