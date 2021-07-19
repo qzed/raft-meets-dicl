@@ -74,8 +74,8 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-def sequence_loss(flow_est, target, valid, gamma=0.8, max_flow=400):
-    loss_fn = models.raft.SequenceLoss(ord=1, gamma=gamma)
+def sequence_loss(flow_est, target, valid):
+    loss_fn = models.raft.SequenceLoss(ord=1, gamma=0.8)
 
     # compute combined loss
     loss = loss_fn(flow_est, target, valid)
@@ -90,7 +90,7 @@ def sequence_loss(flow_est, target, valid, gamma=0.8, max_flow=400):
     return loss, metrics
 
 
-def multiscale_up(flow_est, target, valid, max_flow=400):
+def multiscale_up(flow_est, target, valid):
     weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
     loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
 
