@@ -73,39 +73,6 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-def sequence_loss(result, target, valid):
-    loss_fn = models.raft.SequenceLoss(ord=1, gamma=0.8)
-
-    # compute combined loss
-    loss = loss_fn(result.output(), target, valid)
-
-    # compute end-point error metrics of final result
-    with torch.no_grad():
-        metrics = L.metrics.EndPointError(distances=[1, 3, 5])
-        metrics = metrics(result.final(), target, valid)
-
-        metrics['Loss/train'] = loss.detach().item()
-
-    return loss, metrics
-
-
-def multiscale_up(result, target, valid):
-    weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
-    loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
-
-    # compute combined loss
-    loss = loss_fn(result.output(), target, valid)
-
-    # compute end-point error and metrics for top-level output
-    with torch.no_grad():
-        metrics = L.metrics.EndPointError(distances=[1, 3, 5])
-        metrics = metrics(result.final(), target, valid)
-
-        metrics['Loss/train'] = loss.detach().item()
-
-    return loss, metrics
-
-
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
@@ -169,6 +136,13 @@ def main():
     logging.info(f"set up model with {n_params} parameters")
     logging.info(f"model:\n{model}")
 
+    # setup loss function
+    weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
+    loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
+
+    # setup metrics
+    metrics_fn = L.metrics.EndPointError(distances=[1, 3, 5])
+
     # setup optimizer
     logging.info(f"setting up optimizer")
 
@@ -192,14 +166,13 @@ def main():
         # TODO: for DICL images need to be of size % 128 == 0
 
         result = model(img1, img2, raw=True)
+        final = result.final()
 
         if i % 100 == 0:
-            flow_est = result.final()
-
             ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
             ft = visual.flow_to_rgb(ft)
 
-            fe = flow_est[0].detach().cpu().permute(1, 2, 0).numpy()
+            fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
             fe = visual.flow_to_rgb(fe)
 
             writer.add_image('img1', img1[0].detach().cpu(), i, dataformats='CHW')
@@ -207,7 +180,15 @@ def main():
             writer.add_image('flow', ft, i, dataformats='HWC')
             writer.add_image('flow-est', fe, i, dataformats='HWC')
 
-        loss, metrics = multiscale_up(result, flow, valid)
+        # compute loss
+        loss = loss_fn(result.output(), flow, valid)
+
+        # compute metrics
+        with torch.no_grad():
+            metrics = metrics_fn(final, flow, valid)
+            metrics['Loss/train'] = loss.detach().item()
+
+        # backprop
         loss.backward()
 
         nn.utils.clip_grad_norm_(model.parameters(), clip)
