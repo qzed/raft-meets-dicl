@@ -13,8 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..loss import Loss
-from .common import Result
+from .common import Loss, Result
 
 
 class ConvBlock(nn.Sequential):

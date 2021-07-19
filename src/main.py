@@ -20,7 +20,7 @@ from . import data
 from . import models
 from . import utils
 from . import visual
-from . import loss as L
+from . import metrics as M
 
 
 class Context:
@@ -141,7 +141,7 @@ def main():
     loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
 
     # setup metrics
-    metrics_fn = L.metrics.EndPointError(distances=[1, 3, 5])
+    metrics_fn = M.EndPointError(distances=[1, 3, 5])
 
     # setup optimizer
     logging.info(f"setting up optimizer")
