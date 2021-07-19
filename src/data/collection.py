@@ -1,3 +1,6 @@
+from .adapter import TorchAdapter
+
+
 class Collection:
     def __init__(self):
         pass
@@ -10,3 +13,6 @@ class Collection:
 
     def __len__(self):
         raise NotImplementedError
+
+    def torch(self):
+        return TorchAdapter(self)

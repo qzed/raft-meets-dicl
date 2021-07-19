@@ -1,3 +1,4 @@
+from . import adapter
 from . import augment
 from . import collection
 from . import config

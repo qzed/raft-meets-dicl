@@ -101,7 +101,7 @@ def main():
 
     # load training dataset
     logging.info(f"loading data from configuration: file='{args.data}'")
-    train_dataset = data.load(args.data)
+    train_dataset = data.load(args.data).torch()
     train_loader = td.DataLoader(train_dataset, batch_size=batch_size, pin_memory=False,
                                  shuffle=True, num_workers=4, drop_last=True)
 
@@ -156,11 +156,10 @@ def main():
     for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
         opt.zero_grad()
 
-        # transform to (batch, channels, h, w)
-        # TODO: make torch-adapter for dataset?
-        img1 = img1.float().permute(0, 3, 1, 2).cuda()
-        img2 = img2.float().permute(0, 3, 1, 2).cuda()
-        flow = flow.float().permute(0, 3, 1, 2).cuda()
+        # move to cuda device
+        img1 = img1.cuda()
+        img2 = img2.cuda()
+        flow = flow.cuda()
         valid = valid.cuda()
 
         # convert images from range [0, 1] to range [-1, 1]
