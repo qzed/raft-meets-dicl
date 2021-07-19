@@ -163,7 +163,8 @@ def main():
         valid = valid.cuda()
 
         # convert images from range [0, 1] to range [-1, 1]
-        img1, img2 = 2.0 * img1 - 1.0, 2.0 * img2 - 1.0
+        img1 = 2.0 * torch.clamp(img1, 0.0, 1.0) - 1.0
+        img2 = 2.0 * torch.clamp(img2, 0.0, 1.0) - 1.0
 
         # TODO: for DICL images need to be of size % 128 == 0
 
