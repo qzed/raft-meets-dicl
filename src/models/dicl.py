@@ -491,8 +491,6 @@ class Dicl(nn.Module):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2, raw=False):
-        batch, c, h, w = img1.shape
-
         # convert images from range [0, 1] to range [-1, 1]
         img1, img2 = 2.0 * img1 - 1.0, 2.0 * img2 - 1.0
 
@@ -509,8 +507,22 @@ class Dicl(nn.Module):
 
         # note: flow2 is returned at 1/4th resolution of input image
 
-        if raw:
-            return (flow2, flow2_raw, flow3, flow3_raw, flow4, flow4_raw,
-                    flow5, flow5_raw, flow6, flow6_raw)
-        else:
-            return flow2, flow3, flow4, flow5, flow6
+        flow = [
+            flow2, flow2_raw,
+            flow3, flow3_raw,
+            flow4, flow4_raw,
+            flow5, flow5_raw,
+            flow6, flow6_raw,
+        ]
+
+        return [self.upsample(f, img1.shape) for f in flow if f is not None]
+
+    def upsample(self, flow, shape):
+        _b, _c, fh, fw = flow.shape
+        _b, _c, th, tw = shape
+
+        flow = F.interpolate(flow, (th, tw), mode='bilinear', align_corners=True)
+        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
+        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
+
+        return flow

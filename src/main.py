@@ -110,13 +110,6 @@ def multiscale_up(flow_est, target, valid, max_flow=400):
 
     # compute combined loss
     for i, est in enumerate(flow_est):
-        _b, _c, eh, ew = est.shape
-
-        # scale-up output to target
-        est = F.interpolate(est, (h, w), mode='bilinear', align_corners=True)
-        est[:, 0, :, :] = est[:, 0, :, :] * (w / ew)
-        est[:, 1, :, :] = est[:, 1, :, :] * (h / eh)
-
         # compute error vectors and distance to actual endpoints (end-point error)
         epe = (est - target) * valid[:, None]
         epe = torch.norm(epe, p=2, dim=1)
