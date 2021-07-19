@@ -347,6 +347,34 @@ class OcclusionBackward(Occlusion):
         return self._patch(img1), img2, flow, valid
 
 
+class RestrictFlowMagnitude(Augmentation):
+    type = 'restrict-flow-magnitude'
+
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected '{cls.type}'")
+
+        maximum = float(cfg['maximum'])
+
+        return cls(maximum)
+
+    def __init__(self, maximum):
+        super().__init__()
+
+        self.maximum = maximum
+
+    def get_config(self):
+        return {
+            'type': 'flow-filter',
+            'maximum': self.maximum,
+        }
+
+    def process(self, img1, img2, flow, valid):
+        mag = np.linalg.norm(flow, ord=2, axis=-1)
+        return img1, img2, flow, valid & (mag < self.maximum)
+
+
 class Scale(Augmentation):
     @classmethod
     def _from_config(cls, cfg):
@@ -502,6 +530,7 @@ def _build_augmentation(cfg):
         'noise-normal': NoiseNormal.from_config,
         'occlusion-forward': OcclusionForward.from_config,
         'occlusion-backward': OcclusionBackward.from_config,
+        'restrict-flow-magnitude': RestrictFlowMagnitude.from_config,
         'scale': Scale.from_config,
         'scale-sparse': ScaleSparse.from_config,
     }

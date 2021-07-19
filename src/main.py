@@ -77,10 +77,6 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 def sequence_loss(flow_est, target, valid, gamma=0.8, max_flow=400):
     loss_fn = models.raft.SequenceLoss(ord=1, gamma=gamma)
 
-    # exclude invalid pixels and extremely large displacements
-    target_mag = torch.linalg.vector_norm(target, ord=2, dim=1)
-    valid = valid & (target_mag < max_flow)
-
     # compute combined loss
     loss = loss_fn(flow_est, target, valid)
 
@@ -97,10 +93,6 @@ def sequence_loss(flow_est, target, valid, gamma=0.8, max_flow=400):
 def multiscale_up(flow_est, target, valid, max_flow=400):
     weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
     loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
-
-    # exclude invalid pixels and extremely large displacements
-    target_mag = torch.linalg.vector_norm(target, ord=2, dim=1)
-    valid = valid & (target_mag < max_flow)
 
     # compute combined loss
     loss = loss_fn(flow_est, target, valid)
