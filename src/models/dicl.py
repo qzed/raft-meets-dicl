@@ -552,7 +552,7 @@ class MultiscaleLoss(Loss):
         for i, flow in enumerate(result):
             # compute flow distance according to specified norm
             if self.ord == 'robust':    # robust norm as defined in original DICL implementation
-                dist = ((flow - target).abs().sum(dim=1) + 1e-8)**0.4
+                dist = ((flow - target).abs().sum(dim=-3) + 1e-8)**0.4
             else:                       # generic L{self.ord}-norm
                 dist = torch.linalg.vector_norm(flow - target, ord=self.ord, dim=-3)
 
