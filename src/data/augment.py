@@ -48,6 +48,13 @@ class Augment(Collection):
 
 
 class Augmentation:
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected '{cls.type}'")
+
     def __init__(self):
         pass
 
@@ -62,10 +69,11 @@ class Augmentation:
 
 
 class ColorJitter(Augmentation):
+    type = 'color-jitter'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'color-jitter':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'color-jitter'")
+        cls._typecheck(cfg)
 
         prob_asymmetric = cfg['prob-asymmetric']
         brightness = cfg['brightness']
@@ -88,7 +96,7 @@ class ColorJitter(Augmentation):
 
     def get_config(self):
         return {
-            'type': 'color-jitter',
+            'type': self.type,
             'prob-asymmetric': self.prob_asymmetric,
             'brightness': self.brightness,
             'contrast': self.contrast,
@@ -115,10 +123,11 @@ class ColorJitter(Augmentation):
 
 
 class Crop(Augmentation):
+    type = 'crop'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'crop':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'crop'")
+        cls._typecheck(cfg)
 
         size = list(cfg['size'])
         if len(size) != 2:
@@ -133,7 +142,7 @@ class Crop(Augmentation):
 
     def get_config(self):
         return {
-            'type': 'crop',
+            'type': self.type,
             'size': self.size,
         }
 
@@ -155,10 +164,11 @@ class Crop(Augmentation):
 
 
 class Flip(Augmentation):
+    type = 'flip'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'flip':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'flip'")
+        cls._typecheck(cfg)
 
         prob = list(cfg['probability'])
         if len(prob) != 2:
@@ -173,7 +183,7 @@ class Flip(Augmentation):
 
     def get_config(self):
         return {
-            'type': 'flip',
+            'type': self.type,
             'probability': self.probability,
         }
 
@@ -196,10 +206,11 @@ class Flip(Augmentation):
 
 
 class NoiseNormal(Augmentation):
+    type = 'noise-normal'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'noise-normal':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'noise'")
+        cls._typecheck(cfg)
 
         stddev = cfg['stddev']
         if isinstance(stddev, list):
@@ -217,7 +228,7 @@ class NoiseNormal(Augmentation):
 
     def get_config(self):
         return {
-            'type': 'noise-normal',
+            'type': self.type,
             'stddev': self.stddev,
         }
 
@@ -239,6 +250,8 @@ class NoiseNormal(Augmentation):
 class Occlusion(Augmentation):
     @classmethod
     def _from_config(cls, cfg):
+        cls._typecheck(cfg)
+
         probability = cfg['probability']
 
         num = cfg['num']
@@ -269,9 +282,9 @@ class Occlusion(Augmentation):
         self.min_size = min_size
         self.max_size = max_size
 
-    def _get_config(self, ty):
+    def get_config(self):
         return {
-            'type': ty,
+            'type': self.type,
             'probability': self.probability,
             'num': self.num,
             'min-size': self.min_size,
@@ -310,38 +323,28 @@ class Occlusion(Augmentation):
 
 
 class OcclusionForward(Occlusion):
+    type = 'occlusion-forward'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'occlusion-forward':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected "
-                             "'occlusion-forward'")
-
         return cls._from_config(cfg)
 
     def __init__(self, probability, num, min_size, max_size):
         super().__init__(probability, num, min_size, max_size)
-
-    def get_config(self):
-        return self._get_config('occlusion-forward')
 
     def process(self, img1, img2, flow, valid):
         return img1, self._patch(img2), flow, valid
 
 
 class OcclusionBackward(Occlusion):
+    type = 'occlusion-backward'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'occlusion-backward':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected "
-                             "'occlusion-backward'")
-
         return cls._from_config(cfg)
 
     def __init__(self, probability, num, min_size, max_size):
         super().__init__(probability, num, min_size, max_size)
-
-    def get_config(self):
-        return self._get_config('occlusion-backward')
 
     def process(self, img1, img2, flow, valid):
         return self._patch(img1), img2, flow, valid
@@ -352,8 +355,7 @@ class RestrictFlowMagnitude(Augmentation):
 
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != cls.type:
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected '{cls.type}'")
+        cls._typecheck(cfg)
 
         maximum = float(cfg['maximum'])
 
@@ -376,8 +378,12 @@ class RestrictFlowMagnitude(Augmentation):
 
 
 class Scale(Augmentation):
+    type = 'scale'
+
     @classmethod
-    def _from_config(cls, cfg):
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
         min_size = list(cfg.get('min-size', [0, 0]))
         if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
             raise ValueError('invalid min-size, expected list with two unsigned integers')
@@ -396,13 +402,6 @@ class Scale(Augmentation):
         mode = cfg.get('mode', 'linear')
 
         return cls(min_size, min_scale, max_scale, mode)
-
-    @classmethod
-    def from_config(cls, cfg):
-        if cfg['type'] != 'scale':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale'")
-
-        return cls._from_config(cfg)
 
     def __init__(self, min_size, min_scale, max_scale, mode):
         super().__init__()
@@ -423,17 +422,14 @@ class Scale(Augmentation):
         else:
             raise ValueError(f"invalid scaling mode '{mode}'")
 
-    def _get_config(self, ty):
+    def get_config(self):
         return {
-            'type': ty,
+            'type': self.type,
             'min-size': self.min_size,
             'min-scale': self.min_scale,
             'max-scale': self.max_scale,
             'mode': self.mode,
         }
-
-    def get_config(self):
-        return self._get_config('scale')
 
     def process(self, img1, img2, flow, valid):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
@@ -461,18 +457,10 @@ class Scale(Augmentation):
 
 
 class ScaleSparse(Scale):
-    @classmethod
-    def from_config(cls, cfg):
-        if cfg['type'] != 'scale-sparse':
-            raise ValueError(f"invalid augmentation type '{cfg['type']}', expected 'scale-sparse'")
-
-        return cls._from_config(cfg)
+    type = 'scale-sparse'
 
     def __init__(self, min_size, min_scale, max_scale, mode):
         super().__init__(min_size, min_scale, max_scale, mode)
-
-    def get_config(self):
-        return self._get_config('scale-sparse')
 
     def process(self, img1, img2, flow, valid):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
@@ -523,23 +511,25 @@ class ScaleSparse(Scale):
 
 
 def _build_augmentation(cfg):
-    types = {
-        'color-jitter': ColorJitter.from_config,
-        'crop': Crop.from_config,
-        'flip': Flip.from_config,
-        'noise-normal': NoiseNormal.from_config,
-        'occlusion-forward': OcclusionForward.from_config,
-        'occlusion-backward': OcclusionBackward.from_config,
-        'restrict-flow-magnitude': RestrictFlowMagnitude.from_config,
-        'scale': Scale.from_config,
-        'scale-sparse': ScaleSparse.from_config,
-    }
+    types = [
+        ColorJitter,
+        Crop,
+        Flip,
+        NoiseNormal,
+        OcclusionForward,
+        OcclusionBackward,
+        RestrictFlowMagnitude,
+        Scale,
+        ScaleSparse,
+    ]
+
+    types = {cls.type: cls for cls in types}
 
     ty = cfg['type']
     if ty not in types.keys():
         raise ValueError(f"unknown augmentation type '{ty}'")
 
-    return types[ty](cfg)
+    return types[ty].from_config(cfg)
 
 
 def load_from_config(path, cfg):
