@@ -35,6 +35,9 @@ augmentations:
   - type: noise-normal
     stddev: 0.002
 
+  - type: restrict-flow-magnitude
+    maximum: 400
+
 source:
   type: repeat
   times: 100
