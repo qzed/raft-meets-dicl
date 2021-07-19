@@ -97,36 +97,24 @@ def sequence_loss(flow_est, flow_gt, valid, gamma=0.8, max_flow=400):
 
 
 def multiscale_up(flow_est, target, valid, max_flow=400):
-    batch, _c, h, w = target.shape
-
     weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
-
-    loss = 0.0
-    metrics = {}
+    loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
 
     # exclude invalid pixels and extremely large displacements
     target_mag = torch.linalg.vector_norm(target, ord=2, dim=1)
     valid = valid & (target_mag < max_flow)
 
     # compute combined loss
-    for i, est in enumerate(flow_est):
-        # compute error vectors and distance to actual endpoints (end-point error)
-        epe = (est - target) * valid[:, None]
-        epe = torch.linalg.vector_norm(epe, ord=2, dim=1)
+    loss = loss_fn(flow_est, target, valid)
 
-        # FIXME: should we discard invalid pixels from mean completely and not
-        # just count them as zeros?
+    # compute end-point error and metrics for top-level output
+    with torch.no_grad():
+        metrics = L.metrics.EndPointError(distances=[1, 3, 5])
+        metrics = metrics(flow_est[0], target, valid)
 
-        # update sum of L2 losses
-        loss = loss + epe.mean() * weights[i]
+        metrics['Loss/train'] = loss.detach().item()
 
-        # compute end-point error and metrics for top-level output
-        if i == 0:
-            with torch.no_grad():
-                epe = L.metrics.EndPointError(distances=[1, 3, 5])
-                metrics = epe(est, target, valid)
-
-    return loss / len(flow_est), metrics
+    return loss, metrics
 
 
 def main():

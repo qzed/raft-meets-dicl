@@ -5,11 +5,15 @@
 # Link: https://github.com/jytime/DICL-Flow
 
 import itertools
+from typing import List, Union
+
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from ..loss import Loss
 
 
 class ConvBlock(nn.Sequential):
@@ -526,3 +530,37 @@ class Dicl(nn.Module):
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
         return flow
+
+
+class MultiscaleLoss(Loss):
+    def __init__(self, ord: Union[str, float], weights: List[float]):
+        super().__init__()
+
+        self.ord = ord if ord == 'robust' else float(ord)
+        self.weights = weights
+
+    def get_config(self):
+        return {
+            'type': 'dicl/multiscale',
+            'ord': str(self.ord) if self.ord in (np.inf, -np.inf) else self.ord,
+            'weights': self.weights,
+        }
+
+    def compute(self, result, target, valid):
+        loss = 0.0
+
+        for i, flow in enumerate(result):
+            # compute flow distance according to specified norm
+            if self.ord == 'robust':    # robust norm as defined in original DICL implementation
+                dist = ((flow - target).abs().sum(dim=1) + 1e-8)**0.4
+            else:                       # generic L{self.ord}-norm
+                dist = torch.linalg.vector_norm(flow - target, ord=self.ord, dim=-3)
+
+            # only calculate error for valid pixels
+            dist = dist[valid]
+
+            # update loss
+            loss = loss + self.weights[i] * dist.mean()
+
+        # normalize for our convenience
+        return loss / len(result)
