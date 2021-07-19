@@ -74,24 +74,22 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-def sequence_loss(flow_est, flow_gt, valid, gamma=0.8, max_flow=400):
-    n_predictions = len(flow_est)
-    loss = 0.0
+def sequence_loss(flow_est, target, valid, gamma=0.8, max_flow=400):
+    loss_fn = models.raft.SequenceLoss(ord=1, gamma=gamma)
 
     # exclude invalid pixels and extremely large displacements
-    mag = torch.sum(flow_gt**2, dim=1).sqrt()
-    valid = valid & (mag < max_flow)
+    target_mag = torch.linalg.vector_norm(target, ord=2, dim=1)
+    valid = valid & (target_mag < max_flow)
 
-    # compute weighted L1 loss over layer estimates
-    for i, est in enumerate(flow_est):
-        # FIXME: should we discard invalid pixels from mean completely and not
-        # just count them as zeros?
-        lvl_loss = (est - flow_gt).abs() * valid[:, None]           # L1 loss   # FIXME: this is not a L1 norm...
-        loss += gamma**(n_predictions - i - 1) * lvl_loss.mean()    # add level mean mult. by weight
+    # compute combined loss
+    loss = loss_fn(flow_est, target, valid)
 
     # compute end-point error metrics of final result
-    epe = L.metrics.EndPointError(distances=[1, 3, 5])
-    metrics = epe(flow_est[-1], flow_gt, valid)
+    with torch.no_grad():
+        metrics = L.metrics.EndPointError(distances=[1, 3, 5])
+        metrics = metrics(flow_est[-1], target, valid)
+
+        metrics['Loss/train'] = loss.detach().item()
 
     return loss, metrics
 

@@ -6,9 +6,13 @@
 # Link: https://github.com/princeton-vl/RAFT
 # License: BSD 3-Clause License
 
+from typing import Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+from ..loss import Loss
 
 
 def _make_norm2d(ty, num_channels, num_groups):
@@ -420,3 +424,40 @@ class Raft(nn.Module):
             out.append(flow_up)
 
         return out
+
+
+class SequenceLoss(Loss):
+    def __init__(self, ord: Union[str, float] = 1, gamma: float = 0.8):
+        super().__init__()
+
+        self.ord = float(ord)
+        self.gamma = gamma
+
+    def get_config(self):
+        return {
+            'type': 'raft/sequence',
+            'ord': self.ord,
+            'gamma': self.gamma,
+        }
+
+    def compute(self, result, target, valid):
+        n_predictions = len(result)
+
+        loss = 0.0
+        for i, flow in enumerate(result):
+            # compute weight for sequence index
+            weight = self.gamma**(n_predictions - i - 1)
+
+            # compute flow distance according to specified norm (L1 in orig. impl.)
+            dist = torch.linalg.vector_norm(flow - target, ord=self.ord, dim=-3)
+
+            # Only calculate error for valid pixels. N.b.: This is a difference
+            # to the original implementation, where invalid pixels are included
+            # in the mean as zero loss, skewing it (this should not make much
+            # of a difference wrt. optimization).
+            dist = dist[valid]
+
+            # update loss
+            loss = loss + weight * dist.mean()
+
+        return loss
