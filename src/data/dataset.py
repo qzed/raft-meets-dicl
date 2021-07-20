@@ -406,6 +406,12 @@ class Split:
 # Note: Tensors returned by loaders are numpy arrays in shape (height, width,
 # channels). Values are floats in range [0, 1].
 class FileLoader:
+    @classmethod
+    def _typecheck(cls, cfg):
+        ty = cfg['type'] if isinstance(cfg, dict) else cfg
+        if ty != cls.type:
+            raise ValueError(f"invalid loader type '{cfg['type']}', expected '{cls.type}'")
+
     def __init__(self):
         pass
 
@@ -417,15 +423,18 @@ class FileLoader:
 
 
 class GenericImageLoader(FileLoader):
+    type = 'generic-image'
+
     @classmethod
     def from_config(cls, cfg):
+        cls._typecheck(cfg)
         return cls()
 
     def __init__(self):
         super().__init__()
 
     def get_config(self):
-        return 'generic-image'
+        return self.type
 
     def load(self, file):
         if file is None:
@@ -448,8 +457,12 @@ class GenericImageLoader(FileLoader):
 
 
 class GenericFlowLoader(FileLoader):
+    type = 'generic-flow'
+
     @classmethod
     def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
         uvmax = None
 
         if isinstance(cfg, dict):
@@ -474,7 +487,7 @@ class GenericFlowLoader(FileLoader):
 
     def get_config(self):
         return {
-            'type': 'generic-flow',
+            'type': self.type,
             'uvmax': self.max_uv,
         }
 
@@ -507,15 +520,16 @@ class GenericFlowLoader(FileLoader):
 
 def _build_loader(cfg):
     loaders = {
-        'generic-image': GenericImageLoader.from_config,
-        'generic-flow': GenericFlowLoader.from_config,
+        GenericImageLoader,
+        GenericFlowLoader,
     }
+    loaders = {cls.type: cls for cls in loaders}
 
     ty = cfg['type'] if isinstance(cfg, dict) else cfg
     if ty not in loaders.keys():
         raise ValueError(f"unknown layout type '{ty}'")
 
-    return loaders[ty](cfg)
+    return loaders[ty].from_config(cfg)
 
 
 def _build_layout(cfg):
