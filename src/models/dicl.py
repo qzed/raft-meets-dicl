@@ -5,15 +5,17 @@
 # Link: https://github.com/jytime/DICL-Flow
 
 import itertools
+from collections import OrderedDict
 from typing import List, Union
 
 import numpy as np
+import parse
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .common import Loss, Result
+from .common import Loss, Model, Result
 
 
 class ConvBlock(nn.Sequential):
@@ -466,7 +468,7 @@ class FlowLevel(nn.Module):
         return est1 * mask, mask
 
 
-class Dicl(nn.Module):
+class DiclModule(nn.Module):
     def __init__(self, disp_ranges, ctx_scale, dap_init='identity'):
         super().__init__()
 
@@ -518,9 +520,55 @@ class Dicl(nn.Module):
             flow5, flow5_raw,
             flow6, flow6_raw,
         ]
-        flow = [f for f in flow if f is not None]
 
-        return DiclResult(flow, img1.shape)
+        return [f for f in flow if f is not None]
+
+
+class Dicl(Model):
+    type = 'dicl/baseline'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        def parse_level_list(cfg):
+            pattern = parse.compile("level-{:d}")
+            levels = {}
+
+            for k, v in cfg.items():
+                levels[pattern.parse(k).fixed[0]] = v
+
+            return levels
+
+        param_cfg = cfg['parameters']
+        disp_ranges = parse_level_list(param_cfg['displacement-range'])
+        ctx_scale = parse_level_list(param_cfg['context-scale'])
+        dap_init = param_cfg.get('dap-init', 'identity')
+
+        return cls(disp_ranges, ctx_scale, dap_init)
+
+    def __init__(self, disp_ranges, ctx_scale, dap_init='identity'):
+        self.ctx_scale = ctx_scale
+        self.disp_ranges = disp_ranges
+        self.dap_init = dap_init
+
+        super().__init__(DiclModule(disp_ranges, ctx_scale, dap_init))
+
+    def get_config(self):
+        disp = [(f"level-{k}", v) for k, v in self.disp_ranges.items()]
+        scale = [(f"level-{k}", v) for k, v in self.ctx_scale.items()]
+
+        return {
+            'type': self.type,
+            'parameters': {
+                'displacement-range': OrderedDict(sorted(disp, reverse=True)),
+                'context-scale': OrderedDict(sorted(scale, reverse=True)),
+                'dap-init': self.dap_init,
+            },
+        }
+
+    def forward(self, img1, img2, raw=False):
+        return DiclResult(self.module(img1, img2, raw), img1.shape)
 
 
 class DiclResult(Result):

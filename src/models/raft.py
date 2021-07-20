@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .common import Loss, Result
+from .common import Loss, Model, Result
 
 
 def _make_norm2d(ty, num_channels, num_groups):
@@ -322,7 +322,7 @@ class BasicUpdateBlock(nn.Module):
         return h, mask, d
 
 
-class Raft(nn.Module):
+class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
     def __init__(self, dropout=0.0, mixed_precision=False):
@@ -421,6 +421,38 @@ class Raft(nn.Module):
             out.append(flow_up)
 
         return out
+
+
+class Raft(Model):
+    type = 'raft/baseline'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        param_cfg = cfg['parameters']
+        dropout = float(param_cfg.get('dropout', 0.0))
+        mixed_precision = bool(param_cfg.get('mixed-precision', False))
+
+        return cls(dropout, mixed_precision)
+
+    def __init__(self, dropout=0.0, mixed_precision=False):
+        self.dropout = dropout
+        self.mixed_precision = mixed_precision
+
+        super().__init__(RaftModule(dropout, mixed_precision))
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'parameters': {
+                'dropout': self.dropout,
+                'mixed-precision': self.mixed_precision,
+            },
+        }
+
+    def forward(self, img1, img2, iterations=12, flow_init=None):
+        return RaftResult(self.module(img1, img2, iterations, flow_init))
 
 
 class RaftResult(Result):

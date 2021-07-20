@@ -1,3 +1,23 @@
+import torch.nn as nn
+
+
+class Model(nn.Module):
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid loss type '{cfg['type']}', expected '{cls.type}'")
+
+    def __init__(self, module):
+        super().__init__()
+
+        self.module = module
+
+    def get_config(self):
+        raise NotImplementedError
+
+
 class Result:
     def __init__(self):
         pass
