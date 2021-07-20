@@ -2,23 +2,24 @@ from pathlib import Path
 
 from ..utils import config
 
-from . import dataset
 from . import augment
+from . import dataset
 from . import repeat
 
 
 def _load(path, cfg):
-    types = {
-        'dataset': dataset.load_instance_from_config,
-        'augment': augment.load_from_config,
-        'repeat': repeat.load_from_config,
-    }
+    types = [
+        dataset.Dataset,
+        augment.Augment,
+        repeat.Repeat,
+    ]
+    types = {ty.type: ty for ty in types}
 
     ty = cfg['type']
     if ty not in types.keys():
         raise ValueError(f"unknown data collection type '{ty}'")
 
-    return types[ty](path, cfg)
+    return types[ty].from_config(path, cfg)
 
 
 def load(path, cfg=None):

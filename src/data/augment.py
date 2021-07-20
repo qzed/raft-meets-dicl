@@ -15,6 +15,23 @@ from .collection import Collection
 
 
 class Augment(Collection):
+    type = 'augment'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+
+        augs = cfg['augmentations']
+        source = cfg['source']
+
+        # build augmentations
+        if augs is None:
+            augs = []
+
+        augs = [_build_augmentation(acfg) for acfg in augs]
+
+        return Augment(augs, config.load(path, source))
+
     def __init__(self, augmentations, source):
         super().__init__()
 
@@ -23,7 +40,7 @@ class Augment(Collection):
 
     def get_config(self):
         return {
-            'type': 'augment',
+            'type': self.type,
             'augmentations': [a.get_config() for a in self.augmentations],
             'source': self.source.get_config(),
         }
@@ -530,19 +547,3 @@ def _build_augmentation(cfg):
         raise ValueError(f"unknown augmentation type '{ty}'")
 
     return types[ty].from_config(cfg)
-
-
-def load_from_config(path, cfg):
-    if cfg['type'] != 'augment':
-        raise ValueError(f"invalid dataset type '{cfg['type']}', expected 'augment'")
-
-    augs = cfg['augmentations']
-    source = cfg['source']
-
-    # build augmentations
-    if augs is None:
-        augs = []
-
-    augs = [_build_augmentation(acfg) for acfg in augs]
-
-    return Augment(augs, config.load(path, source))

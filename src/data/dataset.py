@@ -9,6 +9,13 @@ from ..utils import config
 
 
 class Dataset(Collection):
+    type = 'dataset'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+        return _load_instance_from_config(path, cfg)
+
     def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
                  flow_loader):
         super().__init__()
@@ -36,7 +43,7 @@ class Dataset(Collection):
 
     def get_config(self):
         return {
-            'type': 'dataset',
+            'type': self.type,
             'spec': {
                 'id': self.id,
                 'name': self.name,
@@ -517,7 +524,7 @@ def _build_layout(cfg):
     return layouts[ty](cfg)
 
 
-def load_dataset_from_config(path, cfg, params=dict()):
+def _load_dataset_from_config(path, cfg, params=dict()):
     path = Path(path)
 
     # load base dataset config
@@ -548,7 +555,7 @@ def load_dataset_from_config(path, cfg, params=dict()):
                    image_loader, flow_loader)
 
 
-def load_instance_from_config(path, cfg):
+def _load_instance_from_config(path, cfg):
     path = Path(path)
 
     spec = cfg['spec']
@@ -558,4 +565,4 @@ def load_instance_from_config(path, cfg):
         specfile, spec = spec, config.load(path / spec)
         path = (path / specfile).parent
 
-    return load_dataset_from_config(path, spec, params)
+    return _load_dataset_from_config(path, spec, params)

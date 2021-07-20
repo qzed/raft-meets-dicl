@@ -3,6 +3,17 @@ from .collection import Collection
 
 
 class Repeat(Collection):
+    type = 'repeat'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+
+        times = cfg['times']
+        source = cfg['source']
+
+        return Repeat(times, config.load(path, source))
+
     def __init__(self, times, source):
         super().__init__()
         self.times = times
@@ -10,7 +21,7 @@ class Repeat(Collection):
 
     def get_config(self):
         return {
-            'type': 'repeat',
+            'type': self.type,
             'times': self.times,
             'source': self.source.get_config(),
         }
@@ -26,13 +37,3 @@ class Repeat(Collection):
 
     def __len__(self):
         return self.times * len(self.source)
-
-
-def load_from_config(path, cfg):
-    if cfg['type'] != 'repeat':
-        raise ValueError(f"invalid dataset type '{cfg['type']}', expected 'repeat'")
-
-    times = cfg['times']
-    source = cfg['source']
-
-    return Repeat(times, config.load(path, source))
