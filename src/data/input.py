@@ -37,9 +37,6 @@ class Input:
         self.clip = clip
         self.range = range
 
-    def get_config(self):
-        return self.source.get_config()
-
     def __getitem__(self, index):
         img1, img2, flow, valid, key = self.source[index]
 
@@ -61,9 +58,6 @@ class Input:
 class TorchAdapter:
     def __init__(self, source):
         self.source = source
-
-    def get_config(self):
-        return self.source.get_config()
 
     def __getitem__(self, index):
         img1, img2, flow, valid, key = self.source[index]

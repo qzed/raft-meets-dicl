@@ -141,7 +141,7 @@ def main():
                                           cycle_momentum=False, anneal_strategy='linear')
 
     # dump config
-    ctx.dump_config(seeds, train_input, model, loss_fn, input_cfg)
+    ctx.dump_config(seeds, train_source, model, loss_fn, input_cfg)
 
     # training loop
     model = nn.DataParallel(model)
