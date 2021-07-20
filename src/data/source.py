@@ -8,7 +8,7 @@ from .collection import Collection
 from ..utils import config
 
 
-class Dataset(Collection):
+class DataSource(Collection):
     def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
                  flow_loader):
         super().__init__()
@@ -32,7 +32,7 @@ class Dataset(Collection):
             self.files = self.split.filter(self.files, param_vals)
 
     def __str__(self):
-        return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
+        return f"DataSource {{ name: '{self.name}', path: '{self.path}' }} "
 
     def get_config(self):
         return {
@@ -544,8 +544,8 @@ def load_dataset_from_config(path, cfg, params=dict()):
         image_loader = _build_loader('generic-image')
         flow_loader = _build_loader('generic-flow')
 
-    return Dataset(ds_id, ds_name, path / ds_path, layout, split, param_desc, params,
-                   image_loader, flow_loader)
+    return DataSource(ds_id, ds_name, path / ds_path, layout, split, param_desc, params,
+                      image_loader, flow_loader)
 
 
 def load_instance_from_config(path, cfg):
