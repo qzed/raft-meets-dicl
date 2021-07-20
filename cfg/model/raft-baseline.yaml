@@ -1,0 +1,23 @@
+name: RAFT baseline config
+id: raft/baseline
+
+model:
+  type: raft/baseline
+
+  parameters:
+    droput: 0.0
+    mixed-precision: false
+
+  arguments:
+    iterations: 12
+
+loss:
+  type: raft/sequence
+
+  parameters:
+    ord: 1
+    gamma: 0.85
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
