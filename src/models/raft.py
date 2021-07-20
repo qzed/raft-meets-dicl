@@ -433,22 +433,26 @@ class Raft(Model):
         param_cfg = cfg['parameters']
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
+        args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision)
+        return cls(dropout, mixed_precision, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False):
+    def __init__(self, dropout=0.0, mixed_precision=False, arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
 
-        super().__init__(RaftModule(dropout, mixed_precision))
+        super().__init__(RaftModule(dropout, mixed_precision), arguments)
 
     def get_config(self):
+        default_args = {'iterations': 12}
+
         return {
             'type': self.type,
             'parameters': {
                 'dropout': self.dropout,
                 'mixed-precision': self.mixed_precision,
             },
+            'arguments': default_args | self.arguments,
         }
 
     def forward(self, img1, img2, iterations=12, flow_init=None):

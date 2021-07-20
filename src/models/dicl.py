@@ -544,17 +544,20 @@ class Dicl(Model):
         disp_ranges = parse_level_list(param_cfg['displacement-range'])
         ctx_scale = parse_level_list(param_cfg['context-scale'])
         dap_init = param_cfg.get('dap-init', 'identity')
+        args = cfg.get('arguments', {})
 
-        return cls(disp_ranges, ctx_scale, dap_init)
+        return cls(disp_ranges, ctx_scale, dap_init, args)
 
-    def __init__(self, disp_ranges, ctx_scale, dap_init='identity'):
+    def __init__(self, disp_ranges, ctx_scale, dap_init='identity', arguments={}):
         self.ctx_scale = ctx_scale
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
 
-        super().__init__(DiclModule(disp_ranges, ctx_scale, dap_init))
+        super().__init__(DiclModule(disp_ranges, ctx_scale, dap_init), arguments)
 
     def get_config(self):
+        default_args = {'raw': False}
+
         disp = [(f"level-{k}", v) for k, v in self.disp_ranges.items()]
         scale = [(f"level-{k}", v) for k, v in self.ctx_scale.items()]
 
@@ -565,6 +568,7 @@ class Dicl(Model):
                 'context-scale': OrderedDict(sorted(scale, reverse=True)),
                 'dap-init': self.dap_init,
             },
+            'arguments': default_args | self.arguments,
         }
 
     def forward(self, img1, img2, raw=False):

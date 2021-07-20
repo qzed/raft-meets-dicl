@@ -9,13 +9,17 @@ class Model(nn.Module):
         if cfg['type'] != cls.type:
             raise ValueError(f"invalid loss type '{cfg['type']}', expected '{cls.type}'")
 
-    def __init__(self, module):
+    def __init__(self, module, arguments):
         super().__init__()
 
         self.module = module
+        self.arguments = arguments
 
     def get_config(self):
         raise NotImplementedError
+
+    def __call__(self, img1, img2, **kwargs):
+        return super().__call__(img1, img2, **(self.arguments | kwargs))
 
 
 class Result:
