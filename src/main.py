@@ -176,8 +176,6 @@ def main():
         flow = flow.cuda()
         valid = valid.cuda()
 
-        # TODO: for DICL images need to be of size % 128 == 0
-
         result = model(img1, img2)
         final = result.final()
 
