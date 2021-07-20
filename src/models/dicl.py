@@ -545,11 +545,11 @@ class DiclResult(Result):
 
 
 class MultiscaleLoss(Loss):
-    def __init__(self, ord: Union[str, float], weights: List[float], mode: str = 'bilinear'):
+    def __init__(self, weights: List[float], ord: Union[str, float] = 2, mode: str = 'bilinear'):
         super().__init__()
 
-        self.ord = ord if ord == 'robust' else float(ord)
         self.weights = weights
+        self.ord = ord if ord == 'robust' else float(ord)
         self.mode = mode
 
     def get_config(self):

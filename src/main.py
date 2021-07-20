@@ -139,7 +139,7 @@ def main():
 
     # setup loss function
     weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
-    loss_fn = models.dicl.MultiscaleLoss(ord=2, weights=weights)
+    loss_fn = models.dicl.MultiscaleLoss(weights)
 
     # setup metrics
     metrics_fn = M.EndPointError(distances=[1, 3, 5])
