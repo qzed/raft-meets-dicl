@@ -1,4 +1,6 @@
 class Collection:
+    type = None
+
     @classmethod
     def _typecheck(cls, cfg):
         if cfg['type'] != cls.type:

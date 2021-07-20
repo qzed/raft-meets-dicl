@@ -84,6 +84,8 @@ class Dataset(Collection):
 
 
 class Layout:
+    type = None
+
     @classmethod
     def _typecheck(cls, cfg):
         if cfg['type'] != cls.type:
@@ -406,6 +408,8 @@ class Split:
 # Note: Tensors returned by loaders are numpy arrays in shape (height, width,
 # channels). Values are floats in range [0, 1].
 class FileLoader:
+    type = None
+
     @classmethod
     def _typecheck(cls, cfg):
         ty = cfg['type'] if isinstance(cfg, dict) else cfg
