@@ -186,8 +186,8 @@ def main():
             fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
             fe = visual.flow_to_rgb(fe)
 
-            writer.add_image('img1', img1[0].detach().cpu(), i, dataformats='CHW')
-            writer.add_image('img2', img2[0].detach().cpu(), i, dataformats='CHW')
+            writer.add_image('img1', (img1[0].detach().cpu() + 1) / 2, i, dataformats='CHW')
+            writer.add_image('img2', (img2[0].detach().cpu() + 1) / 2, i, dataformats='CHW')
             writer.add_image('flow', ft, i, dataformats='HWC')
             writer.add_image('flow-est', fe, i, dataformats='HWC')
 
