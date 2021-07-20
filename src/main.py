@@ -35,7 +35,7 @@ class Context:
         except git.exc.InvalidGitRepositoryError:
             return '<out-of-tree>'
 
-    def dump_config(self, seeds, data, model, loss, input):
+    def dump_config(self, seeds, data, model):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -46,11 +46,7 @@ class Context:
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
             'data': data.get_config(),
-            'model': {
-                'model': model.get_config(),
-                'loss': loss.get_config(),
-                'input': input.get_config(),
-            },
+            'model': model.get_config(),
         }
 
         utils.config.store(self.dir_out / 'config.json', cfg)
@@ -76,6 +72,28 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     )
 
     return Context(timestamp, dir_out)
+
+
+class ModelSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        model = models.load_model(cfg['model'])
+        loss = models.load_loss(cfg['loss'])
+        input = data.input.InputSpec.from_config(cfg.get('input'))
+
+        return cls(model, loss, input)
+
+    def __init__(self, model, loss, input):
+        self.model = model
+        self.loss = loss
+        self.input = input
+
+    def get_config(self):
+        return {
+            'model': self.model.get_config(),
+            'loss': self.loss.get_config(),
+            'input': self.input.get_config(),
+        }
 
 
 def main():
@@ -106,13 +124,12 @@ def main():
     logging.info(f"loading model info from configuration: file='{args.model}'")
 
     model_cfg = utils.config.load(args.model)
-
-    input_cfg = data.input.InputSpec.from_config(model_cfg.get('input'))
+    model_spec = ModelSpec.from_config(model_cfg)
 
     # load training dataset
     logging.info(f"loading data from configuration: file='{args.data}'")
     train_source = data.load(args.data)
-    train_input = input_cfg.apply(train_source).torch()
+    train_input = model_spec.input.apply(train_source).torch()
     train_loader = td.DataLoader(train_input, batch_size=batch_size, pin_memory=False,
                                  shuffle=True, num_workers=4, drop_last=True)
 
@@ -121,14 +138,14 @@ def main():
     # setup model
     logging.info(f"setting up model")
 
-    model = models.load_model(model_cfg['model'])
+    model = model_spec.model
 
     n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     logging.info(f"set up model with {n_params} parameters")
     logging.info(f"model:\n{model}")
 
     # setup loss function
-    loss_fn = models.load_loss(model_cfg['loss'])
+    loss_fn = model_spec.loss
 
     # setup metrics
     metrics_fn = M.EndPointError(distances=[1, 3, 5])
@@ -141,7 +158,7 @@ def main():
                                           cycle_momentum=False, anneal_strategy='linear')
 
     # dump config
-    ctx.dump_config(seeds, train_source, model, loss_fn, input_cfg)
+    ctx.dump_config(seeds, train_source, model_spec)
 
     # training loop
     model = nn.DataParallel(model)
