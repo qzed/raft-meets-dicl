@@ -1,9 +1,10 @@
-from . import adapter
 from . import augment
 from . import collection
 from . import config
 from . import dataset
+from . import input
 from . import io
 from . import repeat
 
-load = config.load
+from .config import load
+from .input import Input

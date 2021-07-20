@@ -45,7 +45,7 @@ class Context:
             'commit': self._get_git_head_hash(),
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
-            'dataset': data.get_config(),
+            'data': data.get_config(),
         }
 
         utils.config.store(self.dir_out / 'config.json', cfg)
@@ -101,13 +101,14 @@ def main():
 
     # load training dataset
     logging.info(f"loading data from configuration: file='{args.data}'")
-    train_dataset = data.load(args.data).torch()
-    train_loader = td.DataLoader(train_dataset, batch_size=batch_size, pin_memory=False,
+    train_source = data.load(args.data)
+    train_input = data.Input(train_source, clip=(0, 1), range=(-1, 1)).torch()
+    train_loader = td.DataLoader(train_input, batch_size=batch_size, pin_memory=False,
                                  shuffle=True, num_workers=4, drop_last=True)
 
-    logging.info(f"dataset loaded: have {len(train_dataset)} samples")
+    logging.info(f"dataset loaded: have {len(train_loader)} samples")
 
-    ctx.dump_config(seeds, train_dataset)
+    ctx.dump_config(seeds, train_input)
 
     # setup model
     logging.info(f"setting up model")
@@ -147,7 +148,7 @@ def main():
     logging.info(f"setting up optimizer")
 
     opt = optim.AdamW(model.parameters(), lr=lr, weight_decay=wdecay, eps=eps)
-    sched = optim.lr_scheduler.OneCycleLR(opt, lr, len(train_dataset)+100, pct_start=0.05,
+    sched = optim.lr_scheduler.OneCycleLR(opt, lr, len(train_loader)+100, pct_start=0.05,
                                           cycle_momentum=False, anneal_strategy='linear')
 
     # training loop
@@ -161,10 +162,6 @@ def main():
         img2 = img2.cuda()
         flow = flow.cuda()
         valid = valid.cuda()
-
-        # convert images from range [0, 1] to range [-1, 1]
-        img1 = 2.0 * torch.clamp(img1, 0.0, 1.0) - 1.0
-        img2 = 2.0 * torch.clamp(img2, 0.0, 1.0) - 1.0
 
         # TODO: for DICL images need to be of size % 128 == 0
 
