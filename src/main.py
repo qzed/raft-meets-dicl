@@ -35,7 +35,7 @@ class Context:
         except git.exc.InvalidGitRepositoryError:
             return '<out-of-tree>'
 
-    def dump_config(self, seeds, data):
+    def dump_config(self, seeds, data, model, loss):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -46,6 +46,11 @@ class Context:
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
             'data': data.get_config(),
+            'model': {
+                'model': model.get_config(),
+                'loss': loss.get_config(),
+                # TODO: input specification
+            },
         }
 
         utils.config.store(self.dir_out / 'config.json', cfg)
@@ -76,17 +81,15 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
+    parser.add_argument('-m', '--model', required=True, help='The model specification to use')
     parser.add_argument('-o', '--output', default='runs', help='The base output directory to use')
     args = parser.parse_args()
 
     # parameters        # FIXME: put those in config...
     batch_size = 1
-    mixed_precision = False
     lr = 0.001
     wdecay = 0.00001
     eps = 1e-8
-    num_iters = 12
-    gamma = 0.85
     clip = 1.0
 
     # basic setup
@@ -99,47 +102,36 @@ def main():
     # set seeds
     seeds = utils.seeds.random_seeds().apply()
 
+    # load model config
+    logging.info(f"loading model info from configuration: file='{args.model}'")
+
+    model_cfg = utils.config.load(args.model)
+
+    # TODO: add class for this
+    input_cfg = model_cfg.get('input', {})
+    input_clip = input_cfg.get('clip', (0, 1))      # TODO: validate
+    input_range = input_cfg.get('range', (-1, 1))   # TODO: validate
+
     # load training dataset
     logging.info(f"loading data from configuration: file='{args.data}'")
     train_source = data.load(args.data)
-    train_input = data.Input(train_source, clip=(0, 1), range=(-1, 1)).torch()
+    train_input = data.Input(train_source, clip=input_clip, range=input_range).torch()
     train_loader = td.DataLoader(train_input, batch_size=batch_size, pin_memory=False,
                                  shuffle=True, num_workers=4, drop_last=True)
 
     logging.info(f"dataset loaded: have {len(train_loader)} samples")
 
-    ctx.dump_config(seeds, train_input)
-
     # setup model
     logging.info(f"setting up model")
 
-    disp_ranges = {
-        6: (3, 3),
-        5: (3, 3),
-        4: (3, 3),
-        3: (3, 3),
-        2: (3, 3),
-    }
-
-    ctx_scale = {
-        6: 0.03125,
-        5: 0.0625,
-        4: 0.125,
-        3: 0.25,
-        2: 0.5,
-    }
-
-    model = nn.DataParallel(models.Dicl(disp_ranges, ctx_scale, dap_init='identity'))
-    model.cuda()
-    model.train()
+    model = models.load_model(model_cfg['model'])
 
     n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     logging.info(f"set up model with {n_params} parameters")
     logging.info(f"model:\n{model}")
 
     # setup loss function
-    weights = [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
-    loss_fn = models.dicl.MultiscaleLoss(weights)
+    loss_fn = models.load_loss(model_cfg['loss'])
 
     # setup metrics
     metrics_fn = M.EndPointError(distances=[1, 3, 5])
@@ -151,7 +143,14 @@ def main():
     sched = optim.lr_scheduler.OneCycleLR(opt, lr, len(train_loader)+100, pct_start=0.05,
                                           cycle_momentum=False, anneal_strategy='linear')
 
+    # dump config
+    ctx.dump_config(seeds, train_input, model, loss_fn)
+
     # training loop
+    model = nn.DataParallel(model)
+    model.cuda()
+    model.train()
+
     logging.info(f"training...")
 
     for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
@@ -165,7 +164,7 @@ def main():
 
         # TODO: for DICL images need to be of size % 128 == 0
 
-        result = model(img1, img2, raw=True)
+        result = model(img1, img2)
         final = result.final()
 
         if i % 100 == 0:
