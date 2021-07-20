@@ -9,6 +9,9 @@ class Input:
         self.range = range
 
     def get_config(self):
+        # FIXME: input normally comes from tow different config files
+        #        - strategy: specifies data source
+        #        - model: specifies clip, range
         return {
             'clip': self.clip,
             'range': self.range,
