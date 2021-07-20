@@ -84,6 +84,11 @@ class Dataset(Collection):
 
 
 class Layout:
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid layout type '{cfg['type']}', expected '{cls.type}'")
+
     def __init__(self):
         pass
 
@@ -122,10 +127,11 @@ def _pattern_to_glob(pattern):
 
 
 class GenericLayout(Layout):
+    type = 'generic'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'generic':
-            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'generic'")
+        cls._typecheck(cfg)
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
@@ -142,7 +148,7 @@ class GenericLayout(Layout):
 
     def get_config(self):
         return {
-            'type': 'generic',
+            'type': self.type,
             'images': self.pat_img,
             'flows': self.pat_flow,
             'key': self.pat_key,
@@ -201,10 +207,11 @@ class GenericLayout(Layout):
 
 
 class GenericBackwardsLayout(Layout):
+    type = 'generic-backwards'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'generic-backwards':
-            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'generic'")
+        cls._typecheck(cfg)
 
         pat_img = cfg['images']
         pat_flow = cfg['flows']
@@ -221,7 +228,7 @@ class GenericBackwardsLayout(Layout):
 
     def get_config(self):
         return {
-            'type': 'generic-backwards',
+            'type': self.type,
             'images': self.pat_img,
             'flows': self.pat_flow,
             'key': self.pat_key,
@@ -280,10 +287,11 @@ class GenericBackwardsLayout(Layout):
 
 
 class MultiLayout(Layout):
+    type = 'multi'
+
     @classmethod
     def from_config(cls, cfg):
-        if cfg['type'] != 'multi':
-            raise ValueError(f"invalid layout type '{cfg['type']}', expected 'multi'")
+        cls._typecheck(cfg)
 
         layouts = {k: _build_layout(v) for k, v in cfg['instances'].items()}
 
@@ -297,7 +305,7 @@ class MultiLayout(Layout):
 
     def get_config(self):
         return {
-            'type': 'multi',
+            'type': self.type,
             'parameter': self.param,
             'instances': {k: v.get_config() for (k, v) in self.layouts.items()}
         }
@@ -512,16 +520,17 @@ def _build_loader(cfg):
 
 def _build_layout(cfg):
     layouts = {
-        'generic': GenericLayout.from_config,
-        'generic-backwards': GenericBackwardsLayout.from_config,
-        'multi': MultiLayout.from_config,
+        GenericLayout,
+        GenericBackwardsLayout,
+        MultiLayout,
     }
+    layouts = {cls.type: cls for cls in layouts}
 
     ty = cfg['type']
     if ty not in layouts.keys():
         raise ValueError(f"unknown layout type '{ty}'")
 
-    return layouts[ty](cfg)
+    return layouts[ty].from_config(cfg)
 
 
 def _load_dataset_from_config(path, cfg, params=dict()):
