@@ -1,18 +1,8 @@
 import numpy as np
 import torch
 
-from . import config
-
 
 class Input:
-    @classmethod
-    def from_config(cls, path, cfg):
-        clip = cfg['clip']
-        range = cfg['range']
-        source = cfg['source']
-
-        return cls(clip, range, config.load(path, source))
-
     def __init__(self, source, clip=(0.0, 1.0), range=(-1.0, 1.0)):
         self.source = source
         self.clip = clip
