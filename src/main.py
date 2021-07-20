@@ -35,7 +35,7 @@ class Context:
         except git.exc.InvalidGitRepositoryError:
             return '<out-of-tree>'
 
-    def dump_config(self, seeds, data, model, loss):
+    def dump_config(self, seeds, data, model, loss, input):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -49,7 +49,7 @@ class Context:
             'model': {
                 'model': model.get_config(),
                 'loss': loss.get_config(),
-                # TODO: input specification
+                'input': input.get_config(),
             },
         }
 
@@ -107,15 +107,12 @@ def main():
 
     model_cfg = utils.config.load(args.model)
 
-    # TODO: add class for this
-    input_cfg = model_cfg.get('input', {})
-    input_clip = input_cfg.get('clip', (0, 1))      # TODO: validate
-    input_range = input_cfg.get('range', (-1, 1))   # TODO: validate
+    input_cfg = data.input.InputSpec.from_config(model_cfg.get('input'))
 
     # load training dataset
     logging.info(f"loading data from configuration: file='{args.data}'")
     train_source = data.load(args.data)
-    train_input = data.Input(train_source, clip=input_clip, range=input_range).torch()
+    train_input = input_cfg.apply(train_source).torch()
     train_loader = td.DataLoader(train_input, batch_size=batch_size, pin_memory=False,
                                  shuffle=True, num_workers=4, drop_last=True)
 
@@ -144,7 +141,7 @@ def main():
                                           cycle_momentum=False, anneal_strategy='linear')
 
     # dump config
-    ctx.dump_config(seeds, train_input, model, loss_fn)
+    ctx.dump_config(seeds, train_input, model, loss_fn, input_cfg)
 
     # training loop
     model = nn.DataParallel(model)

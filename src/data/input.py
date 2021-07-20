@@ -2,6 +2,35 @@ import numpy as np
 import torch
 
 
+class InputSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        cfg = cfg if cfg is not None else {}
+
+        clip = [float(x) for x in cfg.get('clip', (0, 1))]
+        if len(clip) != 2:
+            raise ValueError(f"invalid value for 'clip', expected list/tuple of two floats")
+
+        range = cfg.get('range', (-1, 1))
+        if len(range) != 2:
+            raise ValueError(f"invalid value for 'range', expected list/tuple of two floats")
+
+        return cls(clip, range)
+
+    def __init__(self, clip=(0.0, 1.0), range=(-1.0, 1.0)):
+        self.clip = clip
+        self.range = range
+
+    def get_config(self):
+        return {
+            'clip': self.clip,
+            'range': self.range,
+        }
+
+    def apply(self, source):
+        return Input(source, self.clip, self.range)
+
+
 class Input:
     def __init__(self, source, clip=(0.0, 1.0), range=(-1.0, 1.0)):
         self.source = source
@@ -9,14 +38,7 @@ class Input:
         self.range = range
 
     def get_config(self):
-        # FIXME: input normally comes from tow different config files
-        #        - strategy: specifies data source
-        #        - model: specifies clip, range
-        return {
-            'clip': self.clip,
-            'range': self.range,
-            'source': self.source.get_config(),
-        }
+        return self.source.get_config()
 
     def __getitem__(self, index):
         img1, img2, flow, valid, key = self.source[index]
