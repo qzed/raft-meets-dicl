@@ -1,6 +1,6 @@
 name: HCI HD1K
 id: hci-hd1k
-path: '../../../datasets/hci-hd1k/data/'
+path: '../../../../datasets/hci-hd1k/data/'
 
 layout:
   type: generic

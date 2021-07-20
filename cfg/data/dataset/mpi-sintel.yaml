@@ -1,6 +1,6 @@
 name: MPI Sintel (clean)
 id: mpi-sintel-clean
-path: '../../../datasets/mpi-sintel-flow/data'
+path: '../../../../datasets/mpi-sintel-flow/data'
 
 layout:
   type: generic

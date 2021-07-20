@@ -1,6 +1,6 @@
 name: KITTI 2015
 id: kitti-2015
-path: '../../../datasets/kitti-flow-2015/data'
+path: '../../../../datasets/kitti-flow-2015/data'
 
 layout:
   type: generic

@@ -1,6 +1,6 @@
 name: Uni Freiburg FlyingChairs
 id: ufreiburg-flyingchairs
-path: '../../../datasets/ufreiburg-flyingchairs/data/data'
+path: '../../../../datasets/ufreiburg-flyingchairs/data/data'
 
 layout:
   type: generic

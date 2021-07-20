@@ -1,6 +1,6 @@
 name: Uni Freiburg ChairsSDHom
 id: ufreiburg-chairssdhom
-path: '../../../datasets/ufreiburg-chairssdhom/data'
+path: '../../../../datasets/ufreiburg-chairssdhom/data'
 
 layout:
   flows: '{type}/flow/{seq:05d}.pfm'

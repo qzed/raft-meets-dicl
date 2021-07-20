@@ -1,6 +1,6 @@
 name: Uni Freiburg FlyingThings3d
 id: ufreiburg-flyingthings3e
-path: '../../../datasets/ufreiburg-flyingthings3d/data'
+path: '../../../../datasets/ufreiburg-flyingthings3d/data'
 
 layout:
   type: multi

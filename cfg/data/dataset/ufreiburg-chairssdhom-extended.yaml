@@ -1,6 +1,6 @@
 name: Uni Freiburg ChairsSDHom (extended)
 id: ufreiburg-chairssdhom-extended
-path: '../../../datasets/ufreiburg-chairssdhom-extended/data'
+path: '../../../../datasets/ufreiburg-chairssdhom-extended/data'
 
 layout:
   type: generic

@@ -1,6 +1,6 @@
 name: Uni Freiburg Driving
 id: ufreiburg-driving
-path: '../../../datasets/ufreiburg-driving/data'
+path: '../../../../datasets/ufreiburg-driving/data'
 
 layout:
   type: multi

@@ -1,6 +1,6 @@
 name: Uni Freiburg Monkaa
 id: ufreiburg-monkaa
-path: '../../../datasets/ufreiburg-monkaa/data'
+path: '../../../../datasets/ufreiburg-monkaa/data'
 
 layout:
   type: multi
