@@ -5,3 +5,14 @@ from . import raft
 
 from .dicl import Dicl
 from .raft import Raft
+
+
+def load_loss(cfg):
+    types = [
+        dicl.MultiscaleLoss,
+        raft.SequenceLoss,
+    ]
+    types = {cls.type: cls for cls in types}
+
+    type = cfg['type']
+    return types[type].from_config(cfg)

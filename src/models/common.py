@@ -10,6 +10,13 @@ class Result:
 
 
 class Loss:
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid loss type '{cfg['type']}', expected '{cls.type}'")
+
     def __init__(self):
         pass
 

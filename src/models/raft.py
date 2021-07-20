@@ -437,6 +437,19 @@ class RaftResult(Result):
 
 
 class SequenceLoss(Loss):
+    type = 'raft/sequence'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        param_cfg = cfg.get('parameters', {})
+
+        ord = param_cfg.get('ord', 1)
+        gamma = param_cfg.get('gamma', 0.8)
+
+        return cls(ord, gamma)
+
     def __init__(self, ord: Union[str, float] = 1, gamma: float = 0.8):
         super().__init__()
 
@@ -445,9 +458,11 @@ class SequenceLoss(Loss):
 
     def get_config(self):
         return {
-            'type': 'raft/sequence',
-            'ord': self.ord,
-            'gamma': self.gamma,
+            'type': self.type,
+            'parameters': {
+                'ord': self.ord,
+                'gamma': self.gamma,
+            }
         }
 
     def compute(self, result, target, valid):

@@ -545,6 +545,20 @@ class DiclResult(Result):
 
 
 class MultiscaleLoss(Loss):
+    type = 'dicl/multiscale'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        param_cfg = cfg['parameters']
+
+        weights = [float(w) for w in param_cfg['weights']]
+        ord = param_cfg.get('ord', 2)
+        mode = param_cfg.get('mode', 'bilinear')
+
+        return cls(weights, ord, mode)
+
     def __init__(self, weights: List[float], ord: Union[str, float] = 2, mode: str = 'bilinear'):
         super().__init__()
 
@@ -554,10 +568,12 @@ class MultiscaleLoss(Loss):
 
     def get_config(self):
         return {
-            'type': 'dicl/multiscale',
-            'ord': str(self.ord) if self.ord in (np.inf, -np.inf) else self.ord,
-            'weights': self.weights,
-            'mode': self.mode,
+            'type': self.type,
+            'parameters': {
+                'weights': self.weights,
+                'ord': str(self.ord) if self.ord in (np.inf, -np.inf) else self.ord,
+                'mode': self.mode,
+            }
         }
 
     def compute(self, result, target, valid):
