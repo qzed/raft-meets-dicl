@@ -129,7 +129,7 @@ def main():
         2: 0.5,
     }
 
-    model = nn.DataParallel(models.Dicl(disp_ranges, ctx_scale, dap_init_ident=True))
+    model = nn.DataParallel(models.Dicl(disp_ranges, ctx_scale, dap_init='identity'))
     model.cuda()
     model.train()
 

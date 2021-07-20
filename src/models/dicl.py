@@ -467,8 +467,11 @@ class FlowLevel(nn.Module):
 
 
 class Dicl(nn.Module):
-    def __init__(self, disp_ranges, ctx_scale, dap_init_ident=True):
+    def __init__(self, disp_ranges, ctx_scale, dap_init='identity'):
         super().__init__()
+
+        if dap_init not in ['identity', 'standard']:
+            raise ValueError(f"unknown dap_init value '{dap_init}'")
 
         # feature network
         self.feature = FeatureNet()
@@ -489,7 +492,7 @@ class Dicl(nn.Module):
                 nn.init.constant_(m.bias, 0.0)
 
         # initialize DAP layers via identity matrices if specified
-        if dap_init_ident:
+        if dap_init == 'identity':
             for m in self.modules():
                 if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
