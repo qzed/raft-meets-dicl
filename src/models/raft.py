@@ -377,7 +377,7 @@ class Raft(nn.Module):
 
         return up_flow
 
-    def forward(self, img1, img2, num_iters=12, flow_init=None, upsample=True):
+    def forward(self, img1, img2, iterations=12, flow_init=None):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -401,7 +401,7 @@ class Raft(nn.Module):
 
         # iteratively predict flow
         out = []
-        for _ in range(num_iters):
+        for _ in range(iterations):
             coords1 = coords1.detach()
 
             # indes correlation volume
