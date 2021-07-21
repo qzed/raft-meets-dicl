@@ -144,7 +144,7 @@ class OptimizerSpec:
     def get_config(self):
         return {
             'type': self.type,
-            'parameteers': self.parameters,
+            'parameters': self.parameters,
         }
 
 
