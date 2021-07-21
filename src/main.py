@@ -47,7 +47,7 @@ class Context:
             'seeds': seeds.get_config(),
             'model': model.get_config(),
             'strategy': {
-                'mode': 'TODO',
+                'mode': 'TODO',     # TODO: add support for multi-stage strategies
                 'stages': [stage.get_config()],
             }
         }
@@ -200,7 +200,7 @@ def main():
 
     args = parser.parse_args()
 
-    # parameters        # FIXME: put those in config...
+    # parameters        # TODO: put those in config...
     clip = 1.0
 
     # basic setup
@@ -243,6 +243,7 @@ def main():
     loss_fn = model_spec.loss
 
     # setup metrics
+    # TODO: load from config?
     metrics_fn = M.EndPointError(distances=[1, 3, 5])
 
     # setup optimizer
@@ -276,6 +277,7 @@ def main():
         result = model(img1, img2, **stage.model_args)
         final = result.final()
 
+        # TODO: allow configuring this interval
         if i % 100 == 0:
             ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
             ft = visual.flow_to_rgb(ft)
@@ -296,9 +298,13 @@ def main():
             metrics = metrics_fn(final, flow, valid)
             metrics['Loss/train'] = loss.detach().item()
 
+        # TODO: more validation stuff
+        # TODO: checkpointing
+
         # backprop
         loss.backward()
 
+        # TODO: make configurable
         nn.utils.clip_grad_norm_(model.parameters(), clip)
 
         opt.step()
