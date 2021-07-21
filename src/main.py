@@ -105,21 +105,27 @@ class DataSpec:
         source = cfg['source']
         epochs = int(cfg.get('epochs', 1))
         batch_size = int(cfg.get('batch-size', 1))
+        drop_last = bool(cfg.get('drop-last', True))
+        shuffle = bool(cfg.get('shuffle', True))
 
         source = data.load(path, source)
 
-        return cls(source, epochs, batch_size)
+        return cls(source, epochs, batch_size, drop_last, shuffle)
 
-    def __init__(self, source, epochs, batch_size):
+    def __init__(self, source, epochs, batch_size, drop_last=True, shuffle=True):
         self.source = source
         self.epochs = epochs
         self.batch_size = batch_size
+        self.drop_last = drop_last
+        self.shuffle = shuffle
 
     def get_config(self):
         return {
             'source': self.source.get_config(),
             'epochs': self.epochs,
             'batch-size': self.batch_size,
+            'drop-last': self.drop_last,
+            'shuffle': self.shuffle,
         }
 
 
@@ -211,8 +217,9 @@ def main():
     stage = Stage.from_config(Path(args.data).parent, utils.config.load(args.data))
 
     train_input = model_spec.input.apply(stage.data.source).torch()
-    train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size, pin_memory=True,
-                                 shuffle=True, num_workers=4, drop_last=True)
+    train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size,
+                                 shuffle=stage.data.shuffle, drop_last=stage.data.drop_last,
+                                 num_workers=4, pin_memory=True)
 
     logging.info(f"dataset loaded: have {len(train_loader)} samples")
 

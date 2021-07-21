@@ -6,8 +6,6 @@ data:
   epochs: 100
   batch-size: 1
 
-  # TODO: add data loader parameters?
-
 optimizer:
   type: adam-w
 
