@@ -176,10 +176,15 @@ class Stage:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Optical Flow Estimation')
-    parser.add_argument('-d', '--data', required=True, help='The data specification to use')
-    parser.add_argument('-m', '--model', required=True, help='The model specification to use')
-    parser.add_argument('-o', '--output', default='runs', help='The base output directory to use')
+    parser = argparse.ArgumentParser(
+        description='Optical Flow Estimation',
+        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=32))
+
+    parser.add_argument('-d', '--data', required=True, help='training strategy and data')
+    parser.add_argument('-m', '--model', required=True, help='specification of the model')
+    parser.add_argument('-o', '--output', default='runs', help='base output directory '
+                                                               '[default: %(default)s]')
+
     args = parser.parse_args()
 
     # parameters        # FIXME: put those in config...
