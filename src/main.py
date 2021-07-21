@@ -155,6 +155,102 @@ class OptimizerSpec:
         return types[self.type](params, **self.parameters)
 
 
+class ClipGradient:
+    type = None
+
+    @classmethod
+    def from_config(cls, cfg):
+        types = [ClipGradientNorm, ClipGradientValue]
+        types = {c.type: c for c in types}
+
+        return types[cfg['type']].from_config(cfg)
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid gradient clip type '{cfg['type']}', expected '{cls.type}'")
+
+    def __init__(self):
+        pass
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def clip(self, params):
+        raise NotImplementedError
+
+    def __call__(self, params):
+        return self.clip(params)
+
+
+class ClipGradientNorm(ClipGradient):
+    type = 'norm'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        value = cfg['value']
+        ord = float(cfg.get('ord', 2))
+
+        return cls(value, ord)
+
+    def __init__(self, value, ord, error_if_nonfinite=False):
+        self.value = value
+        self.ord = ord
+        self.error_if_nonfinite = error_if_nonfinite
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'value': self.value,
+            'ord': self.ord if ord not in [np.inf, -np.inf] else str(self.ord)
+        }
+
+    def clip(self, params):
+        nn.utils.clip_grad_norm_(params, self.value, self.ord, self.error_if_nonfinite)
+
+
+class ClipGradientValue(ClipGradient):
+    type = 'value'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(float(cfg['value']))
+
+    def __init__(self, value):
+        self.value = value
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'value': self.value,
+        }
+
+    def clip(self, params):
+        nn.utils.clip_grad_value_(params, self.value)
+
+
+class GradientSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        clip = cfg.get('clip')
+        if clip is not None:
+            clip = ClipGradient.from_config(clip)
+
+        return cls(clip)
+
+    def __init__(self, clip):
+        self.clip = clip
+
+    def get_config(self):
+        return {
+            'clip': self.clip.get_config(),
+        }
+
+
 class Stage:
     @classmethod
     def from_config(cls, path, cfg):
@@ -167,15 +263,18 @@ class Stage:
         model_args = cfg.get('model', {}).get('arguments', {})
         loss_args = cfg.get('loss', {}).get('arguments', {})
 
-        return cls(name, id, data, optimizer, model_args, loss_args)
+        gradient = GradientSpec.from_config(cfg.get('gradient', {}))
 
-    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}):
+        return cls(name, id, data, optimizer, model_args, loss_args, gradient)
+
+    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}, gradient=None):
         self.name = name
         self.id = id
         self.data = data
         self.optimizer = optimizer
         self.model_args = model_args
         self.loss_args = loss_args
+        self.gradient = gradient
 
     def get_config(self):
         return {
@@ -185,6 +284,7 @@ class Stage:
             'optimizer': self.optimizer.get_config(),
             'model': {'arguments': self.model_args},
             'loss': {'arguments': self.loss_args},
+            'gradient': self.gradient.get_config(),
         }
 
 
@@ -199,9 +299,6 @@ def main():
                                                                '[default: %(default)s]')
 
     args = parser.parse_args()
-
-    # parameters        # TODO: put those in config...
-    clip = 1.0
 
     # basic setup
     ctx = setup(dir_base=args.output)
@@ -304,9 +401,11 @@ def main():
         # backprop
         loss.backward()
 
-        # TODO: make configurable
-        nn.utils.clip_grad_norm_(model.parameters(), clip)
+        # clip gradients
+        if stage.gradient.clip is not None:
+            stage.gradient.clip(model.parameters())
 
+        # run optimizer
         opt.step()
         sched.step()
 

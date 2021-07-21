@@ -23,7 +23,12 @@ loss:
     weights: [1.0, 0.75, 0.5, 0.5, 0.5]
     valid_range: [[372, 372], [360, 360], [336, 336], [288, 288], [192, 192]]
 
+gradient:
+  clip:
+    type: norm
+    value: 1.0
+
 # TODO:
 # - lr-scheduler
 # - gradient scaling for mixed precision
-# - gradient clipping
+# - gradient accumulation?
