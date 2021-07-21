@@ -30,5 +30,4 @@ gradient:
 
 # TODO:
 # - lr-scheduler
-# - gradient scaling for mixed precision
 # - gradient accumulation?

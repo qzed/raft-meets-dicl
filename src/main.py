@@ -236,19 +236,58 @@ class ClipGradientValue(ClipGradient):
         nn.utils.clip_grad_value_(params, self.value)
 
 
+class GradientScalerSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg is None:
+            return cls(enabled=False)
+
+        enabled = bool(cfg.get('enabled', True))
+        init_scale = float(cfg.get('init-scale', 65536.0))
+        growth_factor = float(cfg.get('growth-factor', 2.0))
+        backoff_factor = float(cfg.get('backoff-factor', 0.5))
+        growth_interval = int(cfg.get('growth-interval', 0.5))
+
+        return cls(enabled, init_scale, growth_factor, backoff_factor, growth_interval)
+
+    def __init__(self, enabled=False, init_scale=65536.0, growth_factor=2.0, backoff_factor=0.5,
+                 growth_interval=2000):
+        self.enabled = enabled
+        self.init_scale = init_scale
+        self.growth_factor = growth_factor
+        self.backoff_factor = backoff_factor
+        self.growth_interval = growth_interval
+
+    def get_config(self):
+        return {
+            'enabled': self.enabled,
+            'init-scale': self.init_scale,
+            'growth-factor': self.growth_factor,
+            'backoff-factor': self.backoff_factor,
+            'growth-interval': self.growth_interval,
+        }
+
+    def build(self):
+        return torch.cuda.amp.GradScaler(self.init_scale, self.growth_factor, self.backoff_factor,
+                                         self.growth_interval, self.enabled)
+
+
 class GradientSpec:
     @classmethod
     def from_config(cls, cfg):
         clip = ClipGradient.from_config(cfg.get('clip'))
+        scaler = GradientScalerSpec.from_config(cfg.get('scaler'))
 
-        return cls(clip)
+        return cls(clip, scaler)
 
-    def __init__(self, clip):
+    def __init__(self, clip, scaler):
         self.clip = clip
+        self.scaler = scaler
 
     def get_config(self):
         return {
             'clip': self.clip.get_config(),
+            'scaler': self.scaler.get_config(),
         }
 
 
@@ -348,6 +387,7 @@ def main():
     logging.info(f"setting up optimizer")
 
     opt = stage.optimizer.build(model.parameters())
+    scaler = stage.gradient.scaler.build()
 
     # TODO: build from stage spec
     sched = optim.lr_scheduler.OneCycleLR(opt, 0.001, len(train_loader)+100, pct_start=0.05,
@@ -400,14 +440,17 @@ def main():
         # TODO: checkpointing
 
         # backprop
-        loss.backward()
+        scaler.scale(loss).backward()
 
         # clip gradients
         if stage.gradient.clip is not None:
+            scaler.unscale_(opt)
             stage.gradient.clip(model.parameters())
 
         # run optimizer
-        opt.step()
+        scaler.step(opt)
+        scaler.update()
+
         sched.step()
 
         for k, v in metrics.items():
