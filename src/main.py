@@ -147,6 +147,13 @@ class OptimizerSpec:
             'parameters': self.parameters,
         }
 
+    def build(self, params):
+        types = {
+            'adam-w': torch.optim.AdamW,
+        }
+
+        return types[self.type](params, **self.parameters)
+
 
 class Stage:
     @classmethod
@@ -241,7 +248,9 @@ def main():
     # setup optimizer
     logging.info(f"setting up optimizer")
 
-    opt = optim.AdamW(model.parameters(), **stage.optimizer.parameters)
+    opt = stage.optimizer.build(model.parameters())
+
+    # TODO: build from stage spec
     sched = optim.lr_scheduler.OneCycleLR(opt, 0.001, len(train_loader)+100, pct_start=0.05,
                                           cycle_momentum=False, anneal_strategy='linear')
 
