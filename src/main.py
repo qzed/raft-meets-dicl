@@ -275,17 +275,20 @@ class GradientScalerSpec:
 class GradientSpec:
     @classmethod
     def from_config(cls, cfg):
+        accumulate = int(cfg.get('accumulate', 1))
         clip = ClipGradient.from_config(cfg.get('clip'))
         scaler = GradientScalerSpec.from_config(cfg.get('scaler'))
 
-        return cls(clip, scaler)
+        return cls(accumulate, clip, scaler)
 
-    def __init__(self, clip, scaler):
+    def __init__(self, accumulate, clip, scaler):
+        self.accumulate = accumulate
         self.clip = clip
         self.scaler = scaler
 
     def get_config(self):
         return {
+            'accumulate': self.accumulate,
             'clip': self.clip.get_config(),
             'scaler': self.scaler.get_config(),
         }
@@ -403,9 +406,8 @@ def main():
 
     logging.info(f"training...")
 
+    opt.zero_grad()
     for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
-        opt.zero_grad()
-
         # move to cuda device
         img1 = img1.cuda()
         img2 = img2.cuda()
@@ -447,11 +449,16 @@ def main():
             scaler.unscale_(opt)
             stage.gradient.clip(model.parameters())
 
-        # run optimizer
-        scaler.step(opt)
-        scaler.update()
+        # accumulate gradients if specified
+        if (i + 1) % stage.gradient.accumulate == 0:
+            # run optimizer
+            scaler.step(opt)
+            scaler.update()
 
-        sched.step()
+            sched.step()
 
+            opt.zero_grad()
+
+        # dump metrics
         for k, v in metrics.items():
             writer.add_scalar(k, v, i)

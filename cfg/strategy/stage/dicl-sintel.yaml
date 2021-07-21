@@ -28,6 +28,7 @@ gradient:
     type: norm
     value: 1.0
 
+  accumulate: 2
+
 # TODO:
 # - lr-scheduler
-# - gradient accumulation?
