@@ -160,6 +160,9 @@ class ClipGradient:
 
     @classmethod
     def from_config(cls, cfg):
+        if cfg is None:
+            return None
+
         types = [ClipGradientNorm, ClipGradientValue]
         types = {c.type: c for c in types}
 
@@ -236,9 +239,7 @@ class ClipGradientValue(ClipGradient):
 class GradientSpec:
     @classmethod
     def from_config(cls, cfg):
-        clip = cfg.get('clip')
-        if clip is not None:
-            clip = ClipGradient.from_config(clip)
+        clip = ClipGradient.from_config(cfg.get('clip'))
 
         return cls(clip)
 
