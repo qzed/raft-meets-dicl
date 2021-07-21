@@ -35,7 +35,7 @@ class Context:
         except git.exc.InvalidGitRepositoryError:
             return '<out-of-tree>'
 
-    def dump_config(self, seeds, data, model):
+    def dump_config(self, seeds, model, stage):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -45,8 +45,11 @@ class Context:
             'commit': self._get_git_head_hash(),
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
-            'data': data.get_config(),
             'model': model.get_config(),
+            'strategy': {
+                'mode': 'TODO',
+                'stages': [stage.get_config()],
+            }
         }
 
         utils.config.store(self.dir_out / 'config.json', cfg)
@@ -96,6 +99,82 @@ class ModelSpec:
         }
 
 
+class DataSpec:
+    @classmethod
+    def from_config(cls, path, cfg):
+        source = cfg['source']
+        epochs = int(cfg.get('epochs', 1))
+        batch_size = int(cfg.get('batch-size', 1))
+
+        source = data.load(path, source)
+
+        return cls(source, epochs, batch_size)
+
+    def __init__(self, source, epochs, batch_size):
+        self.source = source
+        self.epochs = epochs
+        self.batch_size = batch_size
+
+    def get_config(self):
+        return {
+            'source': self.source.get_config(),
+            'epochs': self.epochs,
+            'batch-size': self.batch_size,
+        }
+
+
+class OptimizerSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        type = cfg['type']
+        parameters = cfg.get('parameters', {})
+
+        return cls(type, parameters)
+
+    def __init__(self, type, parameters={}):
+        self.type = type
+        self.parameters = parameters
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'parameteers': self.parameters,
+        }
+
+
+class Stage:
+    @classmethod
+    def from_config(cls, path, cfg):
+        name = cfg['name']
+        id = cfg['id']
+
+        data = DataSpec.from_config(path, cfg['data'])
+        optimizer = OptimizerSpec.from_config(cfg['optimizer'])
+
+        model_args = cfg.get('model', {}).get('arguments', {})
+        loss_args = cfg.get('loss', {}).get('arguments', {})
+
+        return cls(name, id, data, optimizer, model_args, loss_args)
+
+    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}):
+        self.name = name
+        self.id = id
+        self.data = data
+        self.optimizer = optimizer
+        self.model_args = model_args
+        self.loss_args = loss_args
+
+    def get_config(self):
+        return {
+            'name': self.name,
+            'id': self.id,
+            'data': self.data.get_config(),
+            'optimizer': self.optimizer.get_config(),
+            'model': {'arguments': self.model_args},
+            'loss': {'arguments': self.loss_args},
+        }
+
+
 def main():
     parser = argparse.ArgumentParser(description='Optical Flow Estimation')
     parser.add_argument('-d', '--data', required=True, help='The data specification to use')
@@ -104,10 +183,6 @@ def main():
     args = parser.parse_args()
 
     # parameters        # FIXME: put those in config...
-    batch_size = 1
-    lr = 0.001
-    wdecay = 0.00001
-    eps = 1e-8
     clip = 1.0
 
     # basic setup
@@ -127,10 +202,11 @@ def main():
     model_spec = ModelSpec.from_config(model_cfg)
 
     # load training dataset
-    logging.info(f"loading data from configuration: file='{args.data}'")
-    train_source = data.load(args.data)
-    train_input = model_spec.input.apply(train_source).torch()
-    train_loader = td.DataLoader(train_input, batch_size=batch_size, pin_memory=False,
+    logging.info(f"loading stage configuration: file='{args.data}'")
+    stage = Stage.from_config(Path(args.data).parent, utils.config.load(args.data))
+
+    train_input = model_spec.input.apply(stage.data.source).torch()
+    train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size, pin_memory=True,
                                  shuffle=True, num_workers=4, drop_last=True)
 
     logging.info(f"dataset loaded: have {len(train_loader)} samples")
@@ -153,12 +229,12 @@ def main():
     # setup optimizer
     logging.info(f"setting up optimizer")
 
-    opt = optim.AdamW(model.parameters(), lr=lr, weight_decay=wdecay, eps=eps)
-    sched = optim.lr_scheduler.OneCycleLR(opt, lr, len(train_loader)+100, pct_start=0.05,
+    opt = optim.AdamW(model.parameters(), **stage.optimizer.parameters)
+    sched = optim.lr_scheduler.OneCycleLR(opt, 0.001, len(train_loader)+100, pct_start=0.05,
                                           cycle_momentum=False, anneal_strategy='linear')
 
     # dump config
-    ctx.dump_config(seeds, train_source, model_spec)
+    ctx.dump_config(seeds, model_spec, stage)
 
     # training loop
     model = nn.DataParallel(model)
@@ -176,7 +252,7 @@ def main():
         flow = flow.cuda()
         valid = valid.cuda()
 
-        result = model(img1, img2)
+        result = model(img1, img2, **stage.model_args)
         final = result.final()
 
         if i % 100 == 0:
@@ -192,7 +268,7 @@ def main():
             writer.add_image('flow-est', fe, i, dataformats='HWC')
 
         # compute loss
-        loss = loss_fn(result.output(), flow, valid)
+        loss = loss_fn(result.output(), flow, valid, **stage.loss_args)
 
         # compute metrics
         with torch.no_grad():

@@ -1,0 +1,30 @@
+name: "DICL: MPI Sintel"
+id: dicl-sintel-0
+
+data:
+  source: ../../data/train-sintel.yaml
+  epochs: 100
+  batch-size: 1
+
+  # TODO: add data loader parameters?
+
+optimizer:
+  type: adam-w
+
+  parameters:
+    lr: 0.001
+    weight_decay: 0.0001
+    eps: 1.0e-9
+
+model:
+  arguments:
+    raw: false
+
+loss:
+  arguments:
+    weights: [1.0, 0.75, 0.5, 0.5, 0.5]
+
+# TODO:
+# - lr-scheduler
+# - gradient scaling for mixed precision
+# - gradient clipping
