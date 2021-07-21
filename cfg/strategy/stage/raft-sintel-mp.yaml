@@ -1,0 +1,24 @@
+name: "RAFT: MPI Sintel"
+id: raft-sintel-0
+
+data:
+  source: ../../data/train-sintel.yaml
+  epochs: 100
+  batch-size: 1
+
+optimizer:
+  type: adam-w
+
+  parameters:
+    lr: 0.001
+    weight_decay: 0.0001
+    eps: 1.0e-9
+
+gradient:
+  clip:
+    type: norm
+    value: 1.0
+
+  scaler:
+    enabled: true
+    init-scale: 8192.0

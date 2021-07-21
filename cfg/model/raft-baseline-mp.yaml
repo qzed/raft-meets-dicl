@@ -1,0 +1,23 @@
+name: RAFT baseline config with mixed precision
+id: raft/baseline-mp
+
+model:
+  type: raft/baseline
+
+  parameters:
+    droput: 0.0
+    mixed-precision: true
+
+  arguments:
+    iterations: 12
+
+loss:
+  type: raft/sequence
+
+  arguments:
+    ord: 1
+    gamma: 0.85
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
