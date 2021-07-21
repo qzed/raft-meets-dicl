@@ -41,14 +41,14 @@ class Loss:
         if cfg['type'] != cls.type:
             raise ValueError(f"invalid loss type '{cfg['type']}', expected '{cls.type}'")
 
-    def __init__(self):
-        pass
+    def __init__(self, arguments):
+        self.arguments = arguments
 
     def get_config(self):
         raise NotImplementedError
 
-    def compute(self, result, target, valid):
+    def compute(self, result, target, valid, **kwargs):
         raise NotImplementedError
 
-    def __call__(self, result, target, valid):
-        return self.compute(result, target, valid)
+    def __call__(self, result, target, valid, **kwargs):
+        return self.compute(result, target, valid, **(self.arguments | kwargs))

@@ -27,7 +27,7 @@ model:
 loss:
   type: dicl/multiscale
 
-  parameters:
+  arguments:
     weights: [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]
     ord: 2
     mode: bilinear

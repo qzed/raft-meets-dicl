@@ -14,7 +14,7 @@ model:
 loss:
   type: raft/sequence
 
-  parameters:
+  arguments:
     ord: 1
     gamma: 0.85
 

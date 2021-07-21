@@ -479,38 +479,29 @@ class SequenceLoss(Loss):
     def from_config(cls, cfg):
         cls._typecheck(cfg)
 
-        param_cfg = cfg.get('parameters', {})
+        return cls(cfg.get('arguments', {}))
 
-        ord = param_cfg.get('ord', 1)
-        gamma = param_cfg.get('gamma', 0.8)
-
-        return cls(ord, gamma)
-
-    def __init__(self, ord: Union[str, float] = 1, gamma: float = 0.8):
-        super().__init__()
-
-        self.ord = float(ord)
-        self.gamma = gamma
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
 
     def get_config(self):
+        default_args = {'ord': 1, 'gamma': 0.8}
+
         return {
             'type': self.type,
-            'parameters': {
-                'ord': self.ord,
-                'gamma': self.gamma,
-            }
+            'arguments': default_args | self.arguments,
         }
 
-    def compute(self, result, target, valid):
+    def compute(self, result, target, valid, ord=1, gamma=0.8):
         n_predictions = len(result)
 
         loss = 0.0
         for i, flow in enumerate(result):
             # compute weight for sequence index
-            weight = self.gamma**(n_predictions - i - 1)
+            weight = gamma**(n_predictions - i - 1)
 
             # compute flow distance according to specified norm (L1 in orig. impl.)
-            dist = torch.linalg.vector_norm(flow - target, ord=self.ord, dim=-3)
+            dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
 
             # Only calculate error for valid pixels. N.b.: This is a difference
             # to the original implementation, where invalid pixels are included

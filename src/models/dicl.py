@@ -606,57 +606,45 @@ class MultiscaleLoss(Loss):
     def from_config(cls, cfg):
         cls._typecheck(cfg)
 
-        param_cfg = cfg['parameters']
+        return cls(cfg.get('arguments', {}))
 
-        weights = [float(w) for w in param_cfg['weights']]
-        ord = param_cfg.get('ord', 2)
-        mode = param_cfg.get('mode', 'bilinear')
-
-        return cls(weights, ord, mode)
-
-    def __init__(self, weights: List[float], ord: Union[str, float] = 2, mode: str = 'bilinear'):
-        super().__init__()
-
-        self.weights = weights
-        self.ord = ord if ord == 'robust' else float(ord)
-        self.mode = mode
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
 
     def get_config(self):
+        default_args = {'ord': 2, 'mode': 'bilinear'}
+
         return {
             'type': self.type,
-            'parameters': {
-                'weights': self.weights,
-                'ord': str(self.ord) if self.ord in (np.inf, -np.inf) else self.ord,
-                'mode': self.mode,
-            }
+            'arguments': default_args | self.arguments,
         }
 
-    def compute(self, result, target, valid):
+    def compute(self, result, target, valid, weights, ord=2, mode='bilinear'):
         loss = 0.0
 
         for i, flow in enumerate(result):
-            flow = self.upsample(flow, target.shape)
+            flow = self.upsample(flow, target.shape, mode)
 
             # compute flow distance according to specified norm
-            if self.ord == 'robust':    # robust norm as defined in original DICL implementation
+            if ord == 'robust':    # robust norm as defined in original DICL implementation
                 dist = ((flow - target).abs().sum(dim=-3) + 1e-8)**0.4
-            else:                       # generic L{self.ord}-norm
-                dist = torch.linalg.vector_norm(flow - target, ord=self.ord, dim=-3)
+            else:                       # generic L{ord}-norm
+                dist = torch.linalg.vector_norm(flow - target, ord=float(ord), dim=-3)
 
             # only calculate error for valid pixels
             dist = dist[valid]
 
             # update loss
-            loss = loss + self.weights[i] * dist.mean()
+            loss = loss + weights[i] * dist.mean()
 
         # normalize for our convenience
         return loss / len(result)
 
-    def upsample(self, flow, shape):
+    def upsample(self, flow, shape, mode):
         _b, _c, fh, fw = flow.shape
         _b, _c, th, tw = shape
 
-        flow = F.interpolate(flow, (th, tw), mode=self.mode, align_corners=True)
+        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
         flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
