@@ -619,11 +619,18 @@ class MultiscaleLoss(Loss):
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, result, target, valid, weights, ord=2, mode='bilinear'):
+    def compute(self, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
         loss = 0.0
 
         for i, flow in enumerate(result):
             flow = self.upsample(flow, target.shape, mode)
+
+            # filter valid flow by per-level range
+            mask = valid
+            if valid_range is not None:
+                mask = torch.clone(mask)
+                mask &= target[..., 0, :, :].abs() < valid_range[i][0]
+                mask &= target[..., 1, :, :].abs() < valid_range[i][1]
 
             # compute flow distance according to specified norm
             if ord == 'robust':    # robust norm as defined in original DICL implementation
@@ -632,7 +639,7 @@ class MultiscaleLoss(Loss):
                 dist = torch.linalg.vector_norm(flow - target, ord=float(ord), dim=-3)
 
             # only calculate error for valid pixels
-            dist = dist[valid]
+            dist = dist[mask]
 
             # update loss
             loss = loss + weights[i] * dist.mean()
