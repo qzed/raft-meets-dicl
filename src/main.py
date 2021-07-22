@@ -36,7 +36,7 @@ class Context:
         except git.exc.InvalidGitRepositoryError:
             return '<out-of-tree>'
 
-    def dump_config(self, seeds, model, stage):
+    def dump_config(self, seeds, model, strat):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -47,10 +47,7 @@ class Context:
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
             'model': model.get_config(),
-            'strategy': {
-                'mode': 'TODO',     # TODO: add support for multi-stage strategies
-                'stages': [stage.get_config()],
-            }
+            'strategy': strat.get_config(),
         }
 
         utils.config.store(self.dir_out / 'config.json', cfg)
@@ -105,8 +102,12 @@ def main():
     model_spec = models.load(args.model)
 
     # load training dataset
-    logging.info(f"loading stage configuration: file='{args.data}'")
-    stage = strategy.load_stage(args.data)
+    logging.info(f"loading strategy configuration: file='{args.data}'")
+    strat = strategy.load(args.data)
+
+    # TODO: support multiple stages
+    stage = strat.stages[0]
+    logging.info(f"running stage: '{stage.name}' ({stage.id})")
 
     train_input = model_spec.input.apply(stage.data.source).torch()
     train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size,
@@ -147,7 +148,7 @@ def main():
     sched_instance, sched_epoch = stage.scheduler.build(opt, sched_vars)
 
     # dump config
-    ctx.dump_config(seeds, model_spec, stage)
+    ctx.dump_config(seeds, model_spec, strat)
 
     # training loop
     model = nn.DataParallel(model)

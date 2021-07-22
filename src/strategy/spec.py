@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from . import config
+
 from .. import data
 from .. import utils
 
@@ -310,4 +312,23 @@ class Stage:
             'loss': {'arguments': self.loss_args},
             'gradient': self.gradient.get_config(),
             'lr-scheduler': self.scheduler.get_config(),
+        }
+
+
+class Strategy:
+    @classmethod
+    def from_config(cls, path, cfg):
+        mode = cfg.get('mode', 'best')
+        stages = [config.load_stage(path, c) for c in cfg.get('stages', [])]
+
+        return cls(mode, stages)
+
+    def __init__(self, mode, stages):
+        self.mode = mode
+        self.stages = stages
+
+    def get_config(self):
+        return {
+            'mode': self.mode,
+            'stages': [s.get_config() for s in self.stages],
         }
