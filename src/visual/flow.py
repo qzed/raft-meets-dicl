@@ -6,6 +6,7 @@
 # Code: https://vision.middlebury.edu/flow/code/flow-code/
 
 import numpy as np
+import warnings
 
 COLORWHEEL = None
 
@@ -68,6 +69,14 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     # lazy-initialize colorwheel
     if COLORWHEEL is None:
         COLORWHEEL = generate_color_wheel()
+
+    # Handle bogus flow fields: This is an indication of network collapse, emit
+    # a warning but set to zero so that we don't fail with index errors later
+    # on.
+    if (not np.isfinite(u).all()) or (not np.isfinite(v).all()):
+        warnings.warn("encountered non-finite values in flow field", RuntimeWarning, stacklevel=2)
+        u[~np.isfinite(u)] = 0.0
+        v[~np.isfinite(v)] = 0.0
 
     # calculate polar representation
     angle = np.arctan2(-v, -u) / np.pi
