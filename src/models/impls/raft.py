@@ -458,6 +458,10 @@ class Raft(Model):
     def forward(self, img1, img2, iterations=12, flow_init=None):
         return RaftResult(self.module(img1, img2, iterations, flow_init))
 
+    def train(self, mode: bool = True):
+        super().train(mode)
+        self.module.freeze_batchnorm()
+
 
 class RaftResult(Result):
     def __init__(self, output):
