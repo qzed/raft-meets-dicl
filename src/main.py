@@ -10,9 +10,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.utils.data as td
-import torch.optim as optim
 
 from torch.utils.tensorboard import SummaryWriter
 
