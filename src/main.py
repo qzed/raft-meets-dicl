@@ -106,7 +106,7 @@ def main():
 
     # load training dataset
     logging.info(f"loading stage configuration: file='{args.data}'")
-    stage = strategy.Stage.from_config(Path(args.data).parent, utils.config.load(args.data))
+    stage = strategy.load_stage(args.data)
 
     train_input = model_spec.input.apply(stage.data.source).torch()
     train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size,
