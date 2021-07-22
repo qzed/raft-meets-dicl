@@ -69,6 +69,8 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
         ],
     )
 
+    logging.captureWarnings(True)
+
     return Context(timestamp, dir_out)
 
 
