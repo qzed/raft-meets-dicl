@@ -294,6 +294,75 @@ class GradientSpec:
         }
 
 
+class SchedulerSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        type = cfg['type']
+        params = cfg.get('parameters', {})
+
+        return cls(type, params)
+
+    def __init__(self, type, parameters):
+        self.type = type
+        self.parameters = parameters
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'parameters': self.parameters,
+        }
+
+    def build(self, optimizer, variables):
+        types = {
+            'one-cycle': optim.lr_scheduler.OneCycleLR,
+        }
+
+        # evaluate parameters
+        params = {k: self._eval_param(v, variables) for k, v in self.parameters.items()}
+
+        # build
+        return types[self.type](optimizer, **params)
+
+    def _eval_param(self, value, variables):
+        # only strings can be expressions
+        if not isinstance(value, str):
+            return value
+
+        # try to evaluate, if we fail this is probably not an expression
+        try:
+            return utils.expr.eval_math_expr(value, **variables)
+        except TypeError:
+            return value
+
+
+class MultiSchedulerSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        instance = cfg.get('instance', [])
+        instance = [SchedulerSpec.from_config(c) for c in instance]
+
+        epoch = cfg.get('epoch', [])
+        epoch = [SchedulerSpec.from_config(c) for c in epoch]
+
+        return cls(instance, epoch)
+
+    def __init__(self, instance=[], epoch=[]):
+        self.instance = instance
+        self.epoch = epoch
+
+    def get_config(self):
+        return {
+            'instance': [s.get_config() for s in self.instance],
+            'epoch': [s.get_config() for s in self.epoch],
+        }
+
+    def build(self, optimizer, variables):
+        instance = [s.build(optimizer, variables) for s in self.instance]
+        epoch = [s.build(optimizer, variables) for s in self.epoch]
+
+        return instance, epoch
+
+
 class Stage:
     @classmethod
     def from_config(cls, path, cfg):
@@ -307,10 +376,12 @@ class Stage:
         loss_args = cfg.get('loss', {}).get('arguments', {})
 
         gradient = GradientSpec.from_config(cfg.get('gradient', {}))
+        scheduler = MultiSchedulerSpec.from_config(cfg.get('lr-scheduler', {}))
 
-        return cls(name, id, data, optimizer, model_args, loss_args, gradient)
+        return cls(name, id, data, optimizer, model_args, loss_args, gradient, scheduler)
 
-    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}, gradient=None):
+    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}, gradient=None,
+                 scheduler=MultiSchedulerSpec()):
         self.name = name
         self.id = id
         self.data = data
@@ -318,6 +389,7 @@ class Stage:
         self.model_args = model_args
         self.loss_args = loss_args
         self.gradient = gradient
+        self.scheduler = scheduler
 
     def get_config(self):
         return {
@@ -328,6 +400,7 @@ class Stage:
             'model': {'arguments': self.model_args},
             'loss': {'arguments': self.loss_args},
             'gradient': self.gradient.get_config(),
+            'lr-scheduler': self.scheduler.get_config(),
         }
 
 
@@ -392,9 +465,14 @@ def main():
     opt = stage.optimizer.build(model.parameters())
     scaler = stage.gradient.scaler.build()
 
-    # TODO: build from stage spec
-    sched = optim.lr_scheduler.OneCycleLR(opt, 0.001, len(train_loader)+100, pct_start=0.05,
-                                          cycle_momentum=False, anneal_strategy='linear')
+    # build learning-rate schedulers
+    sched_vars = {
+        'n_samples': len(train_loader),
+        'n_epochs': stage.data.epochs,
+        'n_accum': stage.gradient.accumulate,
+        'batch_size': stage.data.batch_size,
+    }
+    sched_instance, sched_epoch = stage.scheduler.build(opt, sched_vars)
 
     # dump config
     ctx.dump_config(seeds, model_spec, stage)
@@ -455,7 +533,8 @@ def main():
             scaler.step(opt)
             scaler.update()
 
-            sched.step()
+            for s in sched_instance:
+                s.step()
 
             opt.zero_grad()
 
