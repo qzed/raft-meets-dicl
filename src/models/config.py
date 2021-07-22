@@ -26,3 +26,25 @@ def load_model(cfg):
 
     type = cfg['type']
     return types[type].from_config(cfg)
+
+
+class ModelSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        model = load_model(cfg['model'])
+        loss = load_loss(cfg['loss'])
+        input = load_input(cfg.get('input'))
+
+        return cls(model, loss, input)
+
+    def __init__(self, model, loss, input):
+        self.model = model
+        self.loss = loss
+        self.input = input
+
+    def get_config(self):
+        return {
+            'model': self.model.get_config(),
+            'loss': self.loss.get_config(),
+            'input': self.input.get_config(),
+        }

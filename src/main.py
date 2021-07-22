@@ -77,28 +77,6 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-class ModelSpec:
-    @classmethod
-    def from_config(cls, cfg):
-        model = models.load_model(cfg['model'])
-        loss = models.load_loss(cfg['loss'])
-        input = models.load_input(cfg.get('input'))
-
-        return cls(model, loss, input)
-
-    def __init__(self, model, loss, input):
-        self.model = model
-        self.loss = loss
-        self.input = input
-
-    def get_config(self):
-        return {
-            'model': self.model.get_config(),
-            'loss': self.loss.get_config(),
-            'input': self.input.get_config(),
-        }
-
-
 class DataSpec:
     @classmethod
     def from_config(cls, path, cfg):
@@ -430,7 +408,7 @@ def main():
     logging.info(f"loading model info from configuration: file='{args.model}'")
 
     model_cfg = utils.config.load(args.model)
-    model_spec = ModelSpec.from_config(model_cfg)
+    model_spec = models.ModelSpec.from_config(model_cfg)
 
     # load training dataset
     logging.info(f"loading stage configuration: file='{args.data}'")
