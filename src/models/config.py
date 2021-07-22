@@ -1,10 +1,15 @@
 from . import impls as m
+from . import input
 
 
-def load_model(cfg):
+def load_input(cfg):
+    return input.InputSpec.from_config(cfg)
+
+
+def load_loss(cfg):
     types = [
-        m.dicl.Dicl,
-        m.raft.Raft,
+        m.dicl.MultiscaleLoss,
+        m.raft.SequenceLoss,
     ]
     types = {cls.type: cls for cls in types}
 
@@ -12,10 +17,10 @@ def load_model(cfg):
     return types[type].from_config(cfg)
 
 
-def load_loss(cfg):
+def load_model(cfg):
     types = [
-        m.dicl.MultiscaleLoss,
-        m.raft.SequenceLoss,
+        m.dicl.Dicl,
+        m.raft.Raft,
     ]
     types = {cls.type: cls for cls in types}
 
