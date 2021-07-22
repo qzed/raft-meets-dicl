@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .common import Loss, Model, Result
+from .. import Loss, Model, Result
 
 
 def _make_norm2d(ty, num_channels, num_groups):

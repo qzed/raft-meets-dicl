@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .common import Loss, Model, Result
+from .. import Loss, Model, Result
 
 
 class ConvBlock(nn.Sequential):

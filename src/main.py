@@ -82,7 +82,7 @@ class ModelSpec:
     def from_config(cls, cfg):
         model = models.load_model(cfg['model'])
         loss = models.load_loss(cfg['loss'])
-        input = data.input.InputSpec.from_config(cfg.get('input'))
+        input = models.InputSpec.from_config(cfg.get('input'))
 
         return cls(model, loss, input)
 
