@@ -416,7 +416,7 @@ class RaftModule(nn.Module):
             coords1 = coords1 + d
 
             # upsample flow estimate
-            flow_up = self.upsample_flow(coords1 - coords0, mask)
+            flow_up = self.upsample_flow(coords1 - coords0, mask.float())
 
             out.append(flow_up)
 
