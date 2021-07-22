@@ -76,39 +76,9 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description='Optical Flow Estimation',
-        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=32))
-
-    parser.add_argument('-d', '--data', required=True, help='training strategy and data')
-    parser.add_argument('-m', '--model', required=True, help='specification of the model')
-    parser.add_argument('-o', '--output', default='runs', help='base output directory '
-                                                               '[default: %(default)s]')
-
-    args = parser.parse_args()
-
-    # basic setup
-    ctx = setup(dir_base=args.output)
-
-    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
-
-    writer = SummaryWriter(ctx.dir_out / 'tb')
-
-    # set seeds
-    seeds = utils.seeds.random_seeds().apply()
-
-    # load model config
-    logging.info(f"loading model info from configuration: file='{args.model}'")
-    model_spec = models.load(args.model)
-
-    # load training dataset
-    logging.info(f"loading strategy configuration: file='{args.data}'")
-    strat = strategy.load(args.data)
-
-    # TODO: support multiple stages
-    stage = strat.stages[0]
-    logging.info(f"running stage: '{stage.name}' ({stage.id})")
+def run_stage(ctx, stage, model_spec, writer):
+    # load data
+    logging.info(f"loading dataset {stage.data.source}")
 
     train_input = model_spec.input.apply(stage.data.source).torch()
     train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size,
@@ -117,19 +87,8 @@ def main():
 
     logging.info(f"dataset loaded: have {len(train_loader)} samples")
 
-    # setup model
-    logging.info(f"setting up model")
-
-    model = model_spec.model
-
-    n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
-    logging.info(f"set up model with {n_params} parameters")
-
-    with open(ctx.dir_out / 'model.txt', 'w') as fd:
-        fd.write(str(model))
-
-    # setup loss function
     loss_fn = model_spec.loss
+    model = model_spec.model
 
     # setup metrics
     # TODO: load from config?
@@ -150,15 +109,14 @@ def main():
     }
     sched_instance, sched_epoch = stage.scheduler.build(opt, sched_vars)
 
-    # dump config
-    ctx.dump_config(seeds, model_spec, strat)
-
     # training loop
     model = nn.DataParallel(model)
     model.cuda()
     model.train()
 
     logging.info(f"training...")
+
+    # TODO: properly handle sample indices over multiple stages
 
     step = 0
     for epoch in range(stage.data.epochs):
@@ -226,3 +184,53 @@ def main():
 
         for s in sched_epoch:
             s.step()
+    pass
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Optical Flow Estimation',
+        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=32))
+
+    parser.add_argument('-d', '--data', required=True, help='training strategy and data')
+    parser.add_argument('-m', '--model', required=True, help='specification of the model')
+    parser.add_argument('-o', '--output', default='runs', help='base output directory '
+                                                               '[default: %(default)s]')
+
+    args = parser.parse_args()
+
+    # basic setup
+    ctx = setup(dir_base=args.output)
+
+    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
+
+    writer = SummaryWriter(ctx.dir_out / 'tb')
+
+    # set seeds
+    seeds = utils.seeds.random_seeds().apply()
+
+    # load model config
+    logging.info(f"loading model info from configuration: file='{args.model}'")
+    model_spec = models.load(args.model)
+
+    with open(ctx.dir_out / 'model.txt', 'w') as fd:
+        fd.write(str(model_spec.model))
+
+    model = model_spec.model
+    n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
+    logging.info(f"set up model with {n_params} parameters")
+
+    # load training strategy
+    logging.info(f"loading strategy configuration: file='{args.data}'")
+    strat = strategy.load(args.data)
+
+    # dump config
+    ctx.dump_config(seeds, model_spec, strat)
+
+    # run training stages
+    logging.info("running training stages...")
+
+    for i, stage in enumerate(strat.stages):
+        logging.info(f"running stage {i + 1}/{len(strat.stages)}: '{stage.name}' ({stage.id})")
+
+        run_stage(ctx, stage, model_spec, writer)
