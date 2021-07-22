@@ -16,7 +16,6 @@ import torch.optim as optim
 
 from torch.utils.tensorboard import SummaryWriter
 
-from . import data
 from . import models
 from . import strategy
 from . import utils
