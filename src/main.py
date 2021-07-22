@@ -124,7 +124,9 @@ def main():
 
     n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
     logging.info(f"set up model with {n_params} parameters")
-    logging.info(f"model:\n{model}")
+
+    with open(ctx.dir_out / 'model.txt', 'w') as fd:
+        fd.write(str(model))
 
     # setup loss function
     loss_fn = model_spec.loss
