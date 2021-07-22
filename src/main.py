@@ -204,13 +204,13 @@ def main():
             # backprop
             scaler.scale(loss).backward()
 
-            # clip gradients
-            if stage.gradient.clip is not None:
-                scaler.unscale_(opt)
-                stage.gradient.clip(model.parameters())
-
             # accumulate gradients if specified
             if (i + 1) % stage.gradient.accumulate == 0:
+                # clip gradients
+                if stage.gradient.clip is not None:
+                    scaler.unscale_(opt)
+                    stage.gradient.clip(model.parameters())
+
                 # run optimizer
                 scaler.step(opt)
                 scaler.update()
