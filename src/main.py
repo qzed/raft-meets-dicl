@@ -484,60 +484,69 @@ def main():
 
     logging.info(f"training...")
 
-    opt.zero_grad()
-    for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
-        # move to cuda device
-        img1 = img1.cuda()
-        img2 = img2.cuda()
-        flow = flow.cuda()
-        valid = valid.cuda()
+    step = 0
+    for epoch in range(stage.data.epochs):
+        opt.zero_grad()         # ensure that we don't accumulate over epochs
 
-        result = model(img1, img2, **stage.model_args)
-        final = result.final()
+        for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
+            if i % stage.gradient.accumulate == 0:
+                opt.zero_grad()
 
-        # TODO: allow configuring this interval
-        if i % 100 == 0:
-            ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
-            ft = visual.flow_to_rgb(ft)
+            # move to cuda device
+            img1 = img1.cuda()
+            img2 = img2.cuda()
+            flow = flow.cuda()
+            valid = valid.cuda()
 
-            fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
-            fe = visual.flow_to_rgb(fe)
+            result = model(img1, img2, **stage.model_args)
+            final = result.final()
 
-            writer.add_image('img1', (img1[0].detach().cpu() + 1) / 2, i, dataformats='CHW')
-            writer.add_image('img2', (img2[0].detach().cpu() + 1) / 2, i, dataformats='CHW')
-            writer.add_image('flow', ft, i, dataformats='HWC')
-            writer.add_image('flow-est', fe, i, dataformats='HWC')
+            # TODO: allow configuring this interval
+            if i % 100 == 0:
+                ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
+                ft = visual.flow_to_rgb(ft)
 
-        # compute loss
-        loss = loss_fn(result.output(), flow, valid, **stage.loss_args)
+                fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
+                fe = visual.flow_to_rgb(fe)
 
-        # compute metrics
-        with torch.no_grad():
-            metrics = metrics_fn(final, flow, valid)
-            metrics['Loss/train'] = loss.detach().item()
+                writer.add_image('img1', (img1[0].detach().cpu() + 1) / 2, step, dataformats='CHW')
+                writer.add_image('img2', (img2[0].detach().cpu() + 1) / 2, step, dataformats='CHW')
+                writer.add_image('flow', ft, step, dataformats='HWC')
+                writer.add_image('flow-est', fe, step, dataformats='HWC')
 
-        # TODO: more validation stuff
-        # TODO: checkpointing
+            # compute loss
+            loss = loss_fn(result.output(), flow, valid, **stage.loss_args)
 
-        # backprop
-        scaler.scale(loss).backward()
+            # compute metrics
+            with torch.no_grad():
+                metrics = metrics_fn(final, flow, valid)
+                metrics['Loss/train'] = loss.detach().item()
 
-        # clip gradients
-        if stage.gradient.clip is not None:
-            scaler.unscale_(opt)
-            stage.gradient.clip(model.parameters())
+            # TODO: more validation stuff
+            # TODO: checkpointing
 
-        # accumulate gradients if specified
-        if (i + 1) % stage.gradient.accumulate == 0:
-            # run optimizer
-            scaler.step(opt)
-            scaler.update()
+            # backprop
+            scaler.scale(loss).backward()
 
-            for s in sched_instance:
-                s.step()
+            # clip gradients
+            if stage.gradient.clip is not None:
+                scaler.unscale_(opt)
+                stage.gradient.clip(model.parameters())
 
-            opt.zero_grad()
+            # accumulate gradients if specified
+            if (i + 1) % stage.gradient.accumulate == 0:
+                # run optimizer
+                scaler.step(opt)
+                scaler.update()
 
-        # dump metrics
-        for k, v in metrics.items():
-            writer.add_scalar(k, v, i)
+                for s in sched_instance:
+                    s.step()
+
+            # dump metrics
+            for k, v in metrics.items():
+                writer.add_scalar(k, v, step)
+
+            step += 1
+
+        for s in sched_epoch:
+            s.step()
