@@ -468,7 +468,7 @@ class Scale(Augmentation):
         flow *= scale
 
         # this is for full/non-sparse flows only...
-        valid = np.ones(img1.shape[:2], dtype=np.bool)
+        valid = np.ones(img1.shape[:2], dtype=bool)
 
         return img1, img2, flow, valid
 
