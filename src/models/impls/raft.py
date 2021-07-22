@@ -146,7 +146,7 @@ class CorrBlock:
 
         corr = torch.matmul(fmap1.transpose(1, 2), fmap2)       # dot-product (for each h, w)
         corr = corr.view(batch, h, w, 1, h, w)                  # reshape back to volume
-        corr = corr / torch.sqrt(torch.tensor(dim).float())     # normalize
+        corr = corr / torch.tensor(dim).float().sqrt()          # normalize
 
         # build correlation pyramid
         self.corr_pyramid.append(corr)                          # append full layer
