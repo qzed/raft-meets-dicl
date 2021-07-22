@@ -4,6 +4,7 @@ import git
 import logging
 import numpy as np
 import os
+import warnings
 
 from tqdm import tqdm
 from pathlib import Path
@@ -70,6 +71,7 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     )
 
     logging.captureWarnings(True)
+    warnings.filterwarnings('default')
 
     return Context(timestamp, dir_out)
 
