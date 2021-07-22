@@ -406,9 +406,7 @@ def main():
 
     # load model config
     logging.info(f"loading model info from configuration: file='{args.model}'")
-
-    model_cfg = utils.config.load(args.model)
-    model_spec = models.ModelSpec.from_config(model_cfg)
+    model_spec = models.load(args.model)
 
     # load training dataset
     logging.info(f"loading stage configuration: file='{args.data}'")
