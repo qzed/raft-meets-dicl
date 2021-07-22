@@ -1,3 +1,4 @@
+from . import common
 from . import impls as m
 from . import input
 
@@ -13,7 +14,7 @@ class ModelSpec:
 
         return cls(model, loss, input)
 
-    def __init__(self, model, loss, input):
+    def __init__(self, model: common.Model, loss: common.Loss, input: input.InputSpec):
         self.model = model
         self.loss = loss
         self.input = input
@@ -26,11 +27,11 @@ class ModelSpec:
         }
 
 
-def load_input(cfg):
+def load_input(cfg) -> input.InputSpec:
     return input.InputSpec.from_config(cfg)
 
 
-def load_loss(cfg):
+def load_loss(cfg) -> common.Loss:
     types = [
         m.dicl.MultiscaleLoss,
         m.raft.SequenceLoss,
@@ -41,7 +42,7 @@ def load_loss(cfg):
     return types[type].from_config(cfg)
 
 
-def load_model(cfg):
+def load_model(cfg) -> common.Model:
     types = [
         m.dicl.Dicl,
         m.raft.Raft,
@@ -52,7 +53,7 @@ def load_model(cfg):
     return types[type].from_config(cfg)
 
 
-def load(cfg):
+def load(cfg) -> ModelSpec:
     if not isinstance(cfg, dict):
         cfg = utils.config.load(cfg)
 
