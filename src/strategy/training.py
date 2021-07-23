@@ -52,7 +52,11 @@ class Trainer:
 
         # TODO: make these configurable
         self.loader_args = {'num_workers': 4, 'pin_memory': True}
-        self.metrics = metrics.EndPointError()
+
+        self.metrics = metrics.Collection([
+            metrics.EndPointError(),
+            metrics.Loss(),
+        ])
 
     def run(self):
         n_stages = len(self.strategy.stages)
@@ -143,11 +147,7 @@ class Trainer:
         # compute metrics
         with torch.no_grad():
             final = result.final()
-
-            metrics = self.metrics(final, flow, valid)
-
-            # TODO: build this into self.metrics
-            metrics['Loss/train'] = loss.detach().item()
+            metrics = self.metrics(final, flow, valid, loss.detach().item())
 
         # store metrics and info for current sample
         for k, v in metrics.items():

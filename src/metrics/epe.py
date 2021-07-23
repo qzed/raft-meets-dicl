@@ -20,7 +20,7 @@ class EndPointError(Metric):
             'prefix': self.prefix,
         }
 
-    def compute(self, estimate, target, valid):
+    def compute(self, estimate, target, valid, _loss):
         # end-point error for each individual pixel
         # note: input may be batch or single instance, thus use dim=-3
         epe = torch.linalg.vector_norm(estimate - target, ord=2, dim=-3)
