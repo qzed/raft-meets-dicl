@@ -104,7 +104,7 @@ class Trainer:
 
         # inspection and validation
         with torch.no_grad():
-            self.inspector.on_stage(log, self.model, stage, self.step)
+            self.inspector.on_stage(log, self, stage)
 
     def run_epoch(self, log, stage, epoch):
         # set up progress bar
@@ -123,7 +123,7 @@ class Trainer:
 
         # inspection and validation
         with torch.no_grad():
-            self.inspector.on_epoch(log, self.model, stage, epoch, self.step)
+            self.inspector.on_epoch(log, self, stage, epoch)
 
     def run_instance(self, log, stage, epoch, i, img1, img2, flow, valid):
         # reset gradients
@@ -142,11 +142,10 @@ class Trainer:
         # compute loss
         loss = self.loss(result.output(), flow, valid, **stage.loss_args)
 
-        # inspection
+        # inspection (metrics, validation, ...)
         with torch.no_grad():
-            # metrics, validation, ...
-            self.inspector.on_sample(log, self.model, stage, epoch, self.step, i, img1, img2, flow,
-                                     valid, result, loss)
+            self.inspector.on_sample(log, self, stage, epoch, i, img1, img2, flow, valid, result,
+                                     loss)
 
         # backprop
         self.scaler.scale(loss).backward()

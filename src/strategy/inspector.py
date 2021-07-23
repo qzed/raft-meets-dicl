@@ -2,11 +2,11 @@ class Inspector:
     def __init__(self):
         pass
 
-    def on_sample(self, log, model, stage, epoch, step, i, img1, img2, target, valid, result, loss):
+    def on_sample(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         pass
 
-    def on_epoch(self, log, model, stage, epoch, step):
+    def on_epoch(self, log, ctx, stage, epoch):
         pass
 
-    def on_stage(self, log, model, stage, step):
+    def on_stage(self, log, ctx, stage):
         pass

@@ -66,7 +66,7 @@ class BasicInspector(strategy.training.Inspector):
             metrics.Loss(),
         ])
 
-    def on_sample(self, log, model, stage, epoch, step, i, img1, img2, target, valid, result, loss):
+    def on_sample(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         # get final result (performs upsampling if necessary)
         final = result.final()
 
@@ -75,7 +75,7 @@ class BasicInspector(strategy.training.Inspector):
 
         # store metrics and info for current sample
         for k, v in metrics.items():
-            self.writer.add_scalar(k, v, step)
+            self.writer.add_scalar(k, v, ctx.step)
 
         # TODO: make this more configurable
         if i % 100 == 0:
@@ -88,18 +88,18 @@ class BasicInspector(strategy.training.Inspector):
             i1 = (img1[0].detach().cpu() + 1) / 2
             i2 = (img2[0].detach().cpu() + 1) / 2
 
-            self.writer.add_image('img1', i1, step, dataformats='CHW')
-            self.writer.add_image('img2', i2, step, dataformats='CHW')
-            self.writer.add_image('flow', ft, step, dataformats='HWC')
-            self.writer.add_image('flow-est', fe, step, dataformats='HWC')
+            self.writer.add_image('img1', i1, ctx.step, dataformats='CHW')
+            self.writer.add_image('img2', i2, ctx.step, dataformats='CHW')
+            self.writer.add_image('flow', ft, ctx.step, dataformats='HWC')
+            self.writer.add_image('flow-est', fe, ctx.step, dataformats='HWC')
 
-    def on_epoch(self, log, model, stage, epoch, step):
+    def on_epoch(self, log, ctx, stage, epoch):
         pass
 
         # TODO: validation, metrics, ...
         # TODO: checkpointing
 
-    def on_stage(self, log, model, stage, step):
+    def on_stage(self, log, ctx, stage):
         pass
 
 
