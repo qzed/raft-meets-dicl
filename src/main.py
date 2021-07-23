@@ -99,7 +99,6 @@ def run_stage(log, ctx, stage, model_spec, writer):
     model.train()
 
     log.info(f"training...")
-    logpfx = log.pfx
 
     # TODO: properly handle sample indices over multiple stages
 
