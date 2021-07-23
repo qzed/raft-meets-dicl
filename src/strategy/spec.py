@@ -1,3 +1,5 @@
+from typing import List, Union
+
 import numpy as np
 
 import torch
@@ -275,6 +277,15 @@ class MultiSchedulerSpec:
 
 
 class Stage:
+    name: str
+    id: str
+    data: DataSpec
+    optimizer: OptimizerSpec
+    model_args: dict
+    loss_args: dict
+    gradient: Union[GradientSpec, None]
+    scheduler: MultiSchedulerSpec
+
     @classmethod
     def from_config(cls, path, cfg):
         name = cfg['name']
@@ -316,6 +327,9 @@ class Stage:
 
 
 class Strategy:
+    mode: str
+    stages: List[Stage]
+
     @classmethod
     def from_config(cls, path, cfg):
         mode = cfg.get('mode', 'best')
