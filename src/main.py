@@ -84,16 +84,16 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
-def run_stage(ctx, stage, model_spec, writer):
+def run_stage(log, ctx, stage, model_spec, writer):
     # load data
-    logging.info(f"loading dataset {stage.data.source}")
+    log.info(f"loading dataset: {stage.data.source.description()}")
 
     train_input = model_spec.input.apply(stage.data.source).torch()
     train_loader = td.DataLoader(train_input, batch_size=stage.data.batch_size,
                                  shuffle=stage.data.shuffle, drop_last=stage.data.drop_last,
                                  num_workers=4, pin_memory=True)
 
-    logging.info(f"dataset loaded: have {len(train_loader)} samples")
+    log.info(f"dataset loaded: have {len(train_loader)} samples")
 
     loss_fn = model_spec.loss
     model = model_spec.model
@@ -103,7 +103,7 @@ def run_stage(ctx, stage, model_spec, writer):
     metrics_fn = M.EndPointError(distances=[1, 3, 5])
 
     # setup optimizer
-    logging.info(f"setting up optimizer")
+    log.info(f"setting up optimizer")
 
     opt = stage.optimizer.build(model.parameters())
     scaler = stage.gradient.scaler.build()
@@ -122,15 +122,22 @@ def run_stage(ctx, stage, model_spec, writer):
     model.cuda()
     model.train()
 
-    logging.info(f"training...")
+    log.info(f"training...")
+    logpfx = log.name
 
     # TODO: properly handle sample indices over multiple stages
 
     step = 0
     for epoch in range(stage.data.epochs):
+        log = logging.getLogger(f"{logpfx}, epoch {epoch + 1}/{stage.data.epochs}")
+        log.info(f"starting epoch...")
+
         opt.zero_grad()         # ensure that we don't accumulate over epochs
 
-        for i, (img1, img2, flow, valid, key) in enumerate(tqdm(train_loader, unit='batch')):
+        samples = tqdm(train_loader, unit='batch', leave=False)
+        samples.set_description(log.name)       # FIXME: clean this up (don't use log.name)...
+
+        for i, (img1, img2, flow, valid, key) in enumerate(samples):
             if i % stage.gradient.accumulate == 0:
                 opt.zero_grad()
 
@@ -212,8 +219,6 @@ def main():
 
     logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
 
-    writer = SummaryWriter(ctx.dir_out / 'tb')
-
     # set seeds
     seeds = utils.seeds.random_seeds().apply()
 
@@ -226,7 +231,8 @@ def main():
 
     model = model_spec.model
     n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
-    logging.info(f"set up model with {n_params} parameters")
+    logging.info(f"set up model '{model_spec.name}' ({model_spec.id})")
+    logging.info(f"model has {n_params} parameters")
 
     # load training strategy
     logging.info(f"loading strategy configuration: file='{args.data}'")
@@ -235,10 +241,14 @@ def main():
     # dump config
     ctx.dump_config(seeds, model_spec, strat)
 
+    writer = SummaryWriter(ctx.dir_out / f"tb.{model_spec.id.replace('/', '.')}")
+
     # run training stages
     logging.info("running training stages...")
 
     for i, stage in enumerate(strat.stages):
-        logging.info(f"running stage {i + 1}/{len(strat.stages)}: '{stage.name}' ({stage.id})")
+        pfx = f"stage {i + 1}/{len(strat.stages)}"
+        log = logging.getLogger(pfx)
 
-        run_stage(ctx, stage, model_spec, writer)
+        log.info(f"starting new stage: '{stage.name}' ({stage.id})")
+        run_stage(log, ctx, stage, model_spec, writer)
