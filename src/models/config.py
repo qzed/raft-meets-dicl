@@ -8,13 +8,17 @@ from .. import utils
 class ModelSpec:
     @classmethod
     def from_config(cls, cfg):
+        name = cfg['name']
+        id = cfg['id']
         model = load_model(cfg['model'])
         loss = load_loss(cfg['loss'])
         input = load_input(cfg.get('input'))
 
-        return cls(model, loss, input)
+        return cls(name, id, model, loss, input)
 
-    def __init__(self, model: common.Model, loss: common.Loss, input: input.InputSpec):
+    def __init__(self, name, id, model: common.Model, loss: common.Loss, input: input.InputSpec):
+        self.name = name
+        self.id = id
         self.model = model
         self.loss = loss
         self.input = input
