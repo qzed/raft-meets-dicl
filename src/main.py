@@ -56,6 +56,9 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 
 
 def run_stage(log, ctx, stage, model_spec, writer):
+    device = torch.device('cuda:0')
+    device_ids = None
+
     # load data
     log.info(f"loading dataset: {stage.data.source.description()}")
 
@@ -89,8 +92,10 @@ def run_stage(log, ctx, stage, model_spec, writer):
     sched_instance, sched_epoch = stage.scheduler.build(opt, sched_vars)
 
     # training loop
-    model = nn.DataParallel(model)
-    model.cuda()
+    if device == torch.device('cuda:0'):
+        model = nn.DataParallel(model, device_ids)
+
+    model.to(device)
     model.train()
 
     log.info(f"training...")
@@ -113,10 +118,10 @@ def run_stage(log, ctx, stage, model_spec, writer):
                 opt.zero_grad()
 
             # move to cuda device
-            img1 = img1.cuda()
-            img2 = img2.cuda()
-            flow = flow.cuda()
-            valid = valid.cuda()
+            img1 = img1.to(device)
+            img2 = img2.to(device)
+            flow = flow.to(device)
+            valid = valid.to(device)
 
             result = model(img1, img2, **stage.model_args)
             final = result.final()
