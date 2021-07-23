@@ -51,6 +51,11 @@ class Context:
         utils.config.store(self.dir_out / 'config.json', cfg)
 
 
+class TqdmStream:
+    def write(self, msg):
+        tqdm.write(msg, end='')
+
+
 def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     # setup paths
     dir_out = Path(dir_base) / Path(timestamp.strftime('%G.%m.%d-%H.%M.%S'))
@@ -60,13 +65,16 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     os.makedirs(dir_out, exist_ok=True)
 
     # setup logging
+    console_handler = logging.StreamHandler()
+    console_handler.setStream(TqdmStream())
+
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(message)s',
+        format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(name)-s: %(message)s',
         datefmt='%H:%M:%S',
         handlers=[
             logging.FileHandler(file_log),
-            logging.StreamHandler(),
+            console_handler,
         ],
     )
 
