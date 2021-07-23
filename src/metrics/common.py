@@ -21,16 +21,16 @@ class Metric:
 
 
 class Collection(Metric):
-    def __init__(self, metrics: List[Metric], prefix: str = ''):
+    def __init__(self, metrics: List[Metric], key: str = ''):
         super().__init__()
 
         self.metrics = metrics
-        self.prefix = prefix
+        self.key = key
 
     def get_config(self):
         return {
             'type': 'collection',
-            'prefix': self.prefix,
+            'key': self.key,
             'metrics': [m.get_config() for m in self.metrics],
         }
 
@@ -41,6 +41,6 @@ class Collection(Metric):
             partial = metric(estimate, target, valid, loss)
 
             for k, v in partial.items():
-                result[f'{self.prefix}{k}'] = v
+                result[f'{self.key}{k}'] = v
 
         return result

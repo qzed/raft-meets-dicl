@@ -7,17 +7,17 @@ from .common import Metric
 
 
 class EndPointError(Metric):
-    def __init__(self, distances: List[float] = [1, 3, 5], prefix: str = 'EndPointError/'):
+    def __init__(self, distances: List[float] = [1, 3, 5], key: str = 'EndPointError/'):
         super().__init__()
 
         self.distances = distances
-        self.prefix = prefix
+        self.key = key
 
     def get_config(self):
         return {
             'type': 'epe',
+            'key': self.key,
             'distances': self.distances,
-            'prefix': self.prefix,
         }
 
     def compute(self, estimate, target, valid, _loss):
@@ -30,8 +30,8 @@ class EndPointError(Metric):
 
         # compute metrics based on end-point error means
         result = OrderedDict()
-        result[f'{self.prefix}mean'] = epe.mean().item()
+        result[f'{self.key}mean'] = epe.mean().item()
         for d in self.distances:
-            result[f'{self.prefix}{d}px'] = (epe < d).float().mean().item()
+            result[f'{self.key}{d}px'] = (epe < d).float().mean().item()
 
         return result
