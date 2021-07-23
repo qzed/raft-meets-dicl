@@ -66,7 +66,7 @@ class BasicInspector(strategy.training.Inspector):
             metrics.Loss(),
         ])
 
-    def on_sample(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
+    def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         # get final result (performs upsampling if necessary)
         final = result.final()
 

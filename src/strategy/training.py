@@ -144,8 +144,8 @@ class Trainer:
 
         # inspection (metrics, validation, ...)
         with torch.no_grad():
-            self.inspector.on_sample(log, self, stage, epoch, i, img1, img2, flow, valid, result,
-                                     loss)
+            self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, result,
+                                    loss)
 
         # backprop
         self.scaler.scale(loss).backward()
