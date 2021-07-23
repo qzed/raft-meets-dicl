@@ -144,30 +144,33 @@ class Trainer:
         # compute loss
         loss = self.loss(result.output(), flow, valid, **stage.loss_args)
 
-        # compute metrics
+        # inspection
         with torch.no_grad():
+            # get final result (performs upsampling if necessary)
             final = result.final()
+
+            # compute metrics
             metrics = self.metrics(final, flow, valid, loss.detach().item())
 
-        # store metrics and info for current sample
-        for k, v in metrics.items():
-            self.writer.add_scalar(k, v, self.step)
+            # store metrics and info for current sample
+            for k, v in metrics.items():
+                self.writer.add_scalar(k, v, self.step)
 
-        # TODO: make this more configurable
-        if i % 100 == 0:
-            ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
-            ft = visual.flow_to_rgb(ft)
+            # TODO: make this more configurable
+            if i % 100 == 0:
+                ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
+                ft = visual.flow_to_rgb(ft)
 
-            fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
-            fe = visual.flow_to_rgb(fe)
+                fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
+                fe = visual.flow_to_rgb(fe)
 
-            i1 = (img1[0].detach().cpu() + 1) / 2
-            i2 = (img2[0].detach().cpu() + 1) / 2
+                i1 = (img1[0].detach().cpu() + 1) / 2
+                i2 = (img2[0].detach().cpu() + 1) / 2
 
-            self.writer.add_image('img1', i1, self.step, dataformats='CHW')
-            self.writer.add_image('img2', i2, self.step, dataformats='CHW')
-            self.writer.add_image('flow', ft, self.step, dataformats='HWC')
-            self.writer.add_image('flow-est', fe, self.step, dataformats='HWC')
+                self.writer.add_image('img1', i1, self.step, dataformats='CHW')
+                self.writer.add_image('img2', i2, self.step, dataformats='CHW')
+                self.writer.add_image('flow', ft, self.step, dataformats='HWC')
+                self.writer.add_image('flow-est', fe, self.step, dataformats='HWC')
 
         # backprop
         self.scaler.scale(loss).backward()
