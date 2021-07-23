@@ -1,5 +1,5 @@
 name: "RAFT: MPI Sintel"
-id: raft-sintel-0
+id: raft/sintel-0
 
 data:
   source: ../../data/train-sintel.yaml

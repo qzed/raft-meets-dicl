@@ -1,5 +1,5 @@
 name: "DICL: MPI Sintel"
-id: dicl-sintel-0
+id: dicl/sintel-0
 
 data:
   source: ../../data/train-sintel.yaml
