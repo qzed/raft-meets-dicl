@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import git
 import logging
 import numpy as np
 import os
@@ -26,13 +25,6 @@ class Context:
         self.timestamp = timestamp
         self.dir_out = dir_out
 
-    def _get_git_head_hash(self):
-        try:
-            repo = git.Repo(Path(__file__).parent, search_parent_directories=True)
-            return repo.head.object.hexsha
-        except git.exc.InvalidGitRepositoryError:
-            return '<out-of-tree>'
-
     def dump_config(self, seeds, model, strat):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
@@ -40,7 +32,7 @@ class Context:
 
         cfg = {
             'timestamp': self.timestamp.isoformat(),
-            'commit': self._get_git_head_hash(),
+            'commit': utils.vcs.get_git_head_hash(),
             'cwd': str(Path.cwd()),
             'seeds': seeds.get_config(),
             'model': model.get_config(),
