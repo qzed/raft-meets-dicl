@@ -12,7 +12,6 @@ class Loss(Metric):
     def get_config(self):
         return {
             'type': 'loss',
-            'distances': self.distances,
             'key': self.key,
         }
 
