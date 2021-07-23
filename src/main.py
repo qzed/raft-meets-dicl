@@ -70,7 +70,7 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(name)-s: %(message)s',
+        format='%(asctime)s.%(msecs)03d [%(levelname)-8s] %(message)s',
         datefmt='%H:%M:%S',
         handlers=[
             logging.FileHandler(file_log),
@@ -82,6 +82,22 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     warnings.filterwarnings('default')
 
     return Context(timestamp, dir_out)
+
+
+class Logger:
+    base: logging.Logger
+
+    def __init__(self, pfx):
+        self.pfx = pfx
+
+    def info(self, msg, *args, **kwargs):
+        logging.info(f"{self.pfx}: {msg}", *args, **kwargs)
+
+    def warn(self, msg, *args, **kwargs):
+        logging.warn(f"{self.pfx}: {msg}", *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        logging.error(f"{self.pfx}: {msg}", *args, **kwargs)
 
 
 def run_stage(log, ctx, stage, model_spec, writer):
@@ -123,19 +139,19 @@ def run_stage(log, ctx, stage, model_spec, writer):
     model.train()
 
     log.info(f"training...")
-    logpfx = log.name
+    logpfx = log.pfx
 
     # TODO: properly handle sample indices over multiple stages
 
     step = 0
     for epoch in range(stage.data.epochs):
-        log = logging.getLogger(f"{logpfx}, epoch {epoch + 1}/{stage.data.epochs}")
+        log = Logger(f"{logpfx}, epoch {epoch + 1}/{stage.data.epochs}")
         log.info(f"starting epoch...")
 
         opt.zero_grad()         # ensure that we don't accumulate over epochs
 
         samples = tqdm(train_loader, unit='batch', leave=False)
-        samples.set_description(log.name)       # FIXME: clean this up (don't use log.name)...
+        samples.set_description(log.pfx)    # FIXME: clean this up (don't use log.pfx)...
 
         for i, (img1, img2, flow, valid, key) in enumerate(samples):
             if i % stage.gradient.accumulate == 0:
@@ -247,8 +263,7 @@ def main():
     logging.info("running training stages...")
 
     for i, stage in enumerate(strat.stages):
-        pfx = f"stage {i + 1}/{len(strat.stages)}"
-        log = logging.getLogger(pfx)
+        log = Logger(f"stage {i + 1}/{len(strat.stages)}")
 
         log.info(f"starting new stage: '{stage.name}' ({stage.id})")
         run_stage(log, ctx, stage, model_spec, writer)
