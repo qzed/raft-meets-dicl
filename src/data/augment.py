@@ -63,6 +63,9 @@ class Augment(Collection):
     def __len__(self):
         return len(self.source)
 
+    def __str__(self):
+        return f"Augment {{ source: {str(self.source)} }}"
+
 
 class Augmentation:
     type = None

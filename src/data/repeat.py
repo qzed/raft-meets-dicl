@@ -37,3 +37,6 @@ class Repeat(Collection):
 
     def __len__(self):
         return self.times * len(self.source)
+
+    def __str__(self):
+        return f"Repeat {{ times: {self.times}, source: {str(self.source)} }}"
