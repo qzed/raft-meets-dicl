@@ -43,6 +43,15 @@ class Logger:
     def __init__(self, pfx=''):
         self.pfx = pfx
 
+    def new(self, pfx, sep=':', indent=0):
+        if self.pfx:
+            pfx = f"{self.pfx}{sep}{pfx}"
+
+        if indent:
+            pfx = ' ' * indent + pfx
+
+        return Logger(pfx)
+
     def info(self, msg, *args, **kwargs):
         logging.info(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
 

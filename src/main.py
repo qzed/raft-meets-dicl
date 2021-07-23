@@ -108,13 +108,13 @@ def run_stage(log, ctx, stage, model_spec, writer):
 
     step = 0
     for epoch in range(stage.data.epochs):
-        log = utils.logging.Logger(f"{logpfx}, epoch {epoch + 1}/{stage.data.epochs}")
-        log.info(f"starting epoch...")
+        log_ = log.new(f"epoch {epoch + 1}/{stage.data.epochs}", sep=', ')
+        log_.info(f"starting epoch...")
 
         opt.zero_grad()         # ensure that we don't accumulate over epochs
 
         samples = tqdm(train_loader, unit='batch', leave=False)
-        samples.set_description(log.pfx)    # FIXME: clean this up (don't use log.pfx)...
+        samples.set_description(log_.pfx)    # FIXME: clean this up (don't use log_.pfx)...
 
         for i, (img1, img2, flow, valid, key) in enumerate(samples):
             if i % stage.gradient.accumulate == 0:
