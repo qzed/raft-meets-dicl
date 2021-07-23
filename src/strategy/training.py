@@ -1,4 +1,5 @@
 from typing import List, Optional
+
 from tqdm import tqdm
 
 import torch
@@ -7,22 +8,19 @@ import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
 
+from .inspector import Inspector
 from .spec import Stage, Strategy
 
+from .. import models
 from .. import utils
-from .. import metrics
-from .. import visual
-
-from ..models import Loss, InputSpec
 
 
 class Trainer:
     log: utils.logging.Logger
-    writer: SummaryWriter
     strategy: Strategy
     model: nn.Module
-    loss: Loss
-    input: InputSpec
+    loss: models.Loss
+    input: models.InputSpec
     device: torch.device
 
     step: int
@@ -33,13 +31,13 @@ class Trainer:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, writer, strategy, model, loss, input, device):
+    def __init__(self, log, strategy, model, loss, input, inspector, device):
         self.log = log
-        self.writer = writer
         self.strategy = strategy
         self.model = model
         self.loss = loss
         self.input = input
+        self.inspector = inspector
         self.device = torch.device(device)
 
         self.step = 0
@@ -52,11 +50,6 @@ class Trainer:
 
         # TODO: make these configurable
         self.loader_args = {'num_workers': 4, 'pin_memory': True}
-
-        self.metrics = metrics.Collection([
-            metrics.EndPointError(),
-            metrics.Loss(),
-        ])
 
     def run(self):
         n_stages = len(self.strategy.stages)
@@ -109,6 +102,10 @@ class Trainer:
 
             self.run_epoch(log_, stage, epoch)
 
+        # inspection and validation
+        with torch.no_grad():
+            self.inspector.on_stage(log, self.model, stage, self.step)
+
     def run_epoch(self, log, stage, epoch):
         # set up progress bar
         desc = f"stage {stage.index + 1}/{len(self.strategy.stages)}, "
@@ -118,16 +115,17 @@ class Trainer:
 
         # actual trainng loop
         for i, (img1, img2, flow, valid, _key) in enumerate(samples):
-            self.run_instance(stage, i, img1, img2, flow, valid)
+            self.run_instance(log, stage, epoch, i, img1, img2, flow, valid)
 
         # run per-epoch learning-rate schedulers
         for s in self.lr_sched_epoch:
             s.step()
 
-        # TODO: validation, metrics, ...
-        # TODO: checkpointing
+        # inspection and validation
+        with torch.no_grad():
+            self.inspector.on_epoch(log, self.model, stage, epoch, self.step)
 
-    def run_instance(self, stage, i, img1, img2, flow, valid):
+    def run_instance(self, log, stage, epoch, i, img1, img2, flow, valid):
         # reset gradients
         if i % stage.gradient.accumulate == 0:
             self.optimizer.zero_grad()
@@ -146,31 +144,9 @@ class Trainer:
 
         # inspection
         with torch.no_grad():
-            # get final result (performs upsampling if necessary)
-            final = result.final()
-
-            # compute metrics
-            metrics = self.metrics(final, flow, valid, loss.detach().item())
-
-            # store metrics and info for current sample
-            for k, v in metrics.items():
-                self.writer.add_scalar(k, v, self.step)
-
-            # TODO: make this more configurable
-            if i % 100 == 0:
-                ft = flow[0].detach().cpu().permute(1, 2, 0).numpy()
-                ft = visual.flow_to_rgb(ft)
-
-                fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
-                fe = visual.flow_to_rgb(fe)
-
-                i1 = (img1[0].detach().cpu() + 1) / 2
-                i2 = (img2[0].detach().cpu() + 1) / 2
-
-                self.writer.add_image('img1', i1, self.step, dataformats='CHW')
-                self.writer.add_image('img2', i2, self.step, dataformats='CHW')
-                self.writer.add_image('flow', ft, self.step, dataformats='HWC')
-                self.writer.add_image('flow-est', fe, self.step, dataformats='HWC')
+            # metrics, validation, ...
+            self.inspector.on_sample(log, self.model, stage, epoch, self.step, i, img1, img2, flow,
+                                     valid, result, loss)
 
         # backprop
         self.scaler.scale(loss).backward()
@@ -194,5 +170,5 @@ class Trainer:
         self.step += 1
 
 
-def train(log, writer, strategy, model, loss, input, device):
-    Trainer(log, writer, strategy, model, loss, input, device).run()
+def train(log, strategy, model, loss, input, inspector, device):
+    Trainer(log, strategy, model, loss, input, inspector, device).run()

@@ -6,3 +6,6 @@ from .spec import Stage, Strategy
 
 from . import training
 from .training import Trainer, train
+
+from . import inspector
+from .inspector import Inspector

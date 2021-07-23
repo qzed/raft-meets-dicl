@@ -12,9 +12,11 @@ import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
 
+from . import metrics
 from . import models
 from . import strategy
 from . import utils
+from . import visual
 
 
 class Context:
@@ -50,6 +52,55 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     utils.logging.setup(file=dir_out/'main.log')
 
     return Context(timestamp, dir_out)
+
+
+class BasicInspector(strategy.training.Inspector):
+    def __init__(self, writer):
+        super().__init__()
+
+        self.writer = writer
+
+        # TODO: make these configurable
+        self.metrics = metrics.Collection([
+            metrics.EndPointError(),
+            metrics.Loss(),
+        ])
+
+    def on_sample(self, log, model, stage, epoch, step, i, img1, img2, target, valid, result, loss):
+        # get final result (performs upsampling if necessary)
+        final = result.final()
+
+        # compute metrics
+        metrics = self.metrics(final, target, valid, loss.detach().item())
+
+        # store metrics and info for current sample
+        for k, v in metrics.items():
+            self.writer.add_scalar(k, v, step)
+
+        # TODO: make this more configurable
+        if i % 100 == 0:
+            ft = target[0].detach().cpu().permute(1, 2, 0).numpy()
+            ft = visual.flow_to_rgb(ft)
+
+            fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
+            fe = visual.flow_to_rgb(fe)
+
+            i1 = (img1[0].detach().cpu() + 1) / 2
+            i2 = (img2[0].detach().cpu() + 1) / 2
+
+            self.writer.add_image('img1', i1, step, dataformats='CHW')
+            self.writer.add_image('img2', i2, step, dataformats='CHW')
+            self.writer.add_image('flow', ft, step, dataformats='HWC')
+            self.writer.add_image('flow-est', fe, step, dataformats='HWC')
+
+    def on_epoch(self, log, model, stage, epoch, step):
+        pass
+
+        # TODO: validation, metrics, ...
+        # TODO: checkpointing
+
+    def on_stage(self, log, model, stage, step):
+        pass
 
 
 def main():
@@ -105,7 +156,9 @@ def main():
     logging.info(f"writing tensorboard summary to '{path_summary}'")
     writer = SummaryWriter(path_summary)
 
+    inspector = BasicInspector(writer)
+
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
-    strategy.train(log, writer, strat, model, loss, input, device)
+    strategy.train(log, strat, model, loss, input, inspector, device)
