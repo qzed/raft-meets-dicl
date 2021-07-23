@@ -39,12 +39,8 @@ augmentations:
     maximum: 400
 
 source:
-  type: repeat
-  times: 100
-
-  source:
-    type: dataset
-    spec: dataset/mpi-sintel.yaml
-    parameters:
-      type: train
-      pass: clean
+  type: dataset
+  spec: dataset/mpi-sintel.yaml
+  parameters:
+    type: train
+    pass: clean
