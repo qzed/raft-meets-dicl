@@ -319,7 +319,7 @@ class Strategy:
     @classmethod
     def from_config(cls, path, cfg):
         mode = cfg.get('mode', 'best')
-        stages = [config.load_stage(path, c) for c in cfg.get('stages', [])]
+        stages = [config.load_stage(path, c) for c in cfg['stages']]
 
         return cls(mode, stages)
 
