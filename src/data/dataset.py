@@ -41,6 +41,9 @@ class Dataset(Collection):
     def __str__(self):
         return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
 
+    def description(self):
+        return self.name
+
     def get_config(self):
         return {
             'type': self.type,

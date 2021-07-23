@@ -17,3 +17,6 @@ class Collection:
 
     def __len__(self):
         raise NotImplementedError
+
+    def description(self):
+        raise NotImplementedError

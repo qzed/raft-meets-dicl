@@ -66,6 +66,9 @@ class Augment(Collection):
     def __str__(self):
         return f"Augment {{ source: {str(self.source)} }}"
 
+    def description(self):
+        return f"{self.source.description()}, augmented"
+
 
 class Augmentation:
     type = None

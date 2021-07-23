@@ -40,3 +40,6 @@ class Repeat(Collection):
 
     def __str__(self):
         return f"Repeat {{ times: {self.times}, source: {str(self.source)} }}"
+
+    def description(self):
+        return f"{self.source.description()}, repeat times {self.times}"
