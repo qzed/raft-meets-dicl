@@ -321,7 +321,7 @@ class Stage:
             'optimizer': self.optimizer.get_config(),
             'model': {'arguments': self.model_args},
             'loss': {'arguments': self.loss_args},
-            'gradient': self.gradient.get_config(),
+            'gradient': self.gradient.get_config() if self.gradient is not None else None,
             'lr-scheduler': self.scheduler.get_config(),
         }
 
