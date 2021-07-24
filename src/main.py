@@ -131,10 +131,10 @@ class InspectorSpec:
         }
 
     def build(self, writer):
-        return BasicInspector(writer, self.metrics, self.images)
+        return SummaryInspector(writer, self.metrics, self.images)
 
 
-class BasicInspector(strategy.training.Inspector):
+class SummaryInspector(strategy.training.Inspector):
     def __init__(self, writer, metrics, images):
         super().__init__()
 
