@@ -95,9 +95,6 @@ class CheckpointSpec:
 
 
 class DefaultMetricArgs(dict):
-    def __init__(self, dict):
-        super().__init__(dict)
-
     def __missing__(self, key):
         if not key.startswith('m_'):
             raise KeyError(key)
