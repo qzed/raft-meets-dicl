@@ -134,7 +134,7 @@ class InspectorSpec:
         return SummaryInspector(writer, self.metrics, self.images)
 
 
-class SummaryInspector(strategy.training.Inspector):
+class SummaryInspector(strategy.Inspector):
     def __init__(self, writer, metrics, images):
         super().__init__()
 
