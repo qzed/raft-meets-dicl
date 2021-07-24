@@ -5,7 +5,7 @@ from . import spec
 from .spec import Stage, Strategy
 
 from . import training
-from .training import Trainer, train
+from .training import TrainingContext, train
 
 from . import inspector
 from .inspector import Inspector

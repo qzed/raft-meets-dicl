@@ -15,7 +15,7 @@ from .. import models
 from .. import utils
 
 
-class Trainer:
+class TrainingContext:
     log: utils.logging.Logger
     strategy: Strategy
     model: nn.Module
@@ -170,4 +170,4 @@ class Trainer:
 
 
 def train(log, strategy, model, loss, input, inspector, device, loader_args={}):
-    Trainer(log, strategy, model, loss, input, inspector, device, loader_args).run()
+    TrainingContext(log, strategy, model, loss, input, inspector, device, loader_args).run()
