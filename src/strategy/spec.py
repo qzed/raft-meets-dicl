@@ -42,6 +42,30 @@ class DataSpec:
         }
 
 
+class ValidationSpec:
+    @classmethod
+    def from_config(cls, path, cfg):
+        if cfg is None:
+            return None
+
+        source = cfg['source']
+        batch_size = int(cfg.get('batch-size', 1))
+
+        source = data.load(path, source)
+
+        return cls(source, batch_size)
+
+    def __init__(self, source, batch_size):
+        self.source = source
+        self.batch_size = batch_size
+
+    def get_config(self):
+        return {
+            'source': self.source.get_config(),
+            'batch_size': self.batch_size,
+        }
+
+
 class OptimizerSpec:
     @classmethod
     def from_config(cls, cfg):
@@ -280,6 +304,7 @@ class Stage:
     name: str
     id: str
     data: DataSpec
+    validation: ValidationSpec
     optimizer: OptimizerSpec
     model_args: dict
     loss_args: dict
@@ -292,6 +317,7 @@ class Stage:
         id = cfg['id']
 
         data = DataSpec.from_config(path, cfg['data'])
+        valid = ValidationSpec.from_config(path, cfg.get('validation'))
         optimizer = OptimizerSpec.from_config(cfg['optimizer'])
 
         model_args = cfg.get('model', {}).get('arguments', {})
@@ -300,13 +326,14 @@ class Stage:
         gradient = GradientSpec.from_config(cfg.get('gradient', {}))
         scheduler = MultiSchedulerSpec.from_config(cfg.get('lr-scheduler', {}))
 
-        return cls(name, id, data, optimizer, model_args, loss_args, gradient, scheduler)
+        return cls(name, id, data, valid, optimizer, model_args, loss_args, gradient, scheduler)
 
-    def __init__(self, name, id, data, optimizer, model_args={}, loss_args={}, gradient=None,
-                 scheduler=MultiSchedulerSpec()):
+    def __init__(self, name, id, data, validation, optimizer, model_args={}, loss_args={},
+                 gradient=None, scheduler=MultiSchedulerSpec()):
         self.name = name
         self.id = id
         self.data = data
+        self.validation = validation
         self.optimizer = optimizer
         self.model_args = model_args
         self.loss_args = loss_args
@@ -318,6 +345,7 @@ class Stage:
             'name': self.name,
             'id': self.id,
             'data': self.data.get_config(),
+            'validation': self.validation.get_config() if self.validation is not None else None,
             'optimizer': self.optimizer.get_config(),
             'model': {'arguments': self.model_args},
             'loss': {'arguments': self.loss_args},
