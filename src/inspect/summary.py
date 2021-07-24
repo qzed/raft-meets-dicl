@@ -2,6 +2,7 @@ import re
 
 from collections import OrderedDict
 from pathlib import Path
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -15,6 +16,10 @@ from .. import visual
 
 
 class MetricsGroup:
+    frequency: int
+    prefix: str
+    metrics: List[metrics.Metric]
+
     @classmethod
     def from_config(cls, cfg):
         freq = int(cfg.get('frequency', 1))
@@ -48,6 +53,9 @@ class MetricsGroup:
 
 
 class ImagesSpec:
+    frequency: int
+    prefix: str
+
     @classmethod
     def from_config(cls, cfg):
         if cfg is None:
@@ -70,6 +78,10 @@ class ImagesSpec:
 
 
 class CheckpointSpec:
+    path: Path
+    name: str
+    compare: List[str]
+
     @classmethod
     def from_config(cls, cfg):
         path = cfg.get('path', 'checkpoints')
@@ -104,6 +116,10 @@ class DefaultMetricArgs(dict):
 
 
 class CheckpointManager:
+    path: Path
+    name: str
+    compare: List[str]
+
     def __init__(self, context, path, name, compare):
         self.context = context
         self.path = Path(path)
@@ -201,6 +217,10 @@ class CheckpointManager:
 
 
 class InspectorSpec:
+    metrics: MetricsGroup
+    images: ImagesSpec
+    checkpoints: CheckpointSpec
+
     @classmethod
     def from_config(cls, cfg):
         metrics = cfg.get('metrics', [])
@@ -235,6 +255,11 @@ class InspectorSpec:
 
 
 class SummaryInspector(strategy.Inspector):
+    writer: SummaryWriter
+    metrics: MetricsGroup
+    images: ImagesSpec
+    checkpoints: CheckpointManager
+
     def __init__(self, context, writer, metrics, images, checkpoints):
         super().__init__()
 
