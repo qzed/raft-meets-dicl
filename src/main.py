@@ -79,11 +79,13 @@ class BasicInspector(strategy.training.Inspector):
 
         # TODO: make this more configurable
         if i % 100 == 0:
+            mask = valid[0].detach().cpu()
+
             ft = target[0].detach().cpu().permute(1, 2, 0).numpy()
-            ft = visual.flow_to_rgb(ft)
+            ft = visual.flow_to_rgb(ft, mask=mask)
 
             fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
-            fe = visual.flow_to_rgb(fe)
+            fe = visual.flow_to_rgb(fe, mask=mask)
 
             i1 = (img1[0].detach().cpu() + 1) / 2
             i2 = (img2[0].detach().cpu() + 1) / 2
