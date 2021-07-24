@@ -21,6 +21,7 @@ class Trainer:
     model: nn.Module
     loss: models.Loss
     input: models.InputSpec
+    inspector: Inspector
     device: torch.device
     loader_args: Dict
 
