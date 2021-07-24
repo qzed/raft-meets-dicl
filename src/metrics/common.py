@@ -14,10 +14,12 @@ class Metric:
     def from_config(cls, cfg):
         from . import epe
         from . import loss
+        from . import lr
 
         types = [
             epe.EndPointError,
             loss.Loss,
+            lr.LearningRate,
         ]
         types = {cls.type: cls for cls in types}
 
@@ -29,15 +31,15 @@ class Metric:
     def get_config(self):
         raise NotImplementedError
 
-    def compute(self, estimate, target, valid, loss):
+    def compute(self, model, optimizer, estimate, target, valid, loss):
         # Inputs are assumed to be in shape (c, h, w) for estimate and target,
         # and (h, w) for the valid mask. Optionally, a batch dimension may be
         # prefixed, in which case the metric will be computed over the whole
         # batch.
         raise NotImplementedError
 
-    def __call__(self, estimate, target, valid, loss):
-        return self.compute(estimate, target, valid, loss)
+    def __call__(self, model, optimizer, estimate, target, valid, loss):
+        return self.compute(model, optimizer, estimate, target, valid, loss)
 
 
 class Collection(Metric):
@@ -54,11 +56,11 @@ class Collection(Metric):
             'metrics': [m.get_config() for m in self.metrics],
         }
 
-    def compute(self, estimate, target, valid, loss):
+    def compute(self, model, optimizer, estimate, target, valid, loss):
         result = OrderedDict()
 
         for metric in self.metrics:
-            partial = metric(estimate, target, valid, loss)
+            partial = metric(model, optimizer, estimate, target, valid, loss)
 
             for k, v in partial.items():
                 result[f'{self.key}{k}'] = v

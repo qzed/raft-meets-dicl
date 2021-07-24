@@ -9,6 +9,9 @@ metrics:
       - type: loss
         key: Loss/train
 
+      - type: learning-rate
+        key: LearningRate
+
 images:
   frequency: 100                          # every 100 steps/batches
   prefix: 's{n_stage}:{id_stage}/'

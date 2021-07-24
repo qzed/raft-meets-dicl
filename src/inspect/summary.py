@@ -26,11 +26,11 @@ class MetricsGroup:
             'metrics': [m.get_config() for m in self.metrics],
         }
 
-    def compute(self, estimate, target, valid, loss, fmtargs):
+    def compute(self, model, optimizer, estimate, target, valid, loss, fmtargs):
         result = OrderedDict()
 
         for metric in self.metrics:
-            partial = metric(estimate, target, valid, loss)
+            partial = metric(model, optimizer, estimate, target, valid, loss)
 
             for k, v in partial.items():
                 result[f'{self.prefix}{k}'.format(**fmtargs)] = v
@@ -105,7 +105,8 @@ class SummaryInspector(strategy.Inspector):
                 if ctx.step % m.frequency != 0:
                     continue
 
-                metrics = m.compute(final, target, valid, loss.detach().item(), fmtargs)
+                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid,
+                                    loss.detach().item(), fmtargs)
 
                 for k, v in metrics.items():
                     self.writer.add_scalar(k, v, ctx.step)
