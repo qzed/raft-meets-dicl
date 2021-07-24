@@ -267,7 +267,7 @@ class SchedulerSpec:
 
         # try to evaluate, if we fail this is probably not an expression
         try:
-            return utils.expr.eval_math_expr(value, **variables)
+            return utils.expr.eval_math_expr(value, variables)
         except TypeError:
             return value
 

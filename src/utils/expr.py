@@ -2,7 +2,7 @@ import ast
 import operator as op
 
 
-def eval_math_expr(expr, **kwargs):
+def eval_math_expr(expr, args):
     operators = {
         ast.Add: op.add,
         ast.Sub: op.sub,
@@ -24,7 +24,7 @@ def eval_math_expr(expr, **kwargs):
             raise TypeError(node)
 
     # substitute variables
-    expr = expr.format(**kwargs)
+    expr = expr.format_map(args)
 
     # parse syntax tree
     tree = ast.parse(expr, mode='eval')

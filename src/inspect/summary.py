@@ -40,7 +40,7 @@ class MetricsGroup:
             partial = metric(model, optimizer, estimate, target, valid, loss)
 
             for k, v in partial.items():
-                result[f'{self.prefix}{k}'.format(**fmtargs)] = v
+                result[f'{self.prefix}{k}'.format_map(fmtargs)] = v
 
         return result
 
@@ -117,10 +117,13 @@ class CheckpointManager:
             'n_steps': step,
         }
 
-    def _chkpt_sort_key(self, chkpt):
+    def _chkpt_args(self, chkpt):
         args = self._chkpt_iter_args(chkpt) | self._chkpt_metric_args(chkpt)
 
-        return [utils.expr.eval_math_expr(c, **args) for c in self.compare]
+    def _chkpt_sort_key(self, chkpt):
+        args = self._chkpt_args(chkpt)
+
+        return [utils.expr.eval_math_expr(c, args) for c in self.compare]
 
     def get_best(self, stage_idx=None, epoch=None, map_location=None):
         chkpts = self.checkpoints
@@ -147,12 +150,12 @@ class CheckpointManager:
         entry = (model_id, stage.index, stage.id, epoch, step, metrics, None)
 
         # get formatting arguments for creating path
-        args = self._chkpt_iter_args(entry) | self._chkpt_metric_args(entry)
+        args = self._chkpt_args(entry)
         args['id_model'] = args['id_model'].replace('/', '_').replace('-', '.')
         args['id_stage'] = args['id_stage'].replace('/', '_').replace('-', '.')
 
         # compute path
-        path = self.name.format(**args)                     # format path template
+        path = self.name.format_map(args)                   # format path template
         path = self.context.dir_out / self.path / path      # prefix base-directory
 
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -255,7 +258,7 @@ class SummaryInspector(strategy.Inspector):
             if self.images.prefix:
                 id_s = stage.id.replace('/', '.')
                 fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
-                pfx = self.images.prefix.format(**fmtargs)
+                pfx = self.images.prefix.format_map(fmtargs)
 
             # move data to CPU
             mask = valid[0].detach().cpu()
