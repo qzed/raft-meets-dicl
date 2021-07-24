@@ -119,4 +119,5 @@ def main():
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
-    strategy.train(log, strat, model, loss, input, insp, device)
+    loader_args = {'num_workers': 4, 'pin_memory': True}
+    strategy.train(log, strat, model, loss, input, insp, device, loader_args)

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from tqdm import tqdm
 
@@ -22,6 +22,7 @@ class Trainer:
     loss: models.Loss
     input: models.InputSpec
     device: torch.device
+    loader_args: Dict
 
     step: int
 
@@ -31,7 +32,7 @@ class Trainer:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, strategy, model, loss, input, inspector, device):
+    def __init__(self, log, strategy, model, loss, input, inspector, device, loader_args={}):
         self.log = log
         self.strategy = strategy
         self.model = model
@@ -39,6 +40,7 @@ class Trainer:
         self.input = input
         self.inspector = inspector
         self.device = torch.device(device)
+        self.loader_args = loader_args
 
         self.step = 0
 
@@ -47,9 +49,6 @@ class Trainer:
         self.scaler = None
         self.lr_sched_inst = None
         self.lr_sched_epoch = None
-
-        # TODO: make these configurable
-        self.loader_args = {'num_workers': 4, 'pin_memory': True}
 
     def run(self):
         n_stages = len(self.strategy.stages)
@@ -169,5 +168,5 @@ class Trainer:
         self.step += 1
 
 
-def train(log, strategy, model, loss, input, inspector, device):
-    Trainer(log, strategy, model, loss, input, inspector, device).run()
+def train(log, strategy, model, loss, input, inspector, device, loader_args={}):
+    Trainer(log, strategy, model, loss, input, inspector, device, loader_args).run()
