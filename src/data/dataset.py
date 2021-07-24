@@ -16,7 +16,7 @@ class Dataset(Collection):
         cls._typecheck(cfg)
         return _load_instance_from_config(path, cfg)
 
-    def __init__(self, id, name, path, layout, split, param_desc, param_vals, image_loader,
+    def __init__(self, id, name, path, layout, split, filter, param_desc, param_vals, image_loader,
                  flow_loader):
         super().__init__()
 
@@ -28,6 +28,7 @@ class Dataset(Collection):
         self.path = path
         self.layout = layout
         self.split = split
+        self.filter = filter
         self.param_desc = param_desc
         self.param_vals = param_vals
         self.image_loader = image_loader
@@ -37,6 +38,9 @@ class Dataset(Collection):
 
         if self.split:
             self.files = self.split.filter(self.files, param_vals)
+
+        if self.filter:
+            self.files = self.filter.filter(self.files)
 
     def __str__(self):
         return f"Dataset {{ name: '{self.name}', path: '{self.path}' }} "
@@ -60,6 +64,7 @@ class Dataset(Collection):
                 },
             },
             'parameters': self.param_vals,
+            'filter': self.filter.get_config() if self.filter is not None else None,
         }
 
     def __getitem__(self, index):
@@ -408,6 +413,57 @@ class Split:
         return [f for f, v in zip(files, split) if v == value]
 
 
+class Filter:
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        ty = cfg['type'] if isinstance(cfg, dict) else cfg
+        if ty != cls.type:
+            raise ValueError(f"invalid filter type '{cfg['type']}', expected '{cls.type}'")
+
+    def __init__(self):
+        pass
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def filter(self, files):
+        raise NotImplementedError
+
+
+class FileFilter(Filter):
+    type = 'file'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+
+        file = Path(path) / cfg['file']
+        value = str(cfg['value'])
+
+        return cls(file, value)
+
+    def __init__(self, file, value):
+        super().__init__()
+
+        self.file = file
+        self.value = value
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'file': str(self.file),
+            'value': self.value,
+        }
+
+    def filter(self, files):
+        with open(self.file) as fd:
+            split = fd.read().split()
+
+        return [f for f, v in zip(files, split) if v == self.value]
+
+
 # Note: Tensors returned by loaders are numpy arrays in shape (height, width,
 # channels). Values are floats in range [0, 1].
 class FileLoader:
@@ -525,6 +581,22 @@ class GenericFlowLoader(FileLoader):
         return flow, valid
 
 
+def _build_filter(path, cfg):
+    if cfg is None:
+        return None
+
+    filters = {
+        FileFilter,
+    }
+    filters = {cls.type: cls for cls in filters}
+
+    ty = cfg['type']
+    if ty not in filters.keys():
+        raise ValueError(f"unknown filter type '{ty}'")
+
+    return filters[ty].from_config(path, cfg)
+
+
 def _build_loader(cfg):
     loaders = {
         GenericImageLoader,
@@ -554,7 +626,7 @@ def _build_layout(cfg):
     return layouts[ty].from_config(cfg)
 
 
-def _load_dataset_from_config(path, cfg, params=dict()):
+def _load_dataset_from_config(path, cfg, params=dict(), filter=None):
     path = Path(path)
 
     # load base dataset config
@@ -581,7 +653,7 @@ def _load_dataset_from_config(path, cfg, params=dict()):
         image_loader = _build_loader('generic-image')
         flow_loader = _build_loader('generic-flow')
 
-    return Dataset(ds_id, ds_name, path / ds_path, layout, split, param_desc, params,
+    return Dataset(ds_id, ds_name, path / ds_path, layout, split, filter, param_desc, params,
                    image_loader, flow_loader)
 
 
@@ -589,10 +661,13 @@ def _load_instance_from_config(path, cfg):
     path = Path(path)
 
     spec = cfg['spec']
-    params = cfg.get('parameters', dict())
+    params = cfg.get('parameters', {})
+
+    filter = cfg.get('filter')
+    filter = _build_filter(path, filter)
 
     if not isinstance(spec, dict):
         specfile, spec = spec, config.load(path / spec)
         path = (path / specfile).parent
 
-    return _load_dataset_from_config(path, spec, params)
+    return _load_dataset_from_config(path, spec, params, filter)
