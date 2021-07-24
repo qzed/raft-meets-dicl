@@ -9,8 +9,6 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from torch.utils.tensorboard import SummaryWriter
-
 from . import models
 from . import strategy
 from . import utils
@@ -19,6 +17,7 @@ from . import inspect
 
 class Context:
     def __init__(self, timestamp, dir_out):
+        self.id = 'unspecified'
         self.timestamp = timestamp
         self.dir_out = dir_out
 
@@ -84,6 +83,7 @@ def main():
     with open(ctx.dir_out / 'model.txt', 'w') as fd:
         fd.write(str(model_spec.model))
 
+    ctx.id = model_spec.id
     model = model_spec.model
     loss = model_spec.loss
     input = model_spec.input
@@ -110,11 +110,7 @@ def main():
     # training loop
     log = utils.logging.Logger()
 
-    path_summary = ctx.dir_out / f"tb.{model_spec.id.replace('/', '.')}"
-    logging.info(f"writing tensorboard summary to '{path_summary}'")
-    writer = SummaryWriter(path_summary)
-
-    insp = insp.build(writer)
+    insp = insp.build(log, ctx)
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
