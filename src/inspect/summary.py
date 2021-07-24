@@ -216,10 +216,69 @@ class CheckpointManager:
         self.checkpoints.append(entry)
 
 
+class Validation:
+    type: Optional[str] = None
+    frequency: Union[str, int]
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid validation type '{cfg['type']}', expected '{cls.type}'")
+
+    @classmethod
+    def from_config(cls, cfg):
+        types = [
+            StrategyValidation
+        ]
+        types = {cls.type: cls for cls in types}
+
+        return types[cfg['type']].from_config(cfg)
+
+    def __init__(self, frequency):
+        if not isinstance(frequency, (str, int)):
+            raise ValueError("frequency must be either integer or one of 'epoch', 'stage'")
+
+        if isinstance(frequency, str) and frequency not in ['epoch', 'stage']:
+            raise ValueError("frequency must be either integer or one of 'epoch', 'stage'")
+
+        self.frequency = frequency
+
+    def get_config(self):
+        raise NotImplementedError
+
+    def run(self):                      # TODO: arguments
+        raise NotImplementedError
+
+
+class StrategyValidation(Validation):
+    type = 'strategy'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        freq = cfg['frequency']
+
+        return cls(freq)
+
+    def __init__(self, frequency):
+        super().__init__(frequency)
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'frequency': self.frequency,
+        }
+
+    def run(self):                      # TODO: arguments
+        pass                            # TODO: implement
+
+
 class InspectorSpec:
     metrics: MetricsGroup
     images: ImagesSpec
     checkpoints: CheckpointSpec
+    validation: List[Validation]
 
     @classmethod
     def from_config(cls, cfg):
@@ -229,18 +288,23 @@ class InspectorSpec:
         images = ImagesSpec.from_config(cfg.get('images'))
         checkpoints = CheckpointSpec.from_config(cfg.get('checkpoints', {}))
 
-        return cls(metrics, images, checkpoints)
+        validation = cfg.get('validation', [])
+        validation = [Validation.from_config(v) for v in validation]
 
-    def __init__(self, metrics, images, checkpoints):
+        return cls(metrics, images, checkpoints, validation)
+
+    def __init__(self, metrics, images, checkpoints, validation):
         self.metrics = metrics
         self.images = images
         self.checkpoints = checkpoints
+        self.validation = validation
 
     def get_config(self):
         return {
             'metrics': [g.get_config() for g in self.metrics],
             'images': self.images.get_config() if self.images is not None else None,
             'checkpoints': self.checkpoints.get_config(),
+            'validation': [v.get_config() for v in self.validation],
         }
 
     def build(self, log, context):
@@ -251,7 +315,8 @@ class InspectorSpec:
         log.info(f"writing tensorboard summary to '{path_summary}'")
         writer = SummaryWriter(path_summary)
 
-        return SummaryInspector(context, writer, self.metrics, self.images, checkpoints)
+        return SummaryInspector(context, writer, self.metrics, self.images, checkpoints,
+                                self.validation)
 
 
 class SummaryInspector(strategy.Inspector):
@@ -260,7 +325,11 @@ class SummaryInspector(strategy.Inspector):
     images: ImagesSpec
     checkpoints: CheckpointManager
 
-    def __init__(self, context, writer, metrics, images, checkpoints):
+    val_step: List[Validation]
+    val_epoch: List[Validation]
+    val_stage: List[Validation]
+
+    def __init__(self, context, writer, metrics, images, checkpoints, validation):
         super().__init__()
 
         self.context = context
@@ -268,6 +337,10 @@ class SummaryInspector(strategy.Inspector):
         self.metrics = metrics
         self.images = images
         self.checkpoints = checkpoints
+
+        self.val_step = [v for v in validation if not isinstance(v.frequency, str)]
+        self.val_epoch = [v for v in validation if v.frequency == 'epoch']
+        self.val_stage = [v for v in validation if v.frequency == 'stage']
 
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         # get final result (performs upsampling if necessary)
@@ -315,11 +388,15 @@ class SummaryInspector(strategy.Inspector):
             self.writer.add_image(f"{pfx}flow-gt", ft, ctx.step, dataformats='HWC')
             self.writer.add_image(f"{pfx}flow-est", fe, ctx.step, dataformats='HWC')
 
-    def on_epoch(self, log, ctx, stage, epoch):
-        pass
+        # run validations
+        for val in self.val_step:
+            if ctx.step % val.frequency == 0:
+                val.run()
 
-        # TODO: validation, metrics, ...
-        # TODO: checkpointing
+    def on_epoch(self, log, ctx, stage, epoch):
+        for val in self.val_epoch:
+            val.run()                       # TODO
 
     def on_stage(self, log, ctx, stage):
-        pass
+        for val in self.val_stage:
+            val.run()                       # TODO
