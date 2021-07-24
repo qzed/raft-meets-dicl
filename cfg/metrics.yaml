@@ -1,0 +1,10 @@
+metrics:
+  - prefix: 's{n_stage}:{id_stage}/'      # n_stage, n_epoch, id_stage, n_step
+    frequency: 1                          # every batch/step
+    metrics:
+      - type: epe
+        key: EndPointError/
+        distances: [1, 3, 5]
+
+      - type: loss
+        key: Loss/train

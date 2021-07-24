@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import os
 
+from collections import OrderedDict
 from pathlib import Path
 
 import torch
@@ -23,7 +24,7 @@ class Context:
         self.timestamp = timestamp
         self.dir_out = dir_out
 
-    def dump_config(self, path, seeds, model, strat):
+    def dump_config(self, path, seeds, model, strat, inspect):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -35,6 +36,7 @@ class Context:
             'seeds': seeds.get_config(),
             'model': model.get_config(),
             'strategy': strat.get_config(),
+            'inspect': inspect.get_config(),
         }
 
         utils.config.store(path, cfg)
@@ -53,28 +55,83 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     return Context(timestamp, dir_out)
 
 
+class MetricsGroup:
+    @classmethod
+    def from_config(cls, cfg):
+        freq = int(cfg.get('frequency', 1))
+        pfx = str(cfg.get('prefix', ''))
+        mtx = [metrics.Metric.from_config(m) for m in cfg.get('metrics', [])]
+
+        return cls(freq, pfx, mtx)
+
+    def __init__(self, frequency, prefix, metrics):
+        self.frequency = frequency
+        self.prefix = prefix
+        self.metrics = metrics
+
+    def get_config(self):
+        return {
+            'frequency': self.frequency,
+            'prefix': self.prefix,
+            'metrics': [m.get_config() for m in self.metrics],
+        }
+
+    def compute(self, estimate, target, valid, loss, fmtargs):
+        result = OrderedDict()
+
+        for metric in self.metrics:
+            partial = metric(estimate, target, valid, loss)
+
+            for k, v in partial.items():
+                result[f'{self.prefix}{k}'.format(**fmtargs)] = v
+
+        return result
+
+
+class InspectorSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        metrics = cfg.get('metrics', [])
+        metrics = [MetricsGroup.from_config(m) for m in metrics]
+
+        return cls(metrics)
+
+    def __init__(self, metrics):
+        self.metrics = metrics
+
+    def get_config(self):
+        return {
+            'metrics': [g.get_config() for g in self.metrics],
+        }
+
+    def build(self, writer):
+        return BasicInspector(writer, self.metrics)
+
+
 class BasicInspector(strategy.training.Inspector):
-    def __init__(self, writer):
+    def __init__(self, writer, metrics):
         super().__init__()
 
         self.writer = writer
-
-        # TODO: make these configurable
-        self.metrics = metrics.Collection([
-            metrics.EndPointError(),
-            metrics.Loss(),
-        ])
+        self.metrics = metrics
 
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         # get final result (performs upsampling if necessary)
         final = result.final()
 
         # compute metrics
-        metrics = self.metrics(final, target, valid, loss.detach().item())
+        if self.metrics:
+            stage_id = stage.id.replace('/', '.')
+            fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step)
 
-        # store metrics and info for current sample
-        for k, v in metrics.items():
-            self.writer.add_scalar(k, v, ctx.step)
+            for m in self.metrics:
+                if ctx.step % m.frequency != 0:
+                    continue
+
+                metrics = m.compute(final, target, valid, loss.detach().item(), fmtargs)
+
+                for k, v in metrics.items():
+                    self.writer.add_scalar(k, v, ctx.step)
 
         # TODO: make this more configurable
         if i % 100 == 0:
@@ -111,6 +168,7 @@ def main():
 
     parser.add_argument('-d', '--data', required=True, help='training strategy and data')
     parser.add_argument('-m', '--model', required=True, help='specification of the model')
+    parser.add_argument('-i', '--inspect', required=False, help='specification of metrics')
     parser.add_argument('-o', '--output', default='runs', help='base output directory '
                                                                '[default: %(default)s]')
 
@@ -145,10 +203,17 @@ def main():
     logging.info(f"loading strategy configuration: file='{args.data}'")
     strat = strategy.load(args.data)
 
+    # load inspector configuration
+    inspect = Path(__file__).parent.parent / 'cfg' / 'metrics.yaml'
+    inspect = args.inspect if args.inspect is not None else inspect
+
+    logging.info(f"loading metrics/inspection configuration: file='{inspect}'")
+    inspect = InspectorSpec.from_config(utils.config.load(inspect))         # TODO: add helper
+
     # dump config
     path_config = ctx.dir_out / 'config.json'
     logging.info(f"writing full configuration to '{path_config}'")
-    ctx.dump_config(path_config, seeds, model_spec, strat)
+    ctx.dump_config(path_config, seeds, model_spec, strat, inspect)
 
     # training loop
     log = utils.logging.Logger()
@@ -157,9 +222,9 @@ def main():
     logging.info(f"writing tensorboard summary to '{path_summary}'")
     writer = SummaryWriter(path_summary)
 
-    inspector = BasicInspector(writer)
+    inspect = inspect.build(writer)
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
-    strategy.train(log, strat, model, loss, input, inspector, device)
+    strategy.train(log, strat, model, loss, input, inspect, device)

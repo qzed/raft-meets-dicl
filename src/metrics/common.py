@@ -3,6 +3,26 @@ from typing import List
 
 
 class Metric:
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid metric type '{cfg['type']}', expected '{cls.type}'")
+
+    @classmethod
+    def from_config(cls, cfg):
+        from . import epe
+        from . import loss
+
+        types = [
+            epe.EndPointError,
+            loss.Loss,
+        ]
+        types = {cls.type: cls for cls in types}
+
+        return types[cfg['type']].from_config(cfg)
+
     def __init__(self):
         pass
 

@@ -7,6 +7,17 @@ from .common import Metric
 
 
 class EndPointError(Metric):
+    type = 'epe'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        key = cfg.get('key', 'EndPointError/')
+        dist = list(cfg.get('distances', [1, 3, 4]))
+
+        return cls(dist, key)
+
     def __init__(self, distances: List[float] = [1, 3, 5], key: str = 'EndPointError/'):
         super().__init__()
 
@@ -15,7 +26,7 @@ class EndPointError(Metric):
 
     def get_config(self):
         return {
-            'type': 'epe',
+            'type': self.type,
             'key': self.key,
             'distances': self.distances,
         }
