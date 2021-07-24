@@ -160,13 +160,16 @@ class SummaryInspector(strategy.training.Inspector):
                 for k, v in metrics.items():
                     self.writer.add_scalar(k, v, ctx.step)
 
+        # dump images
         if self.images is not None and ctx.step % self.images.frequency == 0:
+            # compute prefix
             pfx = ''
             if self.images.prefix:
                 id_s = stage.id.replace('/', '.')
                 fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
                 pfx = self.images.prefix.format(**fmtargs)
 
+            # move data to CPU
             mask = valid[0].detach().cpu()
 
             ft = target[0].detach().cpu().permute(1, 2, 0).numpy()
@@ -178,6 +181,7 @@ class SummaryInspector(strategy.training.Inspector):
             i1 = (img1[0].detach().cpu() + 1) / 2
             i2 = (img2[0].detach().cpu() + 1) / 2
 
+            # write images
             self.writer.add_image(f"{pfx}img1", i1, ctx.step, dataformats='CHW')
             self.writer.add_image(f"{pfx}img2", i2, ctx.step, dataformats='CHW')
             self.writer.add_image(f"{pfx}flow-gt", ft, ctx.step, dataformats='HWC')
