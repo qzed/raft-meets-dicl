@@ -88,32 +88,59 @@ class MetricsGroup:
         return result
 
 
+class ImagesSpec:
+    @classmethod
+    def from_config(cls, cfg):
+        if cfg is None:
+            return None
+
+        freq = cfg.get('frequency', 250)
+        pfx = cfg.get('prefix', '')
+
+        return cls(freq, pfx)
+
+    def __init__(self, frequency, prefix):
+        self.frequency = frequency
+        self.prefix = prefix
+
+    def get_config(self):
+        return {
+            'frequency': self.frequency,
+            'prefix': self.prefix,
+        }
+
+
 class InspectorSpec:
     @classmethod
     def from_config(cls, cfg):
         metrics = cfg.get('metrics', [])
         metrics = [MetricsGroup.from_config(m) for m in metrics]
 
-        return cls(metrics)
+        images = ImagesSpec.from_config(cfg.get('images'))
 
-    def __init__(self, metrics):
+        return cls(metrics, images)
+
+    def __init__(self, metrics, images):
         self.metrics = metrics
+        self.images = images
 
     def get_config(self):
         return {
             'metrics': [g.get_config() for g in self.metrics],
+            'images': self.images.get_config() if self.images is not None else None,
         }
 
     def build(self, writer):
-        return BasicInspector(writer, self.metrics)
+        return BasicInspector(writer, self.metrics, self.images)
 
 
 class BasicInspector(strategy.training.Inspector):
-    def __init__(self, writer, metrics):
+    def __init__(self, writer, metrics, images):
         super().__init__()
 
         self.writer = writer
         self.metrics = metrics
+        self.images = images
 
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
         # get final result (performs upsampling if necessary)
@@ -133,8 +160,13 @@ class BasicInspector(strategy.training.Inspector):
                 for k, v in metrics.items():
                     self.writer.add_scalar(k, v, ctx.step)
 
-        # TODO: make this more configurable
-        if i % 100 == 0:
+        if self.images is not None and ctx.step % self.images.frequency == 0:
+            pfx = ''
+            if self.images.prefix:
+                id_s = stage.id.replace('/', '.')
+                fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
+                pfx = self.images.prefix.format(**fmtargs)
+
             mask = valid[0].detach().cpu()
 
             ft = target[0].detach().cpu().permute(1, 2, 0).numpy()
@@ -146,10 +178,10 @@ class BasicInspector(strategy.training.Inspector):
             i1 = (img1[0].detach().cpu() + 1) / 2
             i2 = (img2[0].detach().cpu() + 1) / 2
 
-            self.writer.add_image('img1', i1, ctx.step, dataformats='CHW')
-            self.writer.add_image('img2', i2, ctx.step, dataformats='CHW')
-            self.writer.add_image('flow', ft, ctx.step, dataformats='HWC')
-            self.writer.add_image('flow-est', fe, ctx.step, dataformats='HWC')
+            self.writer.add_image(f"{pfx}img1", i1, ctx.step, dataformats='CHW')
+            self.writer.add_image(f"{pfx}img2", i2, ctx.step, dataformats='CHW')
+            self.writer.add_image(f"{pfx}flow-gt", ft, ctx.step, dataformats='HWC')
+            self.writer.add_image(f"{pfx}flow-est", fe, ctx.step, dataformats='HWC')
 
     def on_epoch(self, log, ctx, stage, epoch):
         pass

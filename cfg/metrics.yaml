@@ -8,3 +8,7 @@ metrics:
 
       - type: loss
         key: Loss/train
+
+images:
+  frequency: 100                          # every 100 steps/batches
+  prefix: 's{n_stage}:{id_stage}/'
