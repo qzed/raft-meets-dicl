@@ -501,7 +501,7 @@ class SummaryInspector(strategy.Inspector):
 
         # run validations
         for val in self.val_step:
-            if ctx.step % val.frequency == 0:
+            if ctx.step > 0 and ctx.step % val.frequency == 0:
                 val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
     def on_epoch(self, log, ctx, stage, epoch):
