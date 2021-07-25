@@ -174,8 +174,13 @@ class CheckpointManager:
     def create(self, log, ctx, stage, epoch, step, metrics):
         model_id = self.context.id
 
+        # We may call this at the end of a stage, i.e. with epoch=None. Create
+        # a variable that is always an integer as we need that for checkpoint
+        # formatting args.
+        epoch_int = epoch if epoch is not None else stage.data.epochs
+
         # create temporary entry without path
-        entry = (model_id, stage.index, stage.id, epoch, step, metrics, None)
+        entry = (model_id, stage.index, stage.id, epoch_int, step, metrics, None)
 
         # get formatting arguments for creating path
         args = self._chkpt_args(entry)
