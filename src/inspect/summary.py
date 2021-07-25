@@ -1,8 +1,8 @@
 import re
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 
@@ -221,6 +221,63 @@ class CheckpointManager:
         self.checkpoints.append(entry)
 
 
+class ValidationMetricSpec:
+    metric: metrics.Metric
+    reduce: str
+    do_log: bool
+
+    @classmethod
+    def from_config(cls, cfg):
+        reduce = str(cfg.get('reduce', 'mean'))
+        do_log = bool(cfg.get('log', True))
+        metric = metrics.Metric.from_config(cfg['metric'])
+
+        return cls(metric, reduce, do_log)
+
+    def __init__(self, metric, reduce, do_log):
+        self.metric = metric
+        self.reduce = reduce
+        self.do_log = do_log
+
+    def get_config(self):
+        return {
+            'reduce': self.reduce,
+            'log': self.do_log,
+            'metric': self.metric.get_config(),
+        }
+
+    def build(self):
+        return ValidationMetric(self.metric, self.reduce, self.do_log)
+
+
+class ValidationMetric:
+    metric: metrics.Metric
+    reduce: str
+    do_log: bool
+    values: Dict[str, List[float]]
+
+    def __init__(self, metric, reduce, do_log):
+        if reduce not in ['mean']:
+            raise ValueError("unsupported reduction type")
+
+        self.metric = metric
+        self.reduce = reduce
+        self.do_log = do_log
+        self.values = defaultdict(list)
+
+    def add(self, model, optimizer, estimate, target, valid, loss):
+        mtx = self.metric(model, optimizer, estimate, target, valid, loss)
+
+        for k, v in mtx.items():
+            self.values[k].append(v)
+
+    def result(self):
+        if self.reduce == 'mean':
+            return [(k, np.mean(vs)) for k, vs in self.values.items()]
+        else:
+            raise ValueError("unsupported reduction type")
+
+
 class Validation:
     type: Optional[str] = None
     frequency: Union[str, int]
@@ -259,6 +316,8 @@ class StrategyValidation(Validation):
     type = 'strategy'
 
     checkpoint: bool
+    tb_metrics_pfx: str
+    metrics: List[ValidationMetricSpec]
 
     @classmethod
     def from_config(cls, cfg):
@@ -266,26 +325,64 @@ class StrategyValidation(Validation):
 
         freq = cfg['frequency']
         checkpoint = bool(cfg.get('checkpoint', True))
+        tb_metrics_pfx = str(cfg.get('tb-metrics-prefix', ''))
 
-        return cls(freq, checkpoint)
+        metrics = cfg.get('metrics', [])
+        metrics = [ValidationMetricSpec.from_config(m) for m in metrics]
 
-    def __init__(self, frequency, checkpoint):
+        return cls(freq, checkpoint, tb_metrics_pfx, metrics)
+
+    def __init__(self, frequency, checkpoint, tb_metrics_pfx, metrics):
         super().__init__(frequency)
 
         self.checkpoint = checkpoint
+        self.tb_metrics_pfx = tb_metrics_pfx
+        self.metrics = metrics
 
     def get_config(self):
         return {
             'type': self.type,
             'frequency': self.frequency,
             'checkpoint': self.checkpoint,
+            'tb-metrics-prefix': self.tb_metrics_pfx,
+            'metrics': [m.get_config() for m in self.metrics],
         }
 
-    def run(self, log, ctx, chkpt, stage, epoch):
-        metrics = {}            # TODO
+    def run(self, log, ctx, writer, chkpt, stage, epoch):
+        # evaluate model
+        metrics = self._evaluate(ctx, stage)
+        kvmetrics = {}
 
+        # build log line and write metrics to tensorboard
+        entries = []
+        for m in metrics:
+            # perform reduction
+            res = m.result()
+            kvmetrics |= {k: v for k, v in res}
+
+            # write to tensorboard
+            for k, v in res:
+                writer.add_scalar(self.tb_metrics_pfx + k, v, ctx.step)
+
+            # append to log line
+            if m.do_log:
+                for k, v in res:
+                    entries += [f"{k}: {v:.4f}"]
+
+        if entries:
+            log.info(f"validation: {', '.join(entries)}")
+
+        # create checkpoint
         if self.checkpoint:
-            chkpt.create(log, ctx, stage, epoch, ctx.step, metrics)
+            chkpt.create(log, ctx, stage, epoch, ctx.step, kvmetrics)
+
+    def _evaluate(self, ctx, stage):
+        # build metric accumulators
+        metrics = [m.build() for m in self.metrics]
+
+        # TODO: evaluate/perform validation
+
+        return metrics
 
 
 class InspectorSpec:
@@ -405,12 +502,12 @@ class SummaryInspector(strategy.Inspector):
         # run validations
         for val in self.val_step:
             if ctx.step % val.frequency == 0:
-                val.run(log, ctx, self.checkpoints, stage, epoch)
+                val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
     def on_epoch(self, log, ctx, stage, epoch):
         for val in self.val_epoch:
-            val.run(log, ctx, self.checkpoints, stage, epoch)
+            val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
     def on_stage(self, log, ctx, stage):
         for val in self.val_stage:
-            val.run(log, ctx, self.checkpoints, stage, None)
+            val.run(log, ctx, self.writer, self.checkpoints, stage, None)
