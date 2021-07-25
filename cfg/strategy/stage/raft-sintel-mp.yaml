@@ -6,6 +6,10 @@ data:
   epochs: 100
   batch-size: 1
 
+validation:
+  source: ../../data/test-sintel.yaml
+  batch-size: 1
+
 optimizer:
   type: adam-w
 
