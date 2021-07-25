@@ -4,9 +4,13 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from tqdm import tqdm
+
 import numpy as np
 
 import torch
+import torch.utils.data as td
+
 from torch.utils.tensorboard import SummaryWriter
 
 from .. import metrics
@@ -350,7 +354,7 @@ class StrategyValidation(Validation):
 
     def run(self, log, ctx, writer, chkpt, stage, epoch):
         # evaluate model
-        metrics = self._evaluate(ctx, stage)
+        metrics = self._evaluate(log, ctx, stage, epoch)
         kvmetrics = {}
 
         # build log line and write metrics to tensorboard
@@ -370,17 +374,56 @@ class StrategyValidation(Validation):
                     entries += [f"{k}: {v:.4f}"]
 
         if entries:
-            log.info(f"validation: {', '.join(entries)}")
+            log.new(f"step {ctx.step}", sep=', ').info(f"validation: {', '.join(entries)}")
 
         # create checkpoint
         if self.checkpoint:
             chkpt.create(log, ctx, stage, epoch, ctx.step, kvmetrics)
 
-    def _evaluate(self, ctx, stage):
+    def _evaluate(self, log, ctx: strategy.TrainingContext, stage: strategy.Stage, epoch):
+        if stage.validation is None:
+            log.warn('no validation data specified, skipping this validation step')
+            return []
+
         # build metric accumulators
         metrics = [m.build() for m in self.metrics]
 
-        # TODO: evaluate/perform validation
+        # load validation data
+        input = ctx.input.apply(stage.validation.source).torch()
+        data = td.DataLoader(input, batch_size=stage.validation.batch_size, shuffle=False,
+                             drop_last=False, **ctx.loader_args)
+
+        # set up progress bar
+        desc = f"validation: stage {stage.index + 1}/{len(ctx.strategy.stages)}"
+        if epoch is not None:
+            desc += f", epoch {epoch + 1}/{stage.data.epochs}"
+        desc += f", step {ctx.step}"
+        samples = tqdm(data, unit='batches', leave=False)
+        samples.set_description(desc)
+
+        # validation loop
+        ctx.model.eval()
+
+        for i, (img1, img2, flow, valid, _key) in enumerate(samples):
+            # move data to device
+            img1 = img1.to(ctx.device)
+            img2 = img2.to(ctx.device)
+            flow = flow.to(ctx.device)
+            valid = valid.to(ctx.device)
+
+            # run model
+            result = ctx.model(img1, img2, **stage.model_args)
+
+            # compute loss
+            loss = ctx.loss(result.output(), flow, valid, **stage.loss_args)
+
+            # update metrics
+            est = result.final()
+
+            for m in metrics:
+                m.add(ctx.model, ctx.optimizer, est, flow, valid, loss.detach().item())
+
+        ctx.model.train()
 
         return metrics
 
