@@ -19,7 +19,7 @@ images:
 checkpoints:
   path: checkpoints/
   name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
-  compare: ['{m_EndPointError_mean}', '-{m_EndPointError_1px}']   # expr or list of exprs
+  compare: ['{m_EndPointError_mean}']     # expr or list of exprs
 
 validation:
   - type: strategy                        # use data specified in strategy stage
