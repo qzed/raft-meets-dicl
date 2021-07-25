@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Optional
 
 import numpy as np
 
@@ -304,11 +304,11 @@ class Stage:
     name: str
     id: str
     data: DataSpec
-    validation: ValidationSpec
+    validation: Optional[ValidationSpec]
     optimizer: OptimizerSpec
     model_args: dict
     loss_args: dict
-    gradient: Union[GradientSpec, None]
+    gradient: Optional[GradientSpec]
     scheduler: MultiSchedulerSpec
 
     @classmethod
