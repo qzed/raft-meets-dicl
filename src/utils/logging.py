@@ -52,6 +52,9 @@ class Logger:
 
         return Logger(pfx)
 
+    def debug(self, msg, *args, **kwargs):
+        logging.debug(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
+
     def info(self, msg, *args, **kwargs):
         logging.info(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
 

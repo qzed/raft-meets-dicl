@@ -193,7 +193,7 @@ class CheckpointManager:
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        log.info(f"saving checkpoint to '{path}'")
+        log.debug(f"saving checkpoint to '{path}'")
 
         # save actual checkpoint data
         chkpt = {
