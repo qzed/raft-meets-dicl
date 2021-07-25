@@ -1,0 +1,11 @@
+type: dataset
+spec: dataset/mpi-sintel.yaml
+
+parameters:
+  type: train
+  pass: clean
+
+filter:
+  type: file
+  file: splits/mpi-sintel-validation.txt
+  value: 1
