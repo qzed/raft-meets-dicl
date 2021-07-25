@@ -251,32 +251,41 @@ class Validation:
     def get_config(self):
         raise NotImplementedError
 
-    def run(self):                      # TODO: arguments
+    def run(self, log, ctx, chkpt, stage, epoch):
         raise NotImplementedError
 
 
 class StrategyValidation(Validation):
     type = 'strategy'
 
+    checkpoint: bool
+
     @classmethod
     def from_config(cls, cfg):
         cls._typecheck(cfg)
 
         freq = cfg['frequency']
+        checkpoint = bool(cfg.get('checkpoint', True))
 
-        return cls(freq)
+        return cls(freq, checkpoint)
 
-    def __init__(self, frequency):
+    def __init__(self, frequency, checkpoint):
         super().__init__(frequency)
+
+        self.checkpoint = checkpoint
 
     def get_config(self):
         return {
             'type': self.type,
             'frequency': self.frequency,
+            'checkpoint': self.checkpoint,
         }
 
-    def run(self):                      # TODO: arguments
-        pass                            # TODO: implement
+    def run(self, log, ctx, chkpt, stage, epoch):
+        metrics = {}            # TODO
+
+        if self.checkpoint:
+            chkpt.create(log, ctx, stage, epoch, ctx.step, metrics)
 
 
 class InspectorSpec:
@@ -396,12 +405,12 @@ class SummaryInspector(strategy.Inspector):
         # run validations
         for val in self.val_step:
             if ctx.step % val.frequency == 0:
-                val.run()
+                val.run(log, ctx, self.checkpoints, stage, epoch)
 
     def on_epoch(self, log, ctx, stage, epoch):
         for val in self.val_epoch:
-            val.run()                       # TODO
+            val.run(log, ctx, self.checkpoints, stage, epoch)
 
     def on_stage(self, log, ctx, stage):
         for val in self.val_stage:
-            val.run()                       # TODO
+            val.run(log, ctx, self.checkpoints, stage, None)
