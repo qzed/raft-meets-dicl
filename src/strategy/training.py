@@ -68,6 +68,9 @@ class TrainingContext:
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
     def run_stage(self, log, stage):
+        # TODO: add support for 'best' mode
+        #       (add prepare_stage hook in inspector?)
+
         # load data
         log.info(f"loading dataset: {stage.data.source.description()}")
 
