@@ -282,6 +282,28 @@ class ValidationMetric:
             raise ValueError("unsupported reduction type")
 
 
+class ValidationImages:
+    enabled: bool
+    prefix: str
+
+    @classmethod
+    def from_config(cls, cfg):
+        enabled = cfg.get('enabled', True)
+        prefix = cfg.get('prefix', 'Validation/')
+
+        return cls(enabled, prefix)
+
+    def get_config(self):
+        return {
+            'enabled': self.enabled,
+            'prefix': self.prefix,
+        }
+
+    def __init__(self, enabled, prefix):
+        self.enabled = enabled
+        self.prefix = prefix
+
+
 class Validation:
     type: Optional[str] = None
     frequency: Union[str, int]
@@ -334,14 +356,18 @@ class StrategyValidation(Validation):
         metrics = cfg.get('metrics', [])
         metrics = [ValidationMetricSpec.from_config(m) for m in metrics]
 
-        return cls(freq, checkpoint, tb_metrics_pfx, metrics)
+        images = cfg.get('images', {})
+        images = ValidationImages.from_config(images)
 
-    def __init__(self, frequency, checkpoint, tb_metrics_pfx, metrics):
+        return cls(freq, checkpoint, tb_metrics_pfx, metrics, images)
+
+    def __init__(self, frequency, checkpoint, tb_metrics_pfx, metrics, images):
         super().__init__(frequency)
 
         self.checkpoint = checkpoint
         self.tb_metrics_pfx = tb_metrics_pfx
         self.metrics = metrics
+        self.images = images
 
     def get_config(self):
         return {
@@ -350,11 +376,12 @@ class StrategyValidation(Validation):
             'checkpoint': self.checkpoint,
             'tb-metrics-prefix': self.tb_metrics_pfx,
             'metrics': [m.get_config() for m in self.metrics],
+            'images': self.images.get_config(),
         }
 
     def run(self, log, ctx, writer, chkpt, stage, epoch):
         # evaluate model
-        metrics = self._evaluate(log, ctx, stage, epoch)
+        metrics = self._evaluate(log, ctx, writer, stage, epoch)
         kvmetrics = {}
 
         # build log line and write metrics to tensorboard
@@ -380,10 +407,13 @@ class StrategyValidation(Validation):
         if self.checkpoint:
             chkpt.create(log, ctx, stage, epoch, ctx.step, kvmetrics)
 
-    def _evaluate(self, log, ctx: strategy.TrainingContext, stage: strategy.Stage, epoch):
+    def _evaluate(self, log, ctx: strategy.TrainingContext, writer, stage: strategy.Stage, epoch):
         if stage.validation is None:
             log.warn('no validation data specified, skipping this validation step')
             return []
+
+        # get image selection
+        images = set(stage.validation.images) if self.images.enabled else {}
 
         # build metric accumulators
         metrics = [m.build() for m in self.metrics]
@@ -422,6 +452,16 @@ class StrategyValidation(Validation):
 
             for m in metrics:
                 m.add(ctx.model, ctx.optimizer, est, flow, valid, loss.detach().item())
+
+            for j in images:        # note: we expect this to be a small set
+                j_min = i * stage.validation.batch_size
+                j_max = (i + 1) * stage.validation.batch_size
+
+                if not (j_min <= j < j_max):
+                    continue
+
+                p = self.images.prefix + f"i{j}."
+                write_images(writer, p, img1[0], img2[0], flow[0], est[0], valid[0], ctx.step)
 
         ctx.model.train()
 
@@ -518,29 +558,13 @@ class SummaryInspector(strategy.Inspector):
         # dump images
         if self.images is not None and ctx.step % self.images.frequency == 0:
             # compute prefix
-            pfx = ''
+            p = ''
             if self.images.prefix:
                 id_s = stage.id.replace('/', '.')
                 fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
-                pfx = self.images.prefix.format_map(fmtargs)
+                p = self.images.prefix.format_map(fmtargs)
 
-            # move data to CPU
-            mask = valid[0].detach().cpu()
-
-            ft = target[0].detach().cpu().permute(1, 2, 0).numpy()
-            ft = visual.flow_to_rgb(ft, mask=mask)
-
-            fe = final[0].detach().cpu().permute(1, 2, 0).numpy()
-            fe = visual.flow_to_rgb(fe, mask=mask)
-
-            i1 = (img1[0].detach().cpu() + 1) / 2
-            i2 = (img2[0].detach().cpu() + 1) / 2
-
-            # write images
-            self.writer.add_image(f"{pfx}img1", i1, ctx.step, dataformats='CHW')
-            self.writer.add_image(f"{pfx}img2", i2, ctx.step, dataformats='CHW')
-            self.writer.add_image(f"{pfx}flow-gt", ft, ctx.step, dataformats='HWC')
-            self.writer.add_image(f"{pfx}flow-est", fe, ctx.step, dataformats='HWC')
+            write_images(self.writer, p, img1[0], img2[0], target[0], final[0], valid[0], ctx.step)
 
         # run validations
         for val in self.val_step:
@@ -554,3 +578,23 @@ class SummaryInspector(strategy.Inspector):
     def on_stage(self, log, ctx, stage):
         for val in self.val_stage:
             val.run(log, ctx, self.writer, self.checkpoints, stage, None)
+
+
+def write_images(writer, pfx, img1, img2, target, estimate, valid, step):
+    # move data to CPU
+    mask = valid.detach().cpu()
+
+    ft = target.detach().cpu().permute(1, 2, 0).numpy()
+    ft = visual.flow_to_rgb(ft, mask=mask)
+
+    fe = estimate.detach().cpu().permute(1, 2, 0).numpy()
+    fe = visual.flow_to_rgb(fe, mask=mask)
+
+    i1 = (img1.detach().cpu() + 1) / 2
+    i2 = (img2.detach().cpu() + 1) / 2
+
+    # write images
+    writer.add_image(f"{pfx}img1", i1, step, dataformats='CHW')
+    writer.add_image(f"{pfx}img2", i2, step, dataformats='CHW')
+    writer.add_image(f"{pfx}flow-gt", ft, step, dataformats='HWC')
+    writer.add_image(f"{pfx}flow-est", fe, step, dataformats='HWC')

@@ -9,6 +9,7 @@ data:
 validation:
   source: ../../data/test-sintel.yaml
   batch-size: 1
+  images: [0]
 
 optimizer:
   type: adam-w

@@ -49,20 +49,23 @@ class ValidationSpec:
             return None
 
         source = cfg['source']
-        batch_size = int(cfg.get('batch-size', 1))
-
         source = data.load(path, source)
 
-        return cls(source, batch_size)
+        batch_size = int(cfg.get('batch-size', 1))
+        images = set(cfg.get('images', {}))
 
-    def __init__(self, source, batch_size):
+        return cls(source, batch_size, images)
+
+    def __init__(self, source, batch_size, images):
         self.source = source
         self.batch_size = batch_size
+        self.images = images
 
     def get_config(self):
         return {
             'source': self.source.get_config(),
             'batch_size': self.batch_size,
+            'images': list(self.images),
         }
 
 

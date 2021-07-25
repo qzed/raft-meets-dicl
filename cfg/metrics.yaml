@@ -39,3 +39,7 @@ validation:
         metric:
           type: loss
           key: Loss
+
+    images:
+      enabled: true
+      prefix: 'Validation/'
