@@ -1,12 +1,99 @@
+import pickle
 import re
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 
 from .. import utils
+
+
+@dataclass
+class Iteration:
+    stage: int
+    epoch: Optional[int]
+    step: int
+
+    @classmethod
+    def from_dict(cls, cfg):
+        return cls(
+            stage=cfg['stage'],
+            epoch=cfg.get('epoch'),
+            step=cfg['step'],
+        )
+
+    def to_dict(self):
+        return {
+            'stage': self.stage,
+            'epoch': self.epoch,
+            'step': self.step,
+        }
+
+
+@dataclass
+class State:
+    model: Any
+    optimizer: Any
+    scaler: Any
+    lr_sched_inst: List[Any]
+    lr_sched_epoch: List[Any]
+
+    @classmethod
+    def from_dict(cls, cfg):
+        return cls(
+            model=cfg['model'],
+            optimizer=cfg['optimizer'],
+            scaler=cfg['scaler'],
+            lr_sched_inst=cfg['lr-scheduler']['instance'],
+            lr_sched_epoch=cfg['lr-scheduler']['epoch'],
+        )
+
+    def to_dict(self):
+        return {
+            'model': self.model,
+            'optimizer': self.optimizer,
+            'scaler': self.scaler,
+            'lr-scheduler': {
+                'instance': self.lr_sched_inst,
+                'epoch': self.lr_sched_epoch,
+            },
+        }
+
+
+@dataclass
+class Checkpoint:
+    model: str
+    iteration: Iteration
+    metrics: Dict[str, float]
+    state: State
+
+    @classmethod
+    def from_dict(cls, cfg):
+        pass
+
+    @classmethod
+    def load(cls, path, **kwargs):
+        chkpt = torch.load(path, **kwargs)
+
+        return cls(
+            model=chkpt['model'],
+            iteration=Iteration.from_dict(chkpt['iteration']),
+            metrics=chkpt['metrics'],
+            state=State.from_dict(chkpt['state']),
+        )
+
+    def to_dict(self):
+        return {
+            'model': self.model,
+            'iteration': self.iteration.to_dict(),
+            'metrics': self.metrics,
+            'state': self.state.to_dict(),
+        }
+
+    def save(self, path):
+        torch.save(self.to_dict(), path)
 
 
 @dataclass
@@ -17,6 +104,9 @@ class CheckpointEntry:
     idx_step: int
     metrics: Dict[str, float]
     path: Optional[Path]
+
+    def load(self, **kwargs) -> Checkpoint:
+        return Checkpoint.load(self.path, **kwargs)
 
 
 class CheckpointManager:
@@ -52,7 +142,7 @@ class CheckpointManager:
 
         return [utils.expr.eval_math_expr(c, args) for c in self.compare]
 
-    def get_best(self, stage_idx=None, epoch=None, map_location=None):
+    def get_best(self, stage_idx=None, epoch=None) -> CheckpointEntry:
         chkpts = self.checkpoints
 
         # filter based on given input
@@ -64,10 +154,7 @@ class CheckpointManager:
             raise ValueError("epoch can only be set if stage_idx is set")
 
         # find best
-        chkpt = min(chkpts, key=self._chkpt_sort_key, default=None)
-
-        # load full checkpoint data
-        return torch.load(chkpt.path, map_location=map_location)
+        return min(chkpts, key=self._chkpt_sort_key, default=None)
 
     def create(self, log, ctx, stage, epoch, step, metrics):
         model_id = self.context.id
@@ -95,25 +182,20 @@ class CheckpointManager:
         log.debug(f"saving checkpoint to '{path}'")
 
         # save actual checkpoint data
-        chkpt = {
-            'model': model_id,
-            'iteration': {
-                'stage': stage.index,
-                'epoch': epoch,
-                'step': step,
-            },
-            'metrics': metrics,
-            'state': {
-                'model': ctx.model.state_dict(),
-                'optimizer': ctx.optimizer.state_dict(),
-                'scaler': ctx.scaler.state_dict(),
-                'lr-scheduler': {
-                    'instance': [s.state_dict() for s in ctx.lr_sched_inst],
-                    'epoch': [s.state_dict() for s in ctx.lr_sched_epoch],
-                },
-            },
-        }
-        torch.save(chkpt, entry.path)
+        chkpt = Checkpoint(
+            model=model_id,
+            iteration=Iteration(stage.index, epoch, step),
+            metrics=metrics,
+            state=State(
+                model=ctx.model.state_dict(),
+                optimizer=ctx.optimizer.state_dict(),
+                scaler=ctx.scaler.state_dict(),
+                lr_sched_inst=[s.state_dict() for s in ctx.lr_sched_inst],
+                lr_sched_epoch=[s.state_dict() for s in ctx.lr_sched_epoch],
+            ),
+        )
+
+        chkpt.save(entry.path)
 
         # add actual entry
         self.checkpoints.append(entry)
