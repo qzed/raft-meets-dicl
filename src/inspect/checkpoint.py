@@ -156,6 +156,19 @@ class CheckpointManager:
         # find best
         return min(chkpts, key=self._chkpt_sort_key, default=None)
 
+    def get_latest(self, stage: Optional[int] = None, epoch: Optional[int] = None):
+        chkpts = self.checkpoints
+
+        # filter based on given input
+        if stage is not None and epoch is not None:
+            chkpts = [c for c in chkpts if c.idx_stage == stage and c.idx_epoch == epoch]
+        elif stage is not None:
+            chkpts = [c for c in chkpts if c.idx_stage == stage]
+        elif epoch is not None:
+            raise ValueError("epoch can only be set if stage is set")
+
+        return max(chkpts, key=lambda c: (c.idx_stage, c.idx_epoch, c.idx_step))
+
     def create(self, log, ctx, stage, epoch, step, metrics):
         model_id = self.context.id
 
