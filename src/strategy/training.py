@@ -70,9 +70,25 @@ class TrainingContext:
 
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
-    def run_stage(self, log, stage):
-        # TODO: add support for 'best' mode
-        #       (add prepare_stage hook in inspector?)
+    def prepare_stage(self, log, stage: Stage):
+        if self.strategy.mode != 'best':
+            return      # nothing to do
+
+        # get best checkpoint of last stage (will return none if stage = -1)
+        chkpt = self.checkpoints.get_best(stage=stage.index - 1)
+        if chkpt is None:
+            return
+
+        # Load checkpoint data to CPU. We explicitly load to CPU as we only
+        # need model weights and GPU memory might be tight.
+        log.info(f"loading best checkpoint from previous stage, file='{chkpt.path}'")
+        model_state = chkpt.load(map_location='cpu').state.model
+
+        # apply restored state
+        self.model.load_state_dict(model_state)
+
+    def run_stage(self, log, stage: Stage):
+        self.prepare_stage(log, stage)
 
         # load data
         log.info(f"loading dataset: {stage.data.source.description()}")
