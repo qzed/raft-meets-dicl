@@ -366,6 +366,9 @@ class Strategy:
         mode = cfg.get('mode', 'best')
         stages = [config.load_stage(path, c) for c in cfg['stages']]
 
+        if mode not in ['best', 'continuous']:
+            raise ValueError(f"invalid value for mode, expected one of ['best', 'continuous']")
+
         return cls(mode, stages)
 
     def __init__(self, mode, stages):
