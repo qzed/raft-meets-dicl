@@ -10,8 +10,6 @@ import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
 
-from .checkpoint import CheckpointManager
-
 from .. import metrics
 from .. import strategy
 from .. import visual
@@ -117,8 +115,8 @@ class CheckpointSpec:
         }
 
     def build(self, context):
-        return CheckpointManager(context.id, context.dir_out / self.path, self.name, self.compare,
-                                 self.keep_latest, self.keep_best)
+        return strategy.CheckpointManager(context.id, context.dir_out / self.path, self.name,
+                                          self.compare, self.keep_latest, self.keep_best)
 
 
 class ValidationMetricSpec:
@@ -415,7 +413,7 @@ class SummaryInspector(strategy.Inspector):
     writer: SummaryWriter
     metrics: MetricsGroup
     images: ImagesSpec
-    checkpoints: CheckpointManager
+    checkpoints: strategy.CheckpointManager
 
     val_step: List[Validation]
     val_epoch: List[Validation]

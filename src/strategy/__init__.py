@@ -1,3 +1,6 @@
+from . import checkpoint
+from .checkpoint import CheckpointManager
+
 from . import config
 from .config import load, load_stage
 

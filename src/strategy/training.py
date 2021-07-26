@@ -8,6 +8,7 @@ import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
 
+from .checkpoint import CheckpointManager
 from .inspector import Inspector
 from .spec import Stage, Strategy
 
@@ -22,6 +23,7 @@ class TrainingContext:
     loss: models.Loss
     input: models.InputSpec
     inspector: Inspector
+    checkpoints: CheckpointManager
     device: torch.device
     loader_args: Dict
 
