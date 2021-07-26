@@ -314,6 +314,8 @@ class Stage:
     gradient: Optional[GradientSpec]
     scheduler: MultiSchedulerSpec
 
+    index: int          # set by training loop
+
     @classmethod
     def from_config(cls, path, cfg):
         name = cfg['name']
@@ -342,6 +344,7 @@ class Stage:
         self.loss_args = loss_args
         self.gradient = gradient
         self.scheduler = scheduler
+        self.index = 0
 
     def get_config(self):
         return {
