@@ -110,10 +110,10 @@ def main():
     # training loop
     log = utils.logging.Logger()
 
-    insp = insp.build(log, ctx)
+    insp, chkptm = insp.build(log, ctx)
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
     loader_args = {'num_workers': 4, 'pin_memory': True}
-    strategy.train(log, strat, model, loss, input, insp, device, loader_args)
+    strategy.train(log, strat, model, loss, input, insp, chkptm, device, loader_args)

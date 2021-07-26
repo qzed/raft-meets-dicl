@@ -405,8 +405,10 @@ class InspectorSpec:
         log.info(f"writing tensorboard summary to '{path_summary}'")
         writer = SummaryWriter(path_summary)
 
-        return SummaryInspector(context, writer, self.metrics, self.images, checkpoints,
-                                self.validation)
+        inspector = SummaryInspector(context, writer, self.metrics, self.images, checkpoints,
+                                     self.validation)
+
+        return inspector, checkpoints
 
 
 class SummaryInspector(strategy.Inspector):

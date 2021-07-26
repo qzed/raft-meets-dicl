@@ -33,13 +33,14 @@ class TrainingContext:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, strategy, model, loss, input, inspector, device, loader_args={}):
+    def __init__(self, log, strategy, model, loss, input, inspector, checkpoints, device, loader_args={}):
         self.log = log
         self.strategy = strategy
         self.model = model
         self.loss = loss
         self.input = input
         self.inspector = inspector
+        self.checkpoints = checkpoints
         self.device = torch.device(device)
         self.loader_args = loader_args
 
@@ -172,5 +173,7 @@ class TrainingContext:
         self.step += 1
 
 
-def train(log, strategy, model, loss, input, inspector, device, loader_args={}):
-    TrainingContext(log, strategy, model, loss, input, inspector, device, loader_args).run()
+def train(log, strategy, model, loss, input, inspector, checkpoints, device, loader_args={}):
+    tctx = TrainingContext(log, strategy, model, loss, input, inspector, checkpoints, device,
+                           loader_args)
+    tctx.run()
