@@ -74,7 +74,15 @@ class Dataset(Collection):
         img2 = self.image_loader.load(img2)
         flow, valid = self.flow_loader.load(flow)
 
-        return img1, img2, flow, valid, (self.id, key)
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+
+        meta = dict(
+            dataset_id=self.id,
+            sample_id=key,
+            original_extents=((0, img1.shape[0]), (0, img1.shape[1])),
+        )
+
+        return img1, img2, flow, valid, meta
 
     def __len__(self):
         return len(self.files)

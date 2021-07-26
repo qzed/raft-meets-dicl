@@ -46,11 +46,11 @@ class Augment(Collection):
         }
 
     def __getitem__(self, index):
-        img1, img2, flow, valid, key = self.source[index]
+        img1, img2, flow, valid, meta = self.source[index]
 
         # perform augmentations
         for aug in self.augmentations:
-            img1, img2, flow, valid = aug(img1, img2, flow, valid)
+            img1, img2, flow, valid, meta = aug(img1, img2, flow, valid, meta)
 
         # ensure that we have contiguous memory for torch later on
         img1 = np.ascontiguousarray(img1)
@@ -58,7 +58,7 @@ class Augment(Collection):
         flow = np.ascontiguousarray(flow)
         valid = np.ascontiguousarray(valid)
 
-        return img1, img2, flow, valid, key
+        return img1, img2, flow, valid, meta
 
     def __len__(self):
         return len(self.source)
@@ -84,11 +84,11 @@ class Augmentation:
     def get_config(self):
         raise NotImplementedError
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         raise NotImplementedError
 
-    def __call__(self, img1, img2, flow, valid):
-        return self.process(img1, img2, flow, valid)
+    def __call__(self, img1, img2, flow, valid, meta):
+        return self.process(img1, img2, flow, valid, meta)
 
 
 class ColorJitter(Augmentation):
@@ -127,7 +127,7 @@ class ColorJitter(Augmentation):
             'hue': self.hue,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         # convert to torch tensors
         img1 = torch.from_numpy(np.ascontiguousarray(img1)).permute(2, 0, 1)
         img2 = torch.from_numpy(np.ascontiguousarray(img2)).permute(2, 0, 1)
@@ -142,7 +142,7 @@ class ColorJitter(Augmentation):
             stack = np.array(self.transform(stack).permute(1, 2, 0))
             img1, img2 = np.split(stack, 2, axis=0)
 
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, meta
 
 
 class Crop(Augmentation):
@@ -169,7 +169,7 @@ class Crop(Augmentation):
             'size': self.size,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
 
         # draw new upper-right corner coordinate randomly
@@ -183,7 +183,9 @@ class Crop(Augmentation):
         flow = flow[y0:y0+self.size[1], x0:x0+self.size[0]]
         valid = valid[y0:y0+self.size[1], x0:x0+self.size[0]]
 
-        return img1, img2, flow, valid
+        meta['original_extents'] = ((0, self.size[1]), (0, self.size[0]))
+
+        return img1, img2, flow, valid, meta
 
 
 class Flip(Augmentation):
@@ -210,7 +212,7 @@ class Flip(Augmentation):
             'probability': self.probability,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         # horizontal flip
         if np.random.rand() < self.probability[0]:
             img1 = img1[:, ::-1]
@@ -225,7 +227,7 @@ class Flip(Augmentation):
             flow = flow[::-1, :] * (1.0, -1.0)
             valid = valid[::-1, :]
 
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, meta
 
 
 class NoiseNormal(Augmentation):
@@ -255,7 +257,7 @@ class NoiseNormal(Augmentation):
             'stddev': self.stddev,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         if self.stddev[0] < self.stddev[1]:
             stddev = np.random.uniform(self.stddev[0], self.stddev[1])
         else:
@@ -267,7 +269,7 @@ class NoiseNormal(Augmentation):
         img1 = np.clip(img1 + n1, 0.0, 1.0)
         img2 = np.clip(img2 + n2, 0.0, 1.0)
 
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, meta
 
 
 class Occlusion(Augmentation):
@@ -355,8 +357,8 @@ class OcclusionForward(Occlusion):
     def __init__(self, probability, num, min_size, max_size):
         super().__init__(probability, num, min_size, max_size)
 
-    def process(self, img1, img2, flow, valid):
-        return img1, self._patch(img2), flow, valid
+    def process(self, img1, img2, flow, valid, meta):
+        return img1, self._patch(img2), flow, valid, meta
 
 
 class OcclusionBackward(Occlusion):
@@ -369,8 +371,8 @@ class OcclusionBackward(Occlusion):
     def __init__(self, probability, num, min_size, max_size):
         super().__init__(probability, num, min_size, max_size)
 
-    def process(self, img1, img2, flow, valid):
-        return self._patch(img1), img2, flow, valid
+    def process(self, img1, img2, flow, valid, meta):
+        return self._patch(img1), img2, flow, valid, meta
 
 
 class RestrictFlowMagnitude(Augmentation):
@@ -395,9 +397,9 @@ class RestrictFlowMagnitude(Augmentation):
             'maximum': self.maximum,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         mag = np.linalg.norm(flow, ord=2, axis=-1)
-        return img1, img2, flow, valid & (mag < self.maximum)
+        return img1, img2, flow, valid & (mag < self.maximum), meta
 
 
 class Scale(Augmentation):
@@ -454,7 +456,7 @@ class Scale(Augmentation):
             'mode': self.mode,
         }
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
         assert np.all(valid)        # full flows only!
 
@@ -476,7 +478,7 @@ class Scale(Augmentation):
         # this is for full/non-sparse flows only...
         valid = np.ones(img1.shape[:2], dtype=bool)
 
-        return img1, img2, flow, valid
+        return img1, img2, flow, valid, meta
 
 
 class ScaleSparse(Scale):
@@ -485,7 +487,7 @@ class ScaleSparse(Scale):
     def __init__(self, min_size, min_scale, max_scale, mode):
         super().__init__(min_size, min_scale, max_scale, mode)
 
-    def process(self, img1, img2, flow, valid):
+    def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
 
         # draw random scale candidates
@@ -530,7 +532,7 @@ class ScaleSparse(Scale):
         new_valid = np.zeros(new_size[::-1], dtype=np.bool)
         new_valid[cy, cx] = True
 
-        return img1, img2, new_flow, new_valid
+        return img1, img2, new_flow, new_valid, meta
 
 
 def _build_augmentation(cfg):

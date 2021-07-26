@@ -16,11 +16,11 @@ class Padding:
     def get_config(self):
         raise NotImplementedError
 
-    def apply(self, img1, img2, flow, valid):
+    def apply(self, img1, img2, flow, valid, meta):
         raise NotImplementedError
 
-    def __call__(self, img1, img2, flow, valid):
-        return self.apply(img1, img2, flow, valid)
+    def __call__(self, img1, img2, flow, valid, meta):
+        return self.apply(img1, img2, flow, valid, meta)
 
 
 class ModuloPadding(Padding):
@@ -51,7 +51,7 @@ class ModuloPadding(Padding):
             'size': self.size,
         }
 
-    def apply(self, img1, img2, flow, valid):
+    def apply(self, img1, img2, flow, valid, meta):
         modes = ['edge', 'maximum', 'mean', 'median', 'minimum', 'reflect', 'symmetric', 'wrap']
 
         if self.mode == 'zeros':
@@ -77,7 +77,10 @@ class ModuloPadding(Padding):
         flow = np.pad(flow, pad, mode='constant', constant_values=0)
         valid = np.pad(valid, pad_v, mode='constant', constant_values=False)
 
-        return img1, img2, flow, valid
+        # note: no need to change meta.original_extents as we apply padding
+        # only the hign-index ends
+
+        return img1, img2, flow, valid, meta
 
 
 def _build_padding(cfg):
@@ -132,7 +135,7 @@ class Input:
         self.padding = padding
 
     def __getitem__(self, index):
-        img1, img2, flow, valid, key = self.source[index]
+        img1, img2, flow, valid, meta = self.source[index]
 
         clip_min, clip_max = self.clip
         range_min, range_max = self.range
@@ -141,9 +144,9 @@ class Input:
         img2 = (range_max - range_min) * np.clip(img2, clip_min, clip_max) + range_min
 
         if self.padding is not None:
-            img1, img2, flow, valid = self.padding(img1, img2, flow, valid)
+            img1, img2, flow, valid, meta = self.padding(img1, img2, flow, valid, meta)
 
-        return img1, img2, flow, valid, key
+        return img1, img2, flow, valid, meta
 
     def __len__(self):
         return len(self.source)
@@ -157,14 +160,14 @@ class TorchAdapter:
         self.source = source
 
     def __getitem__(self, index):
-        img1, img2, flow, valid, key = self.source[index]
+        img1, img2, flow, valid, meta = self.source[index]
 
         img1 = torch.from_numpy(img1).float().permute(2, 0, 1)
         img2 = torch.from_numpy(img2).float().permute(2, 0, 1)
         flow = torch.from_numpy(flow).float().permute(2, 0, 1)
         valid = torch.from_numpy(valid).bool()
 
-        return img1, img2, flow, valid, key
+        return img1, img2, flow, valid, meta
 
     def __len__(self):
         return len(self.source)

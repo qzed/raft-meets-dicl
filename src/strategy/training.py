@@ -117,8 +117,8 @@ class TrainingContext:
         samples.set_description(desc)
 
         # actual trainng loop
-        for i, (img1, img2, flow, valid, _key) in enumerate(samples):
-            self.run_instance(log, stage, epoch, i, img1, img2, flow, valid)
+        for i, (img1, img2, flow, valid, meta) in enumerate(samples):
+            self.run_instance(log, stage, epoch, i, img1, img2, flow, valid, meta)
 
         # run per-epoch learning-rate schedulers
         for s in self.lr_sched_epoch:
@@ -128,7 +128,7 @@ class TrainingContext:
         with torch.no_grad():
             self.inspector.on_epoch(log, self, stage, epoch)
 
-    def run_instance(self, log, stage, epoch, i, img1, img2, flow, valid):
+    def run_instance(self, log, stage, epoch, i, img1, img2, flow, valid, meta):
         # reset gradients
         if i % stage.gradient.accumulate == 0:
             self.optimizer.zero_grad()
@@ -147,8 +147,8 @@ class TrainingContext:
 
         # inspection (metrics, validation, ...)
         with torch.no_grad():
-            self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, result,
-                                    loss)
+            self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, meta,
+                                    result, loss)
 
         # backprop
         self.scaler.scale(loss).backward()

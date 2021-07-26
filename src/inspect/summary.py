@@ -434,7 +434,7 @@ class StrategyValidation(Validation):
         # validation loop
         ctx.model.eval()
 
-        for i, (img1, img2, flow, valid, _key) in enumerate(samples):
+        for i, (img1, img2, flow, valid, meta) in enumerate(samples):
             # move data to device
             img1 = img1.to(ctx.device)
             img2 = img2.to(ctx.device)
@@ -461,7 +461,7 @@ class StrategyValidation(Validation):
                     continue
 
                 p = self.images.prefix + f"i{j}."
-                write_images(writer, p, img1[0], img2[0], flow[0], est[0], valid[0], ctx.step)
+                write_images(writer, p, j - j_min, img1, img2, flow, est, valid, meta, ctx.step)
 
         ctx.model.train()
 
@@ -536,7 +536,7 @@ class SummaryInspector(strategy.Inspector):
         self.val_epoch = [v for v in validation if v.frequency == 'epoch']
         self.val_stage = [v for v in validation if v.frequency == 'stage']
 
-    def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, result, loss):
+    def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta, result, loss):
         # get final result (performs upsampling if necessary)
         final = result.final()
 
@@ -564,7 +564,7 @@ class SummaryInspector(strategy.Inspector):
                 fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
                 p = self.images.prefix.format_map(fmtargs)
 
-            write_images(self.writer, p, img1[0], img2[0], target[0], final[0], valid[0], ctx.step)
+            write_images(self.writer, p, 0, img1, img2, target, final, valid, meta, ctx.step)
 
         # run validations
         for val in self.val_step:
@@ -580,7 +580,17 @@ class SummaryInspector(strategy.Inspector):
             val.run(log, ctx, self.writer, self.checkpoints, stage, None)
 
 
-def write_images(writer, pfx, img1, img2, target, estimate, valid, step):
+def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step):
+    # extract data
+    img1 = img1[i]
+    img2 = img2[i]
+    target = target[i]
+    estimate = estimate[i]
+    valid = valid[i]
+
+    (h0, h1), (w0, w1) = meta['original_extents']
+    h0, h1, w0, w1 = h0[i], h1[i], w0[i], w1[i]
+
     # move data to CPU
     mask = valid.detach().cpu()
 
@@ -592,6 +602,13 @@ def write_images(writer, pfx, img1, img2, target, estimate, valid, step):
 
     i1 = (img1.detach().cpu() + 1) / 2
     i2 = (img2.detach().cpu() + 1) / 2
+
+    # remove padding
+    i1 = i1[h0:h1, w0:w1]
+    i2 = i2[h0:h1, w0:w1]
+    ft = ft[h0:h1, w0:w1]
+    fe = fe[h0:h1, w0:w1]
+    mask = mask[h0:h1, w0:w1]
 
     # write images
     writer.add_image(f"{pfx}img1", i1, step, dataformats='CHW')
