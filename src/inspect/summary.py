@@ -83,6 +83,8 @@ class CheckpointSpec:
     path: Path
     name: str
     compare: List[str]
+    keep_latest: Optional[int]
+    keep_best: Optional[int]
 
     @classmethod
     def from_config(cls, cfg):
@@ -90,22 +92,33 @@ class CheckpointSpec:
         name = cfg.get('name', '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}.pth')
         compare = cfg.get('compare', '{n_steps}')
 
-        return cls(path, name, compare)
+        keep = cfg.get('keep', {})
+        keep_last = keep.get('latest')
+        keep_best = keep.get('best')
 
-    def __init__(self, path, name, compare):
+        return cls(path, name, compare, keep_last, keep_best)
+
+    def __init__(self, path, name, compare, keep_latest=None, keep_best=None):
         self.path = Path(path)
         self.name = name
         self.compare = list(compare)
+        self.keep_latest = keep_latest
+        self.keep_best = keep_best
 
     def get_config(self):
         return {
             'path': str(self.path),
             'name': self.name,
             'compare': self.compare,
+            'keep': {
+                'latest': self.keep_latest,
+                'best': self.keep_best,
+            },
         }
 
     def build(self, context):
-        return CheckpointManager(context.id, context.dir_out / self.path, self.name, self.compare)
+        return CheckpointManager(context.id, context.dir_out / self.path, self.name, self.compare,
+                                 self.keep_latest, self.keep_best)
 
 
 class ValidationMetricSpec:

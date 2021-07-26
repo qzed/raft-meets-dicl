@@ -127,13 +127,17 @@ class CheckpointManager:
     name: str
     compare: List[str]
     checkpoints: List[CheckpointEntry]
+    keep_latest: Optional[int]
+    keep_best: Optional[int]
 
-    def __init__(self, model_id, path, name, compare):
+    def __init__(self, model_id, path, name, compare, keep_latest=None, keep_best=None):
         self.model_id = model_id
         self.path = Path(path)
         self.name = name
         self.compare = list(compare)
         self.checkpoints = []
+        self.keep_latest = keep_latest
+        self.keep_best = keep_best
 
     def _chkpt_metric_args(self, chkpt: CheckpointEntry):
         p = re.compile(r'[\./\\\?!:]')
@@ -265,3 +269,6 @@ class CheckpointManager:
 
         # add actual entry
         self.checkpoints.append(entry)
+
+        # clean up according to config
+        self.trim(n_best=self.keep_best, n_latest=self.keep_latest)

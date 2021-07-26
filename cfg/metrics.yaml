@@ -20,6 +20,9 @@ checkpoints:
   path: checkpoints/
   name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
   compare: ['{m_EndPointError_mean}']     # expr or list of exprs
+  keep:
+    latest: 2
+    best: 2
 
 validation:
   - type: strategy                        # use data specified in strategy stage
