@@ -105,7 +105,7 @@ class CheckpointSpec:
         }
 
     def build(self, context):
-        return CheckpointManager(context, self.path, self.name, self.compare)
+        return CheckpointManager(context.id, context.dir_out / self.path, self.name, self.compare)
 
 
 class ValidationMetricSpec:

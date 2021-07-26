@@ -115,8 +115,8 @@ class CheckpointManager:
     compare: List[str]
     checkpoints: List[CheckpointEntry]
 
-    def __init__(self, context, path, name, compare):
-        self.context = context
+    def __init__(self, model_id, path, name, compare):
+        self.model_id = model_id
         self.path = Path(path)
         self.name = name
         self.compare = list(compare)
@@ -170,15 +170,13 @@ class CheckpointManager:
         return max(chkpts, key=lambda c: (c.idx_stage, c.idx_epoch, c.idx_step))
 
     def create(self, log, ctx, stage, epoch, step, metrics):
-        model_id = self.context.id
-
         # We may call this at the end of a stage, i.e. with epoch=None. Create
         # a variable that is always an integer as we need that for checkpoint
         # formatting args.
         epoch_int = epoch if epoch is not None else stage.data.epochs
 
         # create temporary entry without path
-        entry = CheckpointEntry(self.context.id, stage.index, epoch_int, step, metrics, None)
+        entry = CheckpointEntry(self.model_id, stage.index, epoch_int, step, metrics, None)
 
         # get formatting arguments for creating path
         args = self._chkpt_args(entry) | {'id_stage': stage.id}
@@ -186,17 +184,14 @@ class CheckpointManager:
         args['id_stage'] = args['id_stage'].replace('/', '_').replace('-', '.')
 
         # compute path
-        path = self.name.format_map(args)                   # format path template
-        path = self.context.dir_out / self.path / path      # prefix base-directory
-        entry.path = path
+        entry.path = self.path / self.name.format_map(args)     # format path template
+        entry.path.parent.mkdir(parents=True, exist_ok=True)
 
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        log.debug(f"saving checkpoint to '{path}'")
+        log.debug(f"saving checkpoint to '{entry.path}'")
 
         # save actual checkpoint data
         chkpt = Checkpoint(
-            model=model_id,
+            model=self.model_id,
             iteration=Iteration(stage.index, epoch, step),
             metrics=metrics,
             state=State(
