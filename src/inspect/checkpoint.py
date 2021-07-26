@@ -142,16 +142,16 @@ class CheckpointManager:
 
         return [utils.expr.eval_math_expr(c, args) for c in self.compare]
 
-    def get_best(self, stage_idx=None, epoch=None) -> CheckpointEntry:
+    def get_best(self, stage: Optional[int] = None, epoch: Optional[int] = None) -> CheckpointEntry:
         chkpts = self.checkpoints
 
         # filter based on given input
-        if stage_idx is not None and epoch is not None:
-            chkpts = [c for c in chkpts if c.idx_stage == stage_idx and c.idx_epoch == epoch]
-        elif stage_idx is not None:
-            chkpts = [c for c in chkpts if c.idx_stage == stage_idx]
+        if stage is not None and epoch is not None:
+            chkpts = [c for c in chkpts if c.idx_stage == stage and c.idx_epoch == epoch]
+        elif stage is not None:
+            chkpts = [c for c in chkpts if c.idx_stage == stage]
         elif epoch is not None:
-            raise ValueError("epoch can only be set if stage_idx is set")
+            raise ValueError("epoch can only be set if stage is set")
 
         # find best
         return min(chkpts, key=self._chkpt_sort_key, default=None)
