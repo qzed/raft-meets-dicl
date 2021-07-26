@@ -110,15 +110,6 @@ class CheckpointSpec:
         return CheckpointManager(context, self.path, self.name, self.compare)
 
 
-class DefaultMetricArgs(dict):
-    def __missing__(self, key):
-        if not key.startswith('m_'):
-            raise KeyError(key)
-
-        self[key] = np.inf
-        return self[key]
-
-
 class CheckpointManager:
     path: Path
     name: str
@@ -149,8 +140,7 @@ class CheckpointManager:
         }
 
     def _chkpt_args(self, chkpt):
-        args = self._chkpt_iter_args(chkpt) | self._chkpt_metric_args(chkpt)
-        return DefaultMetricArgs(args)
+        return self._chkpt_iter_args(chkpt) | self._chkpt_metric_args(chkpt)
 
     def _chkpt_sort_key(self, chkpt):
         args = self._chkpt_args(chkpt)
