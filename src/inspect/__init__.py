@@ -1,3 +1,5 @@
+from . import checkpoint
+
 from . import config
 from .config import load
 
