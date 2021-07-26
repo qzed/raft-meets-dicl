@@ -1,17 +1,29 @@
 import re
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional
 
 import torch
 
 from .. import utils
 
 
+@dataclass
+class CheckpointEntry:
+    model: str
+    idx_stage: int
+    idx_epoch: Optional[int]
+    idx_step: int
+    metrics: Dict[str, float]
+    path: Optional[Path]
+
+
 class CheckpointManager:
     path: Path
     name: str
     compare: List[str]
+    checkpoints: List[CheckpointEntry]
 
     def __init__(self, context, path, name, compare):
         self.context = context
@@ -20,27 +32,22 @@ class CheckpointManager:
         self.compare = list(compare)
         self.checkpoints = []
 
-    def _chkpt_metric_args(self, chkpt):
-        model_id, stage_idx, stage_id, epoch, step, metrics, path = chkpt
-
+    def _chkpt_metric_args(self, chkpt: CheckpointEntry):
         p = re.compile(r'[\./\\\?!:]')
-        return {'m_' + p.sub('_', k): v for k, v in metrics.items()}
+        return {'m_' + p.sub('_', k): v for k, v in chkpt.metrics.items()}
 
-    def _chkpt_iter_args(self, chkpt):
-        model_id, stage_idx, stage_id, epoch, step, metrics, path = chkpt
-
+    def _chkpt_iter_args(self, chkpt: CheckpointEntry):
         return {
-            'id_model': model_id,
-            'n_stage': stage_idx,
-            'id_stage': stage_id,
-            'n_epoch': epoch,
-            'n_steps': step,
+            'id_model': chkpt.model,
+            'n_stage': chkpt.idx_stage,
+            'n_epoch': chkpt.idx_epoch,
+            'n_steps': chkpt.idx_step,
         }
 
-    def _chkpt_args(self, chkpt):
+    def _chkpt_args(self, chkpt: CheckpointEntry):
         return self._chkpt_iter_args(chkpt) | self._chkpt_metric_args(chkpt)
 
-    def _chkpt_sort_key(self, chkpt):
+    def _chkpt_sort_key(self, chkpt: CheckpointEntry):
         args = self._chkpt_args(chkpt)
 
         return [utils.expr.eval_math_expr(c, args) for c in self.compare]
@@ -50,18 +57,17 @@ class CheckpointManager:
 
         # filter based on given input
         if stage_idx is not None and epoch is not None:
-            chkpts = [c for c in chkpts if c[1] == stage_idx and c[3] == epoch]
+            chkpts = [c for c in chkpts if c.idx_stage == stage_idx and c.idx_epoch == epoch]
         elif stage_idx is not None:
-            chkpts = [c for c in chkpts if c[1] == stage_idx]
+            chkpts = [c for c in chkpts if c.idx_stage == stage_idx]
         elif epoch is not None:
             raise ValueError("epoch can only be set if stage_idx is set")
 
         # find best
         chkpt = min(chkpts, key=self._chkpt_sort_key, default=None)
-        model_id, stage_idx, stage_id, epoch, step, metrics, path = chkpt
 
         # load full checkpoint data
-        return torch.load(path, map_location=map_location)
+        return torch.load(chkpt.path, map_location=map_location)
 
     def create(self, log, ctx, stage, epoch, step, metrics):
         model_id = self.context.id
@@ -72,16 +78,17 @@ class CheckpointManager:
         epoch_int = epoch if epoch is not None else stage.data.epochs
 
         # create temporary entry without path
-        entry = (model_id, stage.index, stage.id, epoch_int, step, metrics, None)
+        entry = CheckpointEntry(self.context.id, stage.index, epoch_int, step, metrics, None)
 
         # get formatting arguments for creating path
-        args = self._chkpt_args(entry)
+        args = self._chkpt_args(entry) | {'id_stage': stage.id}
         args['id_model'] = args['id_model'].replace('/', '_').replace('-', '.')
         args['id_stage'] = args['id_stage'].replace('/', '_').replace('-', '.')
 
         # compute path
         path = self.name.format_map(args)                   # format path template
         path = self.context.dir_out / self.path / path      # prefix base-directory
+        entry.path = path
 
         path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -106,8 +113,7 @@ class CheckpointManager:
                 },
             },
         }
-        torch.save(chkpt, path)
+        torch.save(chkpt, entry.path)
 
-        # create and add actual entry
-        entry = (model_id, stage.index, stage.id, epoch, step, metrics, path)
+        # add actual entry
         self.checkpoints.append(entry)
