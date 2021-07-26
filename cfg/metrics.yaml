@@ -42,4 +42,4 @@ validation:
 
     images:
       enabled: true
-      prefix: 'Validation/'
+      prefix: Validation/
