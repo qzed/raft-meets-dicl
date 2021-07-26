@@ -162,7 +162,7 @@ class CheckpointManager:
     def _chkpt_sort_key_latest(self, c):
         return c.idx_stage, c.idx_epoch, c.idx_step
 
-    def get_best(self, stage: Optional[int] = None, epoch: Optional[int] = None) -> CheckpointEntry:
+    def get_best(self, stage: Optional[int] = None, epoch: Optional[int] = None) -> Optional[CheckpointEntry]:
         chkpts = self.checkpoints
 
         # filter based on given input
@@ -176,7 +176,7 @@ class CheckpointManager:
         # find best
         return min(chkpts, key=self._chkpt_sort_key_best, default=None)
 
-    def get_latest(self, stage: Optional[int] = None, epoch: Optional[int] = None):
+    def get_latest(self, stage: Optional[int] = None, epoch: Optional[int] = None) -> Optional[CheckpointEntry]:
         chkpts = self.checkpoints
 
         # filter based on given input
