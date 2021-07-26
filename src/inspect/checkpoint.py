@@ -108,6 +108,19 @@ class CheckpointEntry:
     def load(self, **kwargs) -> Checkpoint:
         return Checkpoint.load(self.path, **kwargs)
 
+    def __hash__(self) -> int:
+        return hash((self.model, self.idx_stage, self.idx_epoch, self.idx_step, self.path))
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, CheckpointEntry):
+            return NotImplemented
+
+        return self.model == o.model \
+            and self.idx_stage == o.idx_stage \
+            and self.idx_epoch == o.idx_epoch \
+            and self.idx_step == o.idx_step \
+            and self.path == o.path
+
 
 class CheckpointManager:
     path: Path
@@ -137,10 +150,13 @@ class CheckpointManager:
     def _chkpt_args(self, chkpt: CheckpointEntry):
         return self._chkpt_iter_args(chkpt) | self._chkpt_metric_args(chkpt)
 
-    def _chkpt_sort_key(self, chkpt: CheckpointEntry):
+    def _chkpt_sort_key_best(self, chkpt: CheckpointEntry):
         args = self._chkpt_args(chkpt)
 
         return [utils.expr.eval_math_expr(c, args) for c in self.compare]
+
+    def _chkpt_sort_key_latest(self, c):
+        return c.idx_stage, c.idx_epoch, c.idx_step
 
     def get_best(self, stage: Optional[int] = None, epoch: Optional[int] = None) -> CheckpointEntry:
         chkpts = self.checkpoints
@@ -154,7 +170,7 @@ class CheckpointManager:
             raise ValueError("epoch can only be set if stage is set")
 
         # find best
-        return min(chkpts, key=self._chkpt_sort_key, default=None)
+        return min(chkpts, key=self._chkpt_sort_key_best, default=None)
 
     def get_latest(self, stage: Optional[int] = None, epoch: Optional[int] = None):
         chkpts = self.checkpoints
@@ -167,7 +183,49 @@ class CheckpointManager:
         elif epoch is not None:
             raise ValueError("epoch can only be set if stage is set")
 
-        return max(chkpts, key=lambda c: (c.idx_stage, c.idx_epoch, c.idx_step))
+        return max(chkpts, key=self._chkpt_sort_key_latest)
+
+    def trim(self, n_best=1, n_latest=1, delete=True):
+        # if either one is None, only apply the other trim method, if both are
+        # none, don't do anything
+        if n_best is None and n_latest is None:
+            return
+
+        # collect all stage indices
+        stages = {c.idx_stage for c in self.checkpoints}
+
+        remove = set()
+        keep = set()
+
+        # keep best and latest for each stage
+        for s in stages:
+            chkpts = [c for c in self.checkpoints if c.idx_stage == s]
+
+            # get the N best checkpoints
+            if n_best is not None:
+                best = sorted(chkpts, key=self._chkpt_sort_key_best)
+                keep |= set(best[:n_best])
+                remove |= set(best[n_best:])
+
+            # get the N latest checkpoints
+            if n_latest is not None:
+                latest = sorted(chkpts, key=self._chkpt_sort_key_latest, reverse=True)
+                keep |= set(latest[:n_latest])
+                remove |= set(latest[n_latest:])
+
+        # update list of checkpoints
+        self.checkpoints = sorted(keep, key=self._chkpt_sort_key_latest)
+
+        # remove discarded checkpoints
+        if delete:
+            # checkpoint may have been marked for removal in one branch but
+            # marked as 'keep' in other, only remove what is not marked as
+            # 'keep'
+            remove = remove - keep
+
+            # actually delete files
+            for chkpt in remove:
+                chkpt.path.unlink(missing_ok=True)
 
     def create(self, log, ctx, stage, epoch, step, metrics):
         # We may call this at the end of a stage, i.e. with epoch=None. Create
