@@ -56,9 +56,7 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 def main():
     def fmtcls(prog): return argparse.HelpFormatter(prog, max_help_position=42)
 
-    parser = argparse.ArgumentParser(
-        description='Optical Flow Estimation',
-        formatter_class=fmtcls)
+    parser = argparse.ArgumentParser(description='Optical Flow Estimation', formatter_class=fmtcls)
 
     subp = parser.add_subparsers(dest='command', help='help for command')
 
