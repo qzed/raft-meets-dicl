@@ -45,9 +45,21 @@ def main():
     ptrain.add_argument('--start-epoch', type=int, help='start with sepcified epoch and skip previous')
     ptrain.add_argument('--reproduce', action='store_true', help='use seeds from config')
 
+    # subcommand: checkpoint
+    pchkpt = subp.add_parser('checkpoint', formatter_class=fmtcls, help='inspect and manage checkpoints')
+    pchkpt_sub = pchkpt.add_subparsers(dest='subcommand', help='help for subcommand')
+
+    pchkpt_info = pchkpt_sub.add_parser('info', formatter_class=fmtcls, help='show info on checkpoint(s)')
+    pchkpt_info.add_argument('file', nargs='+', help='checkpoint file or directory to search for checkpoints')
+    pchkpt_info.add_argument('--sort', help='expression(s) for sorting checkpoints (separated by comma)')
+
     # parse arguments
     args = parser.parse_args()
 
     # run subcommand
-    if args.command == 'train':
-        cmd.train(args)
+    commands = {
+        'train': cmd.train,
+        'checkpoint': cmd.checkpoint,
+    }
+
+    commands[args.command](args)
