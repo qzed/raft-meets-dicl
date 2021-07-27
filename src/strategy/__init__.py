@@ -1,5 +1,5 @@
 from . import checkpoint
-from .checkpoint import CheckpointManager
+from .checkpoint import CheckpointManager, Checkpoint
 
 from . import config
 from .config import load, load_stage

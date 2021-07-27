@@ -52,7 +52,7 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 
 
 def main():
-    def fmtcls(prog): return argparse.HelpFormatter(prog, max_help_position=40)
+    def fmtcls(prog): return argparse.HelpFormatter(prog, max_help_position=42)
 
     parser = argparse.ArgumentParser(
         description='Optical Flow Estimation',
@@ -68,6 +68,7 @@ def main():
                                                                '[default: %(default)s]')
     ptrain.add_argument('--device', help='device to use [default: cuda:0 if available]')
     ptrain.add_argument('--device-ids', help='device IDs to use with DataParallel')
+    ptrain.add_argument('-c', '--checkpoint', help='use pre-trained model state from checkpoint')
 
     args = parser.parse_args()
 
@@ -127,6 +128,12 @@ def main():
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
+
+    if args.checkpoint:
+        logging.info(f"loading checkpoint '{args.checkpoint}'")
+        logging.warning(f"configuration not sufficient for reproducibility due to checkpoint")
+        state = strategy.Checkpoint.load(args.checkpoint, map_location='cpu').state.model
+        model.load_state_dict(state)
 
     loader_args = {'num_workers': 4, 'pin_memory': True}
     strategy.train(log, strat, model, loss, input, insp, chkptm, device, loader_args)
