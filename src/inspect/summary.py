@@ -114,9 +114,9 @@ class CheckpointSpec:
             },
         }
 
-    def build(self, context):
-        return strategy.CheckpointManager(context.id, context.dir_out / self.path, self.name,
-                                          self.compare, self.keep_latest, self.keep_best)
+    def build(self, id, base_path):
+        return strategy.CheckpointManager(id, base_path / self.path, self.name, self.compare,
+                                          self.keep_latest, self.keep_best)
 
 
 class ValidationMetricSpec:
@@ -367,6 +367,7 @@ class InspectorSpec:
     images: ImagesSpec
     checkpoints: CheckpointSpec
     validation: List[Validation]
+    tb_path: str
 
     @classmethod
     def from_config(cls, cfg):
@@ -379,13 +380,16 @@ class InspectorSpec:
         validation = cfg.get('validation', [])
         validation = [Validation.from_config(v) for v in validation]
 
-        return cls(metrics, images, checkpoints, validation)
+        tb_path = cfg.get('tensorboard', {}).get('path', 'tb.{id_model}')
 
-    def __init__(self, metrics, images, checkpoints, validation):
+        return cls(metrics, images, checkpoints, validation, tb_path)
+
+    def __init__(self, metrics, images, checkpoints, validation, tb_path):
         self.metrics = metrics
         self.images = images
         self.checkpoints = checkpoints
         self.validation = validation
+        self.tb_path = tb_path
 
     def get_config(self):
         return {
@@ -393,15 +397,19 @@ class InspectorSpec:
             'images': self.images.get_config() if self.images is not None else None,
             'checkpoints': self.checkpoints.get_config(),
             'validation': [v.get_config() for v in self.validation],
+            'tensorboard': {
+                'path': self.tb_path,
+            },
         }
 
-    def build(self, log, context):
-        chkpts = self.checkpoints.build(context)
+    def build(self, log, id, base_path):
+        chkpts = self.checkpoints.build(id, base_path)
 
         # build summary-writer
-        path_summary = context.dir_out / f"tb.{context.id.replace('/', '_').replace('-', '.')}"
-        log.info(f"writing tensorboard summary to '{path_summary}'")
-        writer = SummaryWriter(path_summary)
+        args = {'id_model': f"{id.replace('/', '_').replace('-', '.')}"}
+        path = base_path / self.tb_path.format_map(args)
+        log.info(f"writing tensorboard summary to '{path}'")
+        writer = SummaryWriter(path)
 
         insp = SummaryInspector(writer, self.metrics, self.images, chkpts, self.validation)
 

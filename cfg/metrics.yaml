@@ -46,3 +46,6 @@ validation:
     images:
       enabled: true
       prefix: Validation/
+
+tensorboard:
+  path: 'tb.{id_model}'

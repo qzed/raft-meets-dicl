@@ -110,7 +110,7 @@ def main():
     # training loop
     log = utils.logging.Logger()
 
-    insp, chkptm = insp.build(log, ctx)
+    insp, chkptm = insp.build(log, ctx.id, ctx.dir_out)
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
