@@ -3,6 +3,26 @@ import argparse
 from . import train
 
 
+# example usage:
+# - basic training
+#   {prog} train --data strategy.yaml --model model.yaml
+#   {prog} train --data strategy.yaml --modelm model.yaml -inspect metrics.yaml
+#   {prog} train --config config.yaml
+#
+# - override parts of config
+#   {prog} train --config config.yaml --strategy data.yaml
+#
+# - training with warm start from previous checkpoint (only model weights)
+#   {prog} train --data data.yaml --model model.yaml --checkpoint checkpoint.pth
+#
+# - continue previous run from checkpoint (only epoch granularity, includes optimizer state etc.)
+#   {prog} train --config config.yaml --continue checkpoint.pth
+#   {prog} train --data data.yaml --model model.yaml --continue checkpoint.pth
+#
+# - reproduce previous training run
+#   {prog} train --config config.yaml --reproduce
+
+
 def main():
     def fmtcls(prog): return argparse.HelpFormatter(prog, max_help_position=42)
 
