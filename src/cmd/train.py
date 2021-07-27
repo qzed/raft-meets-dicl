@@ -8,12 +8,12 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from . import models
-from . import strategy
-from . import utils
-from . import inspect
+from .. import models
+from .. import strategy
+from .. import utils
+from .. import inspect
 
-from .strategy.training import TrainingContext
+from ..strategy.training import TrainingContext
 
 
 def train(args):
@@ -81,7 +81,7 @@ def train(args):
         cfg_inspc = args.inspect
 
     if cfg_inspc is None:
-        cfg_inspc = Path(__file__).parent.parent / 'cfg' / 'metrics.yaml'
+        cfg_inspc = Path(__file__).parent.parent.parent / 'cfg' / 'metrics.yaml'
 
     if isinstance(cfg_inspc, (str, Path)):
         logging.info(f"loading metrics/inspection configuration: file='{cfg_inspc}'")

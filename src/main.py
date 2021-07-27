@@ -1,6 +1,6 @@
 import argparse
 
-from . import train
+from . import cmd
 
 
 # example usage:
@@ -50,4 +50,4 @@ def main():
 
     # run subcommand
     if args.command == 'train':
-        train.train(args)
+        cmd.train(args)

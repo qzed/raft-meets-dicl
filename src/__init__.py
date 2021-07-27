@@ -7,4 +7,4 @@ from . import utils
 from . import visual
 
 from . import main
-from . import train
+from . import cmd
