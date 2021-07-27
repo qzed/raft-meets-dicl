@@ -106,7 +106,7 @@ def train(args):
     if isinstance(cfg_strat, str):
         logging.info(f"loading strategy configuration: file='{args.data}'")
 
-    strat = strategy.load(Path.cwd(), cfg_strat)
+    strat = strategy.load('./', cfg_strat)
 
     # load inspector
     if args.inspect is not None:
