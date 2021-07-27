@@ -63,7 +63,7 @@ def main():
     ptrain = subp.add_parser('train', formatter_class=fmtcls, help='train model')
     ptrain.add_argument('-d', '--data', required=True, help='training strategy and data')
     ptrain.add_argument('-m', '--model', required=True, help='specification of the model')
-    ptrain.add_argument('-i', '--inspect', required=False, help='specification of metrics')
+    ptrain.add_argument('-i', '--inspect', help='specification of metrics')
     ptrain.add_argument('-o', '--output', default='runs', help='base output directory '
                                                                '[default: %(default)s]')
     ptrain.add_argument('--device', help='device to use [default: cuda:0 if available]')
