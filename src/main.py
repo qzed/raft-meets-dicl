@@ -21,6 +21,14 @@ from . import cmd
 #
 # - reproduce previous training run
 #   {prog} train --config config.yaml --reproduce
+#
+# - trim checkpoints (keep only best and/or latest checkpoints)
+#   [prog] checkpoint trim ./directory/ --compare "{m_EndPointError_mean}" --keep-best 5
+#   [prog] checkpoint trim ./directory/ --compare "{m_EndPointError_mean}" --keep-latest 5
+#
+# - show info for checkpoints
+#   [prog] checkpoint info checkpoint.pth
+#   [prog] checkpoint info ./directory/ --sort "{m_EndPointError_mean}"
 
 
 def main():
