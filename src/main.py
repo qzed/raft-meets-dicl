@@ -63,6 +63,7 @@ def main():
     parser.add_argument('-o', '--output', default='runs', help='base output directory '
                                                                '[default: %(default)s]')
     parser.add_argument('--device', help='device to use [default: cuda:0 if available]')
+    parser.add_argument('--device-ids', help='device IDs to use with DataParallel')
 
     args = parser.parse_args()
 
@@ -74,6 +75,8 @@ def main():
         device = torch.device('cuda:0')
 
     device_ids = None
+    if args.device_ids:
+        device_ids = [int(id.strip()) for id in args.device_ids.split(',')]
 
     # basic setup
     ctx = setup(dir_base=args.output)
