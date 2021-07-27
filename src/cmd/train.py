@@ -155,9 +155,6 @@ def train(args):
     # training loop
     loader_args = {'num_workers': 4, 'pin_memory': True}
 
-    start_stage = args.start_stage - 1 if args.start_stage else None
-    start_epoch = args.start_epoch - 1 if args.start_epoch else None
-
     log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
-    tctx.run(start_stage, start_epoch, chkpt)
+    tctx.run(args.start_stage, args.start_epoch, chkpt)
