@@ -41,7 +41,7 @@ class Context:
 
 def setup(dir_base='logs', timestamp=datetime.datetime.now()):
     # setup paths
-    dir_out = Path(dir_base) / Path(timestamp.strftime('%G.%m.%d-%H.%M.%S'))
+    dir_out = Path(dir_base) / Path(timestamp.strftime('%G.%m.%dT%H.%M.%S'))
 
     # create output directory
     os.makedirs(dir_out, exist_ok=True)
