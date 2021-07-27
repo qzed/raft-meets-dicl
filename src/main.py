@@ -17,7 +17,6 @@ from . import inspect
 
 class Context:
     def __init__(self, timestamp, dir_out):
-        self.id = 'unspecified'
         self.timestamp = timestamp
         self.dir_out = dir_out
 
@@ -98,7 +97,6 @@ def main():
     with open(ctx.dir_out / 'model.txt', 'w') as fd:
         fd.write(str(model_spec.model))
 
-    ctx.id = model_spec.id
     model = model_spec.model
     loss = model_spec.loss
     input = model_spec.input
@@ -125,7 +123,7 @@ def main():
     # training loop
     log = utils.logging.Logger()
 
-    insp, chkptm = insp.build(log, ctx.id, ctx.dir_out)
+    insp, chkptm = insp.build(log, model_spec.id, ctx.dir_out)
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
