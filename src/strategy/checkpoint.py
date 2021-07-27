@@ -1,3 +1,5 @@
+from collections import defaultdict
+from pickle import UnpicklingError
 import re
 
 from dataclasses import dataclass
@@ -148,6 +150,7 @@ class CheckpointEntry:
 
 
 class CheckpointManager:
+    model_id: str
     path: Path
     name: str
     compare: List[str]
@@ -297,3 +300,38 @@ class CheckpointManager:
 
         # clean up according to config
         self.trim(n_best=self.keep_best, n_latest=self.keep_latest)
+
+
+def load_directory(path, compare) -> List[CheckpointManager]:
+    name = '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}.pth'
+    path = Path(path)
+
+    # load all checkpoint entries
+    checkpoints = defaultdict(list)
+
+    for file in path.iterdir():
+        if not file.is_file():
+            continue
+
+        # try loading checkpoint, ignore if invalid
+        try:
+            chkpt = Checkpoint.load(file).to_entry(file)
+        except (UnpicklingError, KeyError):
+            continue
+
+        # append to models
+        checkpoints[chkpt.model].append(chkpt)
+
+    # sort by model ID
+    checkpoints = [(k, v) for k, v in checkpoints.items()]
+    checkpoints = sorted(checkpoints, key=lambda x: x[0])
+
+    # construct checkpoint managers
+    mgrs = []
+    for model, chkpts in checkpoints:
+        mgr = CheckpointManager(model, path, name, compare)
+        mgr.checkpoints = chkpts
+
+        mgrs.append(mgr)
+
+    return mgrs
