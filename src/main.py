@@ -55,7 +55,7 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 def main():
     parser = argparse.ArgumentParser(
         description='Optical Flow Estimation',
-        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=32))
+        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=34))
 
     parser.add_argument('-d', '--data', required=True, help='training strategy and data')
     parser.add_argument('-m', '--model', required=True, help='specification of the model')
