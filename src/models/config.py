@@ -25,6 +25,8 @@ class ModelSpec:
 
     def get_config(self):
         return {
+            'name': self.name,
+            'id': self.id,
             'model': self.model.get_config(),
             'loss': self.loss.get_config(),
             'input': self.input.get_config(),
