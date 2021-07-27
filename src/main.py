@@ -67,6 +67,11 @@ def main():
 
     args = parser.parse_args()
 
+    # basic setup
+    ctx = setup(dir_base=args.output)
+
+    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
+
     # set up device
     device = torch.device('cpu')
     if args.device:
@@ -77,11 +82,6 @@ def main():
     device_ids = None
     if args.device_ids:
         device_ids = [int(id.strip()) for id in args.device_ids.split(',')]
-
-    # basic setup
-    ctx = setup(dir_base=args.output)
-
-    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
 
     # set seeds
     seeds = utils.seeds.random_seeds().apply()
