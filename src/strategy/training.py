@@ -91,7 +91,12 @@ class TrainingContext:
         self.model.load_state_dict(model_state)
 
     def run_stage(self, log, stage: Stage, start_epoch=0):
-        assert 0 <= start_epoch < stage.data.epochs
+        assert 0 <= start_epoch <= stage.data.epochs
+
+        # Handle special case for checkpoints: if checkpoint is created at end
+        # of stage, it will have epoch == n_epochs. Thus don't run this stage.
+        if start_epoch == stage.data.epochs:
+            return
 
         self.prepare_stage(log, stage)
 
