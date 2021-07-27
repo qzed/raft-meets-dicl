@@ -22,7 +22,7 @@ class Context:
         self.timestamp = timestamp
         self.dir_out = dir_out
 
-    def dump_config(self, path, seeds, model, strat, inspect):
+    def dump_config(self, path, args, seeds, model, strat, inspect):
         """
         Dump full conifg. This should dump everything needed to reproduce a run.
         """
@@ -31,6 +31,7 @@ class Context:
             'timestamp': self.timestamp.isoformat(),
             'commit': utils.vcs.get_git_head_hash(),
             'cwd': str(Path.cwd()),
+            'args': vars(args),
             'seeds': seeds.get_config(),
             'model': model.get_config(),
             'strategy': strat.get_config(),
@@ -120,7 +121,7 @@ def main():
     # dump config
     path_config = ctx.dir_out / 'config.json'
     logging.info(f"writing full configuration to '{path_config}'")
-    ctx.dump_config(path_config, seeds, model_spec, strat, insp)
+    ctx.dump_config(path_config, args, seeds, model_spec, strat, insp)
 
     # training loop
     log = utils.logging.Logger()
