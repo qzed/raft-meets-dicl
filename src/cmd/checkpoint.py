@@ -7,6 +7,7 @@ from ..strategy.checkpoint import load_directory
 def checkpoint(args):
     commands = {
         'info': info,
+        'trim': trim,
     }
 
     commands[args.subcommand](args)
@@ -53,3 +54,23 @@ def info(args):
                     info += [f"{k}: {v:.04f}" for k, v in chkpt.metrics.items()]
 
                     print(f"  {', '.join(info)}")
+
+
+def trim(args):
+    if args.keep_best and not args.compare:
+        raise ValueError('option --compare must be specified when --keep-best is specified')
+
+    if not args.keep_best and not args.keep_latest:
+        raise ValueError('need to specify --keep-best or --keep-latest (or both)')
+
+    # set up comparator for sorting
+    compare = args.compare
+    if not compare:
+        compare = '{n_stage}, {n_epoch}, {n_steps}'
+
+    compare = [expr.strip() for expr in compare.split(',')]
+
+    # trim
+    for path in args.directory:
+        for mgr in load_directory(path, compare):
+            mgr.trim(args.keep_best, args.keep_latest)

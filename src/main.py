@@ -53,6 +53,12 @@ def main():
     pchkpt_info.add_argument('file', nargs='+', help='checkpoint file or directory to search for checkpoints')
     pchkpt_info.add_argument('--sort', help='expression(s) for sorting checkpoints (separated by comma)')
 
+    pchkpt_trim = pchkpt_sub.add_parser('trim', formatter_class=fmtcls, help='remove bad and/or outdated checkpoints')
+    pchkpt_trim.add_argument('directory', nargs='+', help='directory to search for checkpoints')
+    pchkpt_trim.add_argument('--compare', help='expression(s) for comparing checkpoints (separated by comma)')
+    pchkpt_trim.add_argument('--keep-latest', type=int, help='keep specified number of latest checkpoints')
+    pchkpt_trim.add_argument('--keep-best', type=int, help='keep specified number of best checkpoints')
+
     # parse arguments
     args = parser.parse_args()
 
