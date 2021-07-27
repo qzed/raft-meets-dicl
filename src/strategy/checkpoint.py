@@ -94,6 +94,22 @@ class Checkpoint:
     def save(self, path):
         torch.save(self.to_dict(), path)
 
+    def apply(self, model, optimizer=None, scaler=None, lr_sched_inst=[], lr_sched_epoch=[]):
+        if model is not None:
+            model.load_state_dict(self.state.model)
+
+        if optimizer is not None:
+            optimizer.load_state_dict(self.state.optimizer)
+
+        if scaler is not None:
+            scaler.load_state_dict(self.state.scaler)
+
+        for sched, state in zip(lr_sched_inst, self.state.lr_sched_inst):
+            sched.load_state_dict(state)
+
+        for sched, state in zip(lr_sched_epoch, self.state.lr_sched_epoch):
+            sched.load_state_dict(state)
+
 
 @dataclass
 class CheckpointEntry:

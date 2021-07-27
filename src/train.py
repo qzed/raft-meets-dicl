@@ -133,17 +133,33 @@ def train(args):
         model = nn.DataParallel(model, device_ids)
 
     # load checkpoint data
+    chkpt = None
+
+    if args.checkpoint and args.resume:
+        raise ValueError("cannot set both --checkpoint and --resume")
+
+    if args.checkpoint or args.resume:
+        logging.warning(f"saved config not sufficient for reproducibility due to checkpoint data")
+
     if args.checkpoint:
         logging.info(f"loading checkpoint '{args.checkpoint}'")
 
         chkpt = strategy.Checkpoint.load(args.checkpoint, map_location='cpu')
-        model.load_state_dict(chkpt.state.model)
+        chkpt.apply(model)
 
-        del chkpt
+        chkpt = None
+
+    if args.resume:
+        logging.info(f"loading checkpoint '{args.resume}'")
+
+        chkpt = strategy.Checkpoint.load(args.resume, map_location='cpu')
 
     # training loop
     loader_args = {'num_workers': 4, 'pin_memory': True}
 
+    start_stage = args.start_stage - 1 if args.start_stage else None
+    start_epoch = args.start_epoch - 1 if args.start_epoch else None
+
     log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
-    tctx.run(args.start_stage - 1, args.start_epoch - 1)
+    tctx.run(start_stage, start_epoch, chkpt)

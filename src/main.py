@@ -20,8 +20,9 @@ def main():
     ptrain.add_argument('--device', help='device to use [default: cuda:0 if available]')
     ptrain.add_argument('--device-ids', help='device IDs to use with DataParallel')
     ptrain.add_argument('--checkpoint', help='start with pre-trained model state from checkpoint')
-    ptrain.add_argument('--start-stage', type=int, default=1, help='start with sepcified stage and skip previous')
-    ptrain.add_argument('--start-epoch', type=int, default=1, help='start with sepcified epoch and skip previous')
+    ptrain.add_argument('--resume', help='resume trainig from checkpoint (full state)')
+    ptrain.add_argument('--start-stage', type=int, help='start with sepcified stage and skip previous')
+    ptrain.add_argument('--start-epoch', type=int, help='start with sepcified epoch and skip previous')
     ptrain.add_argument('--reproduce', action='store_true', help='use seeds from config')
 
     # parse arguments

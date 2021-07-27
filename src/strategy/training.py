@@ -52,24 +52,48 @@ class TrainingContext:
         self.lr_sched_inst = None
         self.lr_sched_epoch = None
 
-    def run(self, start_stage=0, start_epoch=0):
+    def run(self, start_stage=None, start_epoch=None, checkpoint=None):
         n_stages = len(self.strategy.stages)
+
+        # handle continuation and skipping
+        if start_stage is None and checkpoint is not None:
+            start_stage = checkpoint.iteration.stage
+
+        if start_stage is None:
+            start_stage = 0
 
         assert 0 <= start_stage < n_stages
 
+        if start_epoch is None and checkpoint is not None:
+            start_epoch = checkpoint.iteration.epoch + 1
+
+        if start_epoch is None:
+            start_epoch = 0
+
+        if checkpoint is not None:
+            self.step = checkpoint.iteration.step
+
+        # prepare
         self.log.info(f"start training: running {n_stages} stages on device '{self.device}'")
         self.model.to(self.device)
         self.model.train()
 
+        # run (remaining) training-stages
         stages = [*enumerate(self.strategy.stages)][start_stage:]
         for i, stage in stages:
+            # handle special case when loading from checkpoint created at end of stage
+            if start_epoch >= stage.data.epochs:
+                start_epoch = 0
+                continue
+
             log = self.log.new(f"stage {i + 1}/{n_stages}")
             log.info(f"starting new stage '{stage.name}' ({stage.id}) at step {self.step}")
 
             stage.index = i
-            self.run_stage(log, stage, start_epoch)
+            self.run_stage(log, stage, start_epoch, checkpoint)
 
             start_epoch = 0
+            checkpoint = None
 
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
@@ -85,18 +109,13 @@ class TrainingContext:
         # Load checkpoint data to CPU. We explicitly load to CPU as we only
         # need model weights and GPU memory might be tight.
         log.info(f"loading best checkpoint from previous stage, file='{chkpt.path}'")
-        model_state = chkpt.load(map_location='cpu').state.model
+        chkpt = chkpt.load(map_location='cpu')
 
         # apply restored state
-        self.model.load_state_dict(model_state)
+        chkpt.apply(self.model)
 
-    def run_stage(self, log, stage: Stage, start_epoch=0):
-        assert 0 <= start_epoch <= stage.data.epochs
-
-        # Handle special case for checkpoints: if checkpoint is created at end
-        # of stage, it will have epoch == n_epochs. Thus don't run this stage.
-        if start_epoch == stage.data.epochs:
-            return
+    def run_stage(self, log, stage: Stage, start_epoch=0, checkpoint=None):
+        assert 0 <= start_epoch < stage.data.epochs
 
         self.prepare_stage(log, stage)
 
@@ -124,6 +143,12 @@ class TrainingContext:
             'batch_size': stage.data.batch_size,
         }
         self.lr_sched_inst, self.lr_sched_epoch = stage.scheduler.build(self.optimizer, sched_vars)
+
+        # load full checkpoint state
+        log.info(f"restoring data from checkpoint")
+        if checkpoint is not None:
+            checkpoint.apply(self.model, self.optimizer, self.scaler, self.lr_sched_inst,
+                             self.lr_sched_epoch)
 
         # run training
         log.info(f"running {stage.data.epochs} epochs")
