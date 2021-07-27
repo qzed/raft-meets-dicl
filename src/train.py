@@ -75,7 +75,14 @@ def train(args):
         cfg_inspc = config.get('inspect')
 
     # set seeds
-    seeds = utils.seeds.random_seeds().apply()
+    if args.reproduce:
+        if cfg_seeds is None:
+            raise ValueError("set --reproduce but no seeds specified")
+
+        logging.info("seeding: using seeds from config")
+        seeds = utils.seeds.from_config(cfg_seeds).apply()
+    else:
+        seeds = utils.seeds.random_seeds().apply()
 
     # load model
     if args.model is not None:
