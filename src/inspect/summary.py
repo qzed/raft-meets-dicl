@@ -322,7 +322,7 @@ class StrategyValidation(Validation):
         if epoch is not None:
             desc += f", epoch {epoch + 1}/{stage.data.epochs}"
         desc += f", step {ctx.step}"
-        samples = tqdm(data, unit='batches', leave=False)
+        samples = tqdm(data, unit='batch', leave=False)
         samples.set_description(desc)
 
         # validation loop
