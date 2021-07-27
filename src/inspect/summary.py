@@ -1,3 +1,5 @@
+import logging
+
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -402,13 +404,13 @@ class InspectorSpec:
             },
         }
 
-    def build(self, log, id, base_path):
+    def build(self, id, base_path):
         chkpts = self.checkpoints.build(id, base_path)
 
         # build summary-writer
         args = {'id_model': f"{id.replace('/', '_').replace('-', '.')}"}
         path = base_path / self.tb_path.format_map(args)
-        log.info(f"writing tensorboard summary to '{path}'")
+        logging.info(f"writing tensorboard summary to '{path}'")
         writer = SummaryWriter(path)
 
         insp = SummaryInspector(writer, self.metrics, self.images, chkpts, self.validation)

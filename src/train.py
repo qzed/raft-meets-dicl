@@ -16,53 +16,21 @@ from . import inspect
 from .strategy.training import TrainingContext
 
 
-class Context:
-    def __init__(self, timestamp, dir_out):
-        self.timestamp = timestamp
-        self.dir_out = dir_out
-
-    def dump_config(self, path, args, seeds, model, strat, inspect):
-        """
-        Dump full conifg. This should dump everything needed to reproduce a run.
-        """
-
-        cfg = {
-            'timestamp': self.timestamp.isoformat(),
-            'commit': utils.vcs.get_git_head_hash(),
-            'cwd': str(Path.cwd()),
-            'args': vars(args),
-            'seeds': seeds.get_config(),
-            'model': model.get_config(),
-            'strategy': strat.get_config(),
-            'inspect': inspect.get_config(),
-        }
-
-        utils.config.store(path, cfg)
-
-
-def setup(dir_base='logs', timestamp=datetime.datetime.now()):
-    # setup paths
-    dir_out = Path(dir_base) / Path(timestamp.strftime('%G.%m.%dT%H.%M.%S'))
-
-    # create output directory
-    os.makedirs(dir_out, exist_ok=True)
-
-    # setup logging
-    utils.logging.setup(file=dir_out/'main.log')
-
-    return Context(timestamp, dir_out)
-
-
 def train(args):
+    timestamp = datetime.datetime.now()
+
     cfg_seeds = None
     cfg_model = None
     cfg_strat = None
     cfg_inspc = None
 
     # basic setup
-    ctx = setup(dir_base=args.output)
+    path_out = Path(args.output) / timestamp.strftime('%G.%m.%dT%H.%M.%S')
+    path_out.mkdir()
 
-    logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
+    utils.logging.setup(path_out / 'main.log')
+
+    logging.info(f"starting: time is {timestamp}, writing to '{path_out}'")
 
     # load full config, if specified
     if args.config is not None:
@@ -121,15 +89,24 @@ def train(args):
     inspc = inspect.load(cfg_inspc)
 
     # save info about training-run
-    path_config = ctx.dir_out / 'config.json'
-    path_model = ctx.dir_out / 'model.txt'
+    path_config = path_out / 'config.json'
+    path_model = path_out / 'model.txt'
 
     logging.info(f"writing full configuration to '{path_config}'")
 
     with open(path_model, 'w') as fd:
         fd.write(str(model.model))
 
-    ctx.dump_config(path_config, args, seeds, model, strat, inspc)
+    utils.config.store(path_config, {
+        'timestamp': timestamp.isoformat(),
+        'commit': utils.vcs.get_git_head_hash(),
+        'cwd': str(Path.cwd()),
+        'args': vars(args),
+        'seeds': seeds.get_config(),
+        'model': model.get_config(),
+        'strategy': strat.get_config(),
+        'inspect': inspc.get_config(),
+    })
 
     # set up device
     device = torch.device('cpu')
@@ -146,24 +123,27 @@ def train(args):
     n_params = utils.model.count_parameters(model.model)
     logging.info(f"set up model '{model.name}' ({model.id}) with {n_params:,} parameters")
 
-    # TODO: clean up stuff below, handle checkpoint/continue, ...
+    # build inspector and checkpoint manager
+    inspc, chkptm = inspc.build(model.id, path_out)
 
-    # training loop
-    log = utils.logging.Logger()
-    inspc, chkptm = inspc.build(log, model.id, ctx.dir_out)
-
+    # prepare model
     model, loss, input = model.model, model.loss, model.input
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
+    # load checkpoint data
     if args.checkpoint:
         logging.info(f"loading checkpoint '{args.checkpoint}'")
-        logging.warning(f"configuration not sufficient for reproducibility due to checkpoint")
-        state = strategy.Checkpoint.load(args.checkpoint, map_location='cpu').state.model
-        model.load_state_dict(state)
 
+        chkpt = strategy.Checkpoint.load(args.checkpoint, map_location='cpu')
+        model.load_state_dict(chkpt.state.model)
+
+        del chkpt
+
+    # training loop
     loader_args = {'num_workers': 4, 'pin_memory': True}
 
+    log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
     tctx.run(args.start_stage - 1, args.start_epoch - 1)
