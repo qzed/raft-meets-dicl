@@ -14,6 +14,8 @@ from . import strategy
 from . import utils
 from . import inspect
 
+from .strategy.training import TrainingContext
+
 
 class Context:
     def __init__(self, timestamp, dir_out):
@@ -64,11 +66,12 @@ def main():
     ptrain.add_argument('-d', '--data', required=True, help='training strategy and data')
     ptrain.add_argument('-m', '--model', required=True, help='specification of the model')
     ptrain.add_argument('-i', '--inspect', help='specification of metrics')
-    ptrain.add_argument('-o', '--output', default='runs', help='base output directory '
-                                                               '[default: %(default)s]')
+    ptrain.add_argument('-o', '--output', default='runs', help='base output directory [default: %(default)s]')
     ptrain.add_argument('--device', help='device to use [default: cuda:0 if available]')
     ptrain.add_argument('--device-ids', help='device IDs to use with DataParallel')
     ptrain.add_argument('-c', '--checkpoint', help='use pre-trained model state from checkpoint')
+    ptrain.add_argument('--start-stage', type=int, default=1, help='start with sepcified stage and skip previous')
+    ptrain.add_argument('--start-epoch', type=int, default=1, help='start with sepcified epoch and skip previous')
 
     args = parser.parse_args()
 
@@ -136,4 +139,5 @@ def main():
         model.load_state_dict(state)
 
     loader_args = {'num_workers': 4, 'pin_memory': True}
-    strategy.train(log, strat, model, loss, input, insp, chkptm, device, loader_args)
+    tctx = TrainingContext(log, strat, model, loss, input, insp, chkptm, device, loader_args)
+    tctx.run(args.start_stage - 1, args.start_epoch - 1)

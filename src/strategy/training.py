@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import torch.utils.data as td
 
-from torch.utils.tensorboard import SummaryWriter
-
 from .checkpoint import CheckpointManager
 from .inspector import Inspector
 from .spec import Stage, Strategy
@@ -54,19 +52,24 @@ class TrainingContext:
         self.lr_sched_inst = None
         self.lr_sched_epoch = None
 
-    def run(self):
+    def run(self, start_stage=0, start_epoch=0):
         n_stages = len(self.strategy.stages)
+
+        assert 0 <= start_stage < n_stages
 
         self.log.info(f"start training: running {n_stages} stages on device '{self.device}'")
         self.model.to(self.device)
         self.model.train()
 
-        for i, stage in enumerate(self.strategy.stages):
+        stages = [*enumerate(self.strategy.stages)][start_stage:]
+        for i, stage in stages:
             log = self.log.new(f"stage {i + 1}/{n_stages}")
             log.info(f"starting new stage '{stage.name}' ({stage.id}) at step {self.step}")
 
             stage.index = i
-            self.run_stage(log, stage)
+            self.run_stage(log, stage, start_epoch)
+
+            start_epoch = 0
 
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
@@ -87,7 +90,9 @@ class TrainingContext:
         # apply restored state
         self.model.load_state_dict(model_state)
 
-    def run_stage(self, log, stage: Stage):
+    def run_stage(self, log, stage: Stage, start_epoch=0):
+        assert 0 <= start_epoch < stage.data.epochs
+
         self.prepare_stage(log, stage)
 
         # load data
@@ -118,7 +123,7 @@ class TrainingContext:
         # run training
         log.info(f"running {stage.data.epochs} epochs")
 
-        for epoch in range(stage.data.epochs):
+        for epoch in range(start_epoch, stage.data.epochs):
             log_ = log.new(f"epoch {epoch + 1}/{stage.data.epochs}", sep=', ')
             log_.info(f"starting new epoch at step {self.step}")
 
@@ -189,9 +194,3 @@ class TrainingContext:
 
         # next step
         self.step += 1
-
-
-def train(log, strategy, model, loss, input, inspector, checkpoints, device, loader_args={}):
-    tctx = TrainingContext(log, strategy, model, loss, input, inspector, checkpoints, device,
-                           loader_args)
-    tctx.run()
