@@ -393,7 +393,7 @@ class RestrictFlowMagnitude(Augmentation):
 
     def get_config(self):
         return {
-            'type': 'flow-filter',
+            'type': self.type,
             'maximum': self.maximum,
         }
 
