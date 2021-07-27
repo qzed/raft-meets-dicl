@@ -120,17 +120,6 @@ def train(args):
 
     inspc = inspect.load(cfg_inspc)
 
-    # set up device
-    device = torch.device('cpu')
-    if args.device:
-        device = torch.device(args.device)
-    elif torch.cuda.is_available():
-        device = torch.device('cuda:0')
-
-    device_ids = None
-    if args.device_ids:
-        device_ids = [int(id.strip()) for id in args.device_ids.split(',')]
-
     # save info about training-run
     path_config = ctx.dir_out / 'config.json'
     path_model = ctx.dir_out / 'model.txt'
@@ -141,6 +130,17 @@ def train(args):
         fd.write(str(model.model))
 
     ctx.dump_config(path_config, args, seeds, model, strat, inspc)
+
+    # set up device
+    device = torch.device('cpu')
+    if args.device:
+        device = torch.device(args.device)
+    elif torch.cuda.is_available():
+        device = torch.device('cuda:0')
+
+    device_ids = None
+    if args.device_ids:
+        device_ids = [int(id.strip()) for id in args.device_ids.split(',')]
 
     # log number of parameters
     n_params = utils.model.count_parameters(model.model)
