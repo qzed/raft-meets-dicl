@@ -39,7 +39,7 @@ def main():
     subp = parser.add_subparsers(dest='command', help='help for command')
 
     # subcommand: train
-    train = subp.add_parser('train', formatter_class=fmtcls, help='train model')
+    train = subp.add_parser('train', aliases=['t'], formatter_class=fmtcls, help='train model')
     train.add_argument('-c', '--config', help='full training configuration')
     train.add_argument('-d', '--data', help='training strategy and data')
     train.add_argument('-m', '--model', help='specification of the model')
