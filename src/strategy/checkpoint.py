@@ -91,6 +91,16 @@ class Checkpoint:
             'state': self.state.to_dict(),
         }
 
+    def to_entry(self, path):
+        return CheckpointEntry(
+            self.model,
+            self.iteration.stage,
+            self.iteration.epoch,
+            self.iteration.step,
+            self.metrics,
+            path
+        )
+
     def save(self, path):
         torch.save(self.to_dict(), path)
 
