@@ -62,10 +62,17 @@ def main():
     parser.add_argument('-i', '--inspect', required=False, help='specification of metrics')
     parser.add_argument('-o', '--output', default='runs', help='base output directory '
                                                                '[default: %(default)s]')
+    parser.add_argument('--device', help='device to use [default: cuda:0 if available]')
 
     args = parser.parse_args()
 
-    device = torch.device('cuda:0')
+    # set up device
+    device = torch.device('cpu')
+    if args.device:
+        device = torch.device(args.device)
+    elif torch.cuda.is_available():
+        device = torch.device('cuda:0')
+
     device_ids = None
 
     # basic setup

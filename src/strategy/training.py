@@ -57,7 +57,7 @@ class TrainingContext:
     def run(self):
         n_stages = len(self.strategy.stages)
 
-        self.log.info(f"start training: running {n_stages} stages")
+        self.log.info(f"start training: running {n_stages} stages on device '{self.device}'")
         self.model.to(self.device)
         self.model.train()
 
