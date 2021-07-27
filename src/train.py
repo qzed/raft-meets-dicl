@@ -54,11 +54,64 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 
 
 def train(args):
+    cfg_seeds = None
+    cfg_model = None
+    cfg_strat = None
+    cfg_inspc = None
 
     # basic setup
     ctx = setup(dir_base=args.output)
 
     logging.info(f"starting: time is {ctx.timestamp}, writing to '{ctx.dir_out}'")
+
+    # load full config, if specified
+    if args.config is not None:
+        logging.info(f"loading configuration: file='{args.config}'")
+        config = utils.config.load(args.config)
+
+        cfg_seeds = config.get('seeds')
+        cfg_model = config.get('model')
+        cfg_strat = config.get('strategy')
+        cfg_inspc = config.get('inspect')
+
+    # set seeds
+    seeds = utils.seeds.random_seeds().apply()
+
+    # load model
+    if args.model is not None:
+        cfg_model = args.model
+
+    if cfg_model is None:
+        raise ValueError("no model configuration specified")
+
+    if isinstance(cfg_model, str):
+        logging.info(f"loading model configuration: file='{args.model}'")
+
+    model = models.load(cfg_model)
+
+    # load strategy
+    if args.data is not None:
+        cfg_strat = args.data
+
+    if cfg_strat is None:
+        raise ValueError("no strategy/data configuration specified")
+
+    if isinstance(cfg_strat, str):
+        logging.info(f"loading strategy configuration: file='{args.data}'")
+
+    strat = strategy.load(Path.cwd(), cfg_strat)
+
+    # load inspector
+    if args.inspect is not None:
+        cfg_inspc = args.inspect
+
+    if cfg_inspc is None:
+        cfg_inspc = Path(__file__).parent.parent / 'cfg' / 'metrics.yaml'
+
+    if isinstance(cfg_inspc, (str, Path)):
+        logging.info(f"loading metrics/inspection configuration: file='{cfg_inspc}'")
+
+    inspc = inspect.load(cfg_inspc)
 
     # set up device
     device = torch.device('cpu')
@@ -71,43 +124,28 @@ def train(args):
     if args.device_ids:
         device_ids = [int(id.strip()) for id in args.device_ids.split(',')]
 
-    # set seeds
-    seeds = utils.seeds.random_seeds().apply()
-
-    # load model config
-    logging.info(f"loading model configuration: file='{args.model}'")
-    model_spec = models.load(args.model)
-
-    with open(ctx.dir_out / 'model.txt', 'w') as fd:
-        fd.write(str(model_spec.model))
-
-    model = model_spec.model
-    loss = model_spec.loss
-    input = model_spec.input
-
-    n_params = np.sum([np.prod(p.size()) for p in model.parameters() if p.requires_grad])
-    logging.info(f"set up model '{model_spec.name}' ({model_spec.id}) with {n_params:,} parameters")
-
-    # load training strategy
-    logging.info(f"loading strategy configuration: file='{args.data}'")
-    strat = strategy.load(args.data)
-
-    # load inspector configuration
-    insp = Path(__file__).parent.parent / 'cfg' / 'metrics.yaml'
-    insp = args.inspect if args.inspect is not None else insp
-
-    logging.info(f"loading metrics/inspection configuration: file='{insp}'")
-    insp = inspect.load(insp)
-
-    # dump config
+    # save info about training-run
     path_config = ctx.dir_out / 'config.json'
+    path_model = ctx.dir_out / 'model.txt'
+
     logging.info(f"writing full configuration to '{path_config}'")
-    ctx.dump_config(path_config, args, seeds, model_spec, strat, insp)
+
+    with open(path_model, 'w') as fd:
+        fd.write(str(model.model))
+
+    ctx.dump_config(path_config, args, seeds, model, strat, inspc)
+
+    # log number of parameters
+    n_params = utils.model.count_parameters(model.model)
+    logging.info(f"set up model '{model.name}' ({model.id}) with {n_params:,} parameters")
+
+    # TODO: clean up stuff below, handle checkpoint/continue, ...
 
     # training loop
     log = utils.logging.Logger()
+    inspc, chkptm = inspc.build(log, model.id, ctx.dir_out)
 
-    insp, chkptm = insp.build(log, model_spec.id, ctx.dir_out)
+    model, loss, input = model.model, model.loss, model.input
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
@@ -119,5 +157,6 @@ def train(args):
         model.load_state_dict(state)
 
     loader_args = {'num_workers': 4, 'pin_memory': True}
-    tctx = TrainingContext(log, strat, model, loss, input, insp, chkptm, device, loader_args)
+
+    tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
     tctx.run(args.start_stage - 1, args.start_epoch - 1)
