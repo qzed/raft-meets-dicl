@@ -1,4 +1,3 @@
-import pickle
 import re
 
 from dataclasses import dataclass
