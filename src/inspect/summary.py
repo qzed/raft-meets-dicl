@@ -396,17 +396,16 @@ class InspectorSpec:
         }
 
     def build(self, log, context):
-        checkpoints = self.checkpoints.build(context)
+        chkpts = self.checkpoints.build(context)
 
         # build summary-writer
         path_summary = context.dir_out / f"tb.{context.id.replace('/', '_').replace('-', '.')}"
         log.info(f"writing tensorboard summary to '{path_summary}'")
         writer = SummaryWriter(path_summary)
 
-        inspector = SummaryInspector(context, writer, self.metrics, self.images, checkpoints,
-                                     self.validation)
+        insp = SummaryInspector(writer, self.metrics, self.images, chkpts, self.validation)
 
-        return inspector, checkpoints
+        return insp, chkpts
 
 
 class SummaryInspector(strategy.Inspector):
@@ -419,10 +418,9 @@ class SummaryInspector(strategy.Inspector):
     val_epoch: List[Validation]
     val_stage: List[Validation]
 
-    def __init__(self, context, writer, metrics, images, checkpoints, validation):
+    def __init__(self, writer, metrics, images, checkpoints, validation):
         super().__init__()
 
-        self.context = context
         self.writer = writer
         self.metrics = metrics
         self.images = images
