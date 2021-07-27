@@ -53,17 +53,22 @@ def setup(dir_base='logs', timestamp=datetime.datetime.now()):
 
 
 def main():
+    def fmtcls(prog): return argparse.HelpFormatter(prog, max_help_position=40)
+
     parser = argparse.ArgumentParser(
         description='Optical Flow Estimation',
-        formatter_class=lambda prog: argparse.HelpFormatter(prog, max_help_position=34))
+        formatter_class=fmtcls)
 
-    parser.add_argument('-d', '--data', required=True, help='training strategy and data')
-    parser.add_argument('-m', '--model', required=True, help='specification of the model')
-    parser.add_argument('-i', '--inspect', required=False, help='specification of metrics')
-    parser.add_argument('-o', '--output', default='runs', help='base output directory '
+    subp = parser.add_subparsers(dest='command', help='help for command')
+
+    ptrain = subp.add_parser('train', formatter_class=fmtcls, help='train model')
+    ptrain.add_argument('-d', '--data', required=True, help='training strategy and data')
+    ptrain.add_argument('-m', '--model', required=True, help='specification of the model')
+    ptrain.add_argument('-i', '--inspect', required=False, help='specification of metrics')
+    ptrain.add_argument('-o', '--output', default='runs', help='base output directory '
                                                                '[default: %(default)s]')
-    parser.add_argument('--device', help='device to use [default: cuda:0 if available]')
-    parser.add_argument('--device-ids', help='device IDs to use with DataParallel')
+    ptrain.add_argument('--device', help='device to use [default: cuda:0 if available]')
+    ptrain.add_argument('--device-ids', help='device IDs to use with DataParallel')
 
     args = parser.parse_args()
 
