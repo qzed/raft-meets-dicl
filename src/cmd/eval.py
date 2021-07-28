@@ -67,7 +67,7 @@ class MeanCollector(Collector):
         results = OrderedDict()
 
         for k, vs in self.results.items():
-            results[k] = np.mean(vs)
+            results[k] = np.mean(vs).item()
 
         return results
 
