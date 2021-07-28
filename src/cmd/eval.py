@@ -162,6 +162,8 @@ def evaluate(args):
 
     torch.set_grad_enabled(False)
 
+    output = []
+
     for img1, img2, flow, valid, meta in samples:
         batch, _, _, _ = img1.shape
 
@@ -191,6 +193,9 @@ def evaluate(args):
             # compute metrics
             sample_metrics = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
 
+            # collect for output
+            output.append({'id': sample_id, 'metrics': sample_metrics})
+
             # collect for summary
             collectors.collect(sample_metrics)
 
@@ -203,3 +208,10 @@ def evaluate(args):
     for collector in collectors.collectors:
         info = [f"{k}: {v:.04f}" for k, v in collector.result().items()]
         logging.info(f"  {collector.type}: {', '.join(info)}")
+
+    # write output
+    if args.output:
+        utils.config.store(args.output, {
+            'samples': output,
+            'summary': {c.type: c.result() for c in collectors.collectors},
+        })
