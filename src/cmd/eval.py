@@ -158,8 +158,9 @@ def evaluate(args):
     samples = tqdm(samples, unit='batch', leave=False)
 
     # prepare output directories
-    if args.output:
-        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    path_out = Path(args.output) if args.output else None
+    if path_out is not None:
+        path_out.parent.mkdir(parents=True, exist_ok=True)
 
     # run evaluation
     logging.info(f"evaluating {len(dataset)} samples")
@@ -213,8 +214,8 @@ def evaluate(args):
         logging.info(f"  {collector.type}: {', '.join(info)}")
 
     # write output
-    if args.output:
-        utils.config.store(args.output, {
+    if path_out is not None:
+        utils.config.store(path_out, {
             'samples': output,
             'summary': {c.type: c.result() for c in collectors.collectors},
         })
