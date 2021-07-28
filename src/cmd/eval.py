@@ -154,8 +154,10 @@ def evaluate(args):
     # load data
     logging.info(f"loading data specification, file='{args.data}'")
 
+    compute_metrics = not args.flow_only
+
     dataset = data.load(args.data)
-    dataset = input.apply(dataset).torch(flow=True)
+    dataset = input.apply(dataset).torch(compute_metrics)
     samples = DataLoader(dataset, args.batch_size, drop_last=False, num_workers=4, pin_memory=True)
     samples = tqdm(samples, unit='batch', leave=False)
 
@@ -181,14 +183,22 @@ def evaluate(args):
     torch.set_grad_enabled(False)
 
     output = []
-    for img1, img2, flow, valid, meta in samples:
+    for sample in samples:
+        # not all evaluation datasets have ground-truth
+        if compute_metrics:
+            img1, img2, flow, valid, meta = sample
+        else:
+            (img1, img2, meta), flow, valid = sample, None, None
+
         batch, _, _, _ = img1.shape
 
         # move to device
         img1 = img1.to(device)
         img2 = img2.to(device)
-        flow = flow.to(device)
-        valid = valid.to(device)
+
+        if flow is not None:
+            flow = flow.to(device)
+            valid = valid.to(device)
 
         # run model
         result = model(img1, img2)
@@ -198,45 +208,52 @@ def evaluate(args):
         for b in range(batch):
             # switch to batch size of one
             sample_id = meta['sample_id'][b]
-            sample_output = result.output(b)
             sample_final = final[b].view(1, *final.shape[1:])
-            sample_flow = flow[b].view(1, *flow.shape[1:])
-            sample_valid = valid[b].view(1, *valid.shape[1:])
 
-            # compute loss
-            sample_loss = loss(sample_output, sample_flow, sample_valid)
-            sample_loss = sample_loss.detach().item()
+            if flow is not None:
+                sample_output = result.output(b)
+                sample_flow = flow[b].view(1, *flow.shape[1:])
+                sample_valid = valid[b].view(1, *valid.shape[1:])
 
-            # compute metrics
-            sample_metrics = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
+                # compute loss
+                sample_loss = loss(sample_output, sample_flow, sample_valid)
+                sample_loss = sample_loss.detach().item()
 
-            # collect for output
-            output.append({'id': sample_id, 'metrics': sample_metrics})
+                # compute metrics
+                sample_metrs = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
 
-            # collect for summary
-            collectors.collect(sample_metrics)
+                # collect for output
+                output.append({'id': sample_id, 'metrics': sample_metrs})
 
-            # log info about current sample
-            info = [f"{k}: {v:.04f}" for k, v in sample_metrics.items()]
-            logging.info(f"sample: {sample_id}, {', '.join(info)}")
+                # collect for summary
+                collectors.collect(sample_metrs)
+
+                # log info about current sample
+                info = [f"{k}: {v:.04f}" for k, v in sample_metrs.items()]
+                logging.info(f"sample: {sample_id}, {', '.join(info)}")
+
+            else:
+                # log info about current sample
+                logging.info(f"sample: {sample_id}")
 
             # save flow image
             if path_flow is not None:
                 est = sample_final[0].detach().cpu().permute(1, 2, 0).numpy()
                 save_flow_image(path_flow, args.flow_format, sample_id, est, flow_visual_args)
 
-    # log summary
-    logging.info("summary:")
-    for collector in collectors.collectors:
-        info = [f"{k}: {v:.04f}" for k, v in collector.result().items()]
-        logging.info(f"  {collector.type}: {', '.join(info)}")
+    if compute_metrics:
+        # log summary
+        logging.info("summary:")
+        for collector in collectors.collectors:
+            info = [f"{k}: {v:.04f}" for k, v in collector.result().items()]
+            logging.info(f"  {collector.type}: {', '.join(info)}")
 
-    # write output
-    if path_out is not None:
-        utils.config.store(path_out, {
-            'samples': output,
-            'summary': {c.type: c.result() for c in collectors.collectors},
-        })
+        # write output
+        if path_out is not None:
+            utils.config.store(path_out, {
+                'samples': output,
+                'summary': {c.type: c.result() for c in collectors.collectors},
+            })
 
 
 def save_flow_image(dir, format, sample_id, flow, visual_args):

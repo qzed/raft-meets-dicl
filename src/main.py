@@ -66,6 +66,7 @@ def main():
                       help='output format(s) for flow images (comma separated list) [default: visual]')
     eval.add_argument('--flow-mrm', type=float, help='maximum range of motion for visual flow image output')
     eval.add_argument('--flow-gamma', type=float, help='gamma for visual flow image output')
+    eval.add_argument('--flow-only', action='store_true', help='only compute flow images, do not evaluate metrics')
     eval.add_argument('--device', help='device to use [default: cuda:0 if available]')
     eval.add_argument('--device-ids', help='device IDs to use with DataParallel')
 
