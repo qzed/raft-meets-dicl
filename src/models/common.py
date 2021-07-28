@@ -26,7 +26,7 @@ class Result:
     def __init__(self):
         pass
 
-    def output(self):
+    def output(self, batch_index=None):
         raise NotImplementedError
 
     def final(self):

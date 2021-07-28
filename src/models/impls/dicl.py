@@ -583,8 +583,11 @@ class DiclResult(Result):
         self.shape = target_shape
         self.mode = 'bilinear'
 
-    def output(self):
-        return self.result
+    def output(self, batch_index=None):
+        if batch_index is None:
+            return self.result
+
+        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
 
     def final(self):
         flow = self.result[0]
