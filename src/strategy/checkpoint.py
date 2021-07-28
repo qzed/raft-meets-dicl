@@ -168,7 +168,9 @@ class CheckpointManager:
         self.keep_best = keep_best
 
     def _chkpt_metric_args(self, chkpt: CheckpointEntry):
-        p = re.compile(r'[\./\\\?!:]')
+        # ensure that we only get valid names for string replacements
+        p = re.compile(r'[\./\\\?!:-]')
+
         return {'m_' + p.sub('_', k): v for k, v in chkpt.metrics.items()}
 
     def _chkpt_iter_args(self, chkpt: CheckpointEntry):
