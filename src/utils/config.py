@@ -1,7 +1,16 @@
 import json
 import yaml
 
+from collections import OrderedDict
 from pathlib import Path
+
+
+# properly handle OrderedDict when storing data in yaml format
+def yaml_repr_ordereddict(dumper, data):
+    return dumper.represent_mapping('tag:yaml.org,2002:map', data.items())
+
+
+yaml.add_representer(OrderedDict, yaml_repr_ordereddict)
 
 
 def to_string(cfg, fmt='json'):
