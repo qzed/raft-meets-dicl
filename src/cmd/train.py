@@ -79,7 +79,7 @@ def train(args):
         cfg_inspc = args.inspect
 
     if cfg_inspc is None:
-        cfg_inspc = Path(__file__).parent.parent.parent / 'cfg' / 'metrics.yaml'
+        cfg_inspc = Path(__file__).parent.parent.parent / 'cfg' / 'inspect' / 'default.yaml'
 
     if isinstance(cfg_inspc, (str, Path)):
         logging.info(f"loading metrics/inspection configuration: file='{cfg_inspc}'")
