@@ -6,6 +6,7 @@ import logging
 
 from tqdm import tqdm
 
+import cv2
 import numpy as np
 
 import torch
@@ -17,6 +18,7 @@ from .. import metrics
 from .. import models
 from .. import strategy
 from .. import utils
+from .. import visual
 
 
 class Collector:
@@ -162,6 +164,17 @@ def evaluate(args):
     if path_out is not None:
         path_out.parent.mkdir(parents=True, exist_ok=True)
 
+    path_flow = Path(args.flow) if args.flow else None
+
+    # handle arguments for flow image
+    flow_visual_args = {}
+
+    if args.flow_mrm:
+        flow_visual_args['mrm'] = float(args.flow_mrm)
+
+    if args.flow_gamma:
+        flow_visual_args['gamma'] = float(args.flow_gamma)
+
     # run evaluation
     logging.info(f"evaluating {len(dataset)} samples")
 
@@ -207,6 +220,11 @@ def evaluate(args):
             info = [f"{k}: {v:.04f}" for k, v in sample_metrics.items()]
             logging.info(f"sample: {sample_id}, {', '.join(info)}")
 
+            # save flow image
+            if path_flow is not None:
+                est = sample_final[0].detach().cpu().permute(1, 2, 0).numpy()
+                save_flow_image(path_flow, args.flow_format, sample_id, est, flow_visual_args)
+
     # log summary
     logging.info("summary:")
     for collector in collectors.collectors:
@@ -219,3 +237,20 @@ def evaluate(args):
             'samples': output,
             'summary': {c.type: c.result() for c in collectors.collectors},
         })
+
+
+def save_flow_image(dir, format, sample_id, flow, visual_args):
+    formats = {
+        'kitti': (data.io.write_flow_kitti, {}, 'png'),
+        'visual': (save_flow_visual, visual_args, 'png'),
+    }
+
+    write, kwargs, ext = formats[format]
+    write(dir / f"{sample_id}.{ext}", flow, **kwargs)
+
+
+def save_flow_visual(path, uv, **kwargs):
+    rgb = visual.flow_to_rgb(uv, **kwargs)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(path), rgb * 255)
