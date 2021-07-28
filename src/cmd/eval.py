@@ -243,14 +243,16 @@ def save_flow_image(dir, format, sample_id, flow, visual_args):
     formats = {
         'kitti': (data.io.write_flow_kitti, {}, 'png'),
         'visual': (save_flow_visual, visual_args, 'png'),
+        'flo': (data.io.write_flow_mb, {}, 'flo'),
     }
 
     write, kwargs, ext = formats[format]
-    write(dir / f"{sample_id}.{ext}", flow, **kwargs)
+
+    path = dir / f"{sample_id}.{ext}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    write(path, flow, **kwargs)
 
 
 def save_flow_visual(path, uv, **kwargs):
-    rgb = visual.flow_to_rgb(uv, **kwargs)
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(path), rgb * 255)
+    cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs) * 255)

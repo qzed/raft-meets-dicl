@@ -78,6 +78,22 @@ def read_flow_mb(file):
     return flow.reshape((h, w, 2))
 
 
+def write_flow_mb(file, uv):
+    """Write flow file in Middlebury format (.flo)"""
+
+    h, w, _ = uv.shape
+
+    with open(file, 'wb') as fd:
+        # write magic tag
+        fd.write(b'PIEH')
+
+        # write image size
+        np.asarray((w, h)).astype('<i').tofile(fd)
+
+        # write values (interleaved u, v)
+        np.asarray(uv).reshape(h * w * 2).astype('<f').tofile(fd)
+
+
 def read_pfm(file):
     """Read image file in PFM format (.pfm)"""
 
