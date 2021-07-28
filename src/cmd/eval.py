@@ -75,6 +75,7 @@ def evaluate(args):
         # run evaluation per-sample instead of per-batch
         for b in range(batch):
             # switch to batch size of one
+            sample_id = meta['sample_id'][b]
             sample_output = result.output(b)
             sample_final = final[b].view(1, *final.shape[1:])
             sample_flow = flow[b].view(1, *flow.shape[1:])
@@ -84,4 +85,4 @@ def evaluate(args):
             sample_loss = loss(sample_output, sample_flow, sample_valid)
 
             # log info about current sample
-            logging.info(f"sample: {meta['sample_id'][b]}, loss: {sample_loss}")
+            logging.info(f"sample: {sample_id}, loss: {sample_loss}")
