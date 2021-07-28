@@ -72,9 +72,14 @@ class Dataset(Collection):
 
         img1 = self.image_loader.load(img1)
         img2 = self.image_loader.load(img2)
-        flow, valid = self.flow_loader.load(flow)
 
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[:2] == img2.shape[:2]
+
+        if flow is not None and flow.exists():      # test datasets may not have flow
+            flow, valid = self.flow_loader.load(flow)
+            assert img1.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        else:
+            flow, valid = None, None
 
         meta = dict(
             dataset_id=self.id,

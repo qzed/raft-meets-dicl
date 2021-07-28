@@ -55,8 +55,10 @@ class Augment(Collection):
         # ensure that we have contiguous memory for torch later on
         img1 = np.ascontiguousarray(img1)
         img2 = np.ascontiguousarray(img2)
-        flow = np.ascontiguousarray(flow)
-        valid = np.ascontiguousarray(valid)
+
+        if flow is not None:
+            flow = np.ascontiguousarray(flow)
+            valid = np.ascontiguousarray(valid)
 
         return img1, img2, flow, valid, meta
 
@@ -170,7 +172,7 @@ class Crop(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[:2] == img2.shape[:2]
 
         # draw new upper-right corner coordinate randomly
         mx, my = img1.shape[1] - self.size[0], img1.shape[0] - self.size[1]
@@ -180,8 +182,10 @@ class Crop(Augmentation):
         # perform crop
         img1 = img1[y0:y0+self.size[1], x0:x0+self.size[0]]
         img2 = img2[y0:y0+self.size[1], x0:x0+self.size[0]]
-        flow = flow[y0:y0+self.size[1], x0:x0+self.size[0]]
-        valid = valid[y0:y0+self.size[1], x0:x0+self.size[0]]
+
+        if flow is not None:
+            flow = flow[y0:y0+self.size[1], x0:x0+self.size[0]]
+            valid = valid[y0:y0+self.size[1], x0:x0+self.size[0]]
 
         meta['original_extents'] = ((0, self.size[1]), (0, self.size[0]))
 
@@ -217,15 +221,19 @@ class Flip(Augmentation):
         if np.random.rand() < self.probability[0]:
             img1 = img1[:, ::-1]
             img2 = img2[:, ::-1]
-            flow = flow[:, ::-1] * (-1.0, 1.0)
-            valid = valid[:, ::-1]
+
+            if flow is not None:
+                flow = flow[:, ::-1] * (-1.0, 1.0)
+                valid = valid[:, ::-1]
 
         # vertical flip
         if np.random.rand() < self.probability[1]:
             img1 = img1[::-1, :]
             img2 = img2[::-1, :]
-            flow = flow[::-1, :] * (1.0, -1.0)
-            valid = valid[::-1, :]
+
+            if flow is not None:
+                flow = flow[::-1, :] * (1.0, -1.0)
+                valid = valid[::-1, :]
 
         return img1, img2, flow, valid, meta
 
@@ -457,7 +465,7 @@ class Scale(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[:2] == img2.shape[:2]
         assert np.all(valid)        # full flows only!
 
         # draw random scale candidates
@@ -472,11 +480,13 @@ class Scale(Augmentation):
         # scale images
         img1 = cv2.resize(img1, new_size, interpolation=cv2.INTER_LINEAR)
         img2 = cv2.resize(img2, new_size, interpolation=cv2.INTER_LINEAR)
-        flow = cv2.resize(flow, new_size, interpolation=cv2.INTER_LINEAR)
-        flow *= scale
 
-        # this is for full/non-sparse flows only...
-        valid = np.ones(img1.shape[:2], dtype=bool)
+        if flow is not None:
+            flow = cv2.resize(flow, new_size, interpolation=cv2.INTER_LINEAR)
+            flow *= scale
+
+            # this is for full/non-sparse flows only...
+            valid = np.ones(img1.shape[:2], dtype=bool)
 
         return img1, img2, flow, valid, meta
 
