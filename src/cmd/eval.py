@@ -157,6 +157,10 @@ def evaluate(args):
     samples = DataLoader(dataset, args.batch_size, drop_last=False, num_workers=4, pin_memory=True)
     samples = tqdm(samples, unit='batch', leave=False)
 
+    # prepare output directories
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+
     # run evaluation
     logging.info(f"evaluating {len(dataset)} samples")
 
