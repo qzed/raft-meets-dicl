@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import List
 
 import logging
@@ -9,9 +10,29 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .. import data
+from .. import metrics
 from .. import models
 from .. import strategy
 from .. import utils
+
+
+class Metrics:
+    metrics: List[metrics.Metric]
+
+    @classmethod
+    def from_config(cls, cfg):
+        return cls([metrics.Metric.from_config(c) for c in cfg])
+
+    def __init__(self, metrics):
+        self.metrics = metrics
+
+    def __call__(self, model, estimate, target, valid, loss):
+        result = OrderedDict()
+
+        for metric in self.metrics:
+            result.update(metric(model, None, estimate, target, valid, loss))
+
+        return result
 
 
 def evaluate(args):
@@ -45,6 +66,12 @@ def evaluate(args):
     model.load_state_dict(chkpt.state.model)
     model.to(device)
     model.eval()
+
+    # load metrics
+    logging.info(f"loading metrics specification, file='{args.metrics}'")
+
+    metrics_cfg = utils.config.load(args.metrics)
+    metrics = Metrics.from_config(metrics_cfg['metrics'])
 
     # load data
     logging.info(f"loading data specification, file='{args.data}'")
@@ -84,5 +111,9 @@ def evaluate(args):
             # compute loss
             sample_loss = loss(sample_output, sample_flow, sample_valid)
 
+            # compute metrics
+            sample_metrics = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
+
             # log info about current sample
-            logging.info(f"sample: {sample_id}, loss: {sample_loss}")
+            info = [f"{k}: {v:.04f}" for k, v in sample_metrics.items()]
+            logging.info(f"sample: {sample_id}, {', '.join(info)}")

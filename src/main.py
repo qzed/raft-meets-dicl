@@ -59,6 +59,7 @@ def main():
     eval.add_argument('-m', '--model', required=True, help='the model to ue')
     eval.add_argument('-c', '--checkpoint', required=True, help='the checkpoint to load')
     eval.add_argument('-b', '--batch-size', type=int, default=1, help='batch-size to use for evaluation')
+    eval.add_argument('-x', '--metrics', help='specification of metrics to use for evaluation')
     eval.add_argument('--device', help='device to use [default: cuda:0 if available]')
     eval.add_argument('--device-ids', help='device IDs to use with DataParallel')
 

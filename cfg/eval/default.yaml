@@ -1,0 +1,10 @@
+metrics:
+  - type: epe
+    key: EndPointError/
+    distances: [1, 3, 5]
+
+  - type: fl-all
+    key: Fl-all
+
+  - type: loss
+    key: Loss
