@@ -163,7 +163,6 @@ def evaluate(args):
     torch.set_grad_enabled(False)
 
     output = []
-
     for img1, img2, flow, valid, meta in samples:
         batch, _, _, _ = img1.shape
 
