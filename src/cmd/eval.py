@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pathlib import Path
 from typing import List
 
 import logging
@@ -138,9 +139,13 @@ def evaluate(args):
     model.eval()
 
     # load metrics
-    logging.info(f"loading metrics specification, file='{args.metrics}'")
+    metrics_path = args.metrics
+    if metrics_path is None:
+        metrics_path = Path(__file__).parent.parent.parent / 'cfg' / 'eval' / 'default.yaml'
 
-    metrics_cfg = utils.config.load(args.metrics)
+    logging.info(f"loading metrics specification, file='{metrics_path}'")
+
+    metrics_cfg = utils.config.load(metrics_path)
     metrics = Metrics.from_config(metrics_cfg['metrics'])
     collectors = Collectors.from_config(metrics_cfg['summary'])
 
