@@ -53,6 +53,15 @@ def main():
     train.add_argument('--start-epoch', type=int, help='start with sepcified epoch and skip previous')
     train.add_argument('--reproduce', action='store_true', help='use seeds from config')
 
+    # subcommand: eval[uate]
+    eval = subp.add_parser('evaluate', aliases=['e', 'eval'], formatter_class=fmtcls, help='evaluate model')
+    eval.add_argument('-d', '--data', required=True, help='evaluation dataset')
+    eval.add_argument('-m', '--model', required=True, help='the model to ue')
+    eval.add_argument('-c', '--checkpoint', required=True, help='the checkpoint to load')
+    eval.add_argument('-b', '--batch-size', type=int, default=1, help='batch-size to use for evaluation')
+    eval.add_argument('--device', help='device to use [default: cuda:0 if available]')
+    eval.add_argument('--device-ids', help='device IDs to use with DataParallel')
+
     # subcommand: checkpoint
     chkpt = subp.add_parser('checkpoint', formatter_class=fmtcls, help='inspect and manage checkpoints')
     chkpt_sub = chkpt.add_subparsers(dest='subcommand', help='help for subcommand')
@@ -73,6 +82,7 @@ def main():
     # run subcommand
     commands = {
         'train': cmd.train,
+        'evaluate': cmd.evaluate,
         'checkpoint': cmd.checkpoint,
     }
 
