@@ -8,3 +8,6 @@ metrics:
 
   - type: loss
     key: Loss
+
+summary:
+  - type: mean

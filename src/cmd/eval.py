@@ -5,6 +5,8 @@ import logging
 
 from tqdm import tqdm
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -14,6 +16,74 @@ from .. import metrics
 from .. import models
 from .. import strategy
 from .. import utils
+
+
+class Collector:
+    type = None
+
+    @classmethod
+    def _typecheck(cls, cfg):
+        if cfg['type'] != cls.type:
+            raise ValueError(f"invalid collector type '{cfg['type']}', expected '{cls.type}'")
+
+    @classmethod
+    def from_config(cls, cfg):
+        types = [MeanCollector]
+        types = {cls.type: cls for cls in types}
+
+        return types[cfg['type']].from_config(cfg)
+
+    def collect(metrics):
+        raise NotImplementedError
+
+    def result(self):
+        raise NotImplementedError
+
+    def __call__(self, metrics):
+        self.collect(metrics)
+
+
+class MeanCollector(Collector):
+    type = 'mean'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls()
+
+    def __init__(self):
+        self.results = OrderedDict()
+
+    def collect(self, metrics):
+        for k, v in metrics.items():
+            if k not in self.results:
+                self.results[k] = list()
+
+            self.results[k].append(v)
+
+    def result(self):
+        results = OrderedDict()
+
+        for k, vs in self.results.items():
+            results[k] = np.mean(vs)
+
+        return results
+
+
+class Collectors:
+    collectors: List[Collector]
+
+    @classmethod
+    def from_config(cls, cfg):
+        return cls([Collector.from_config(c) for c in cfg])
+
+    def __init__(self, collectors):
+        self.collectors = collectors
+
+    def collect(self, metrics):
+        for collector in self.collectors:
+            collector.collect(metrics)
 
 
 class Metrics:
@@ -72,6 +142,7 @@ def evaluate(args):
 
     metrics_cfg = utils.config.load(args.metrics)
     metrics = Metrics.from_config(metrics_cfg['metrics'])
+    collectors = Collectors.from_config(metrics_cfg['summary'])
 
     # load data
     logging.info(f"loading data specification, file='{args.data}'")
@@ -110,10 +181,20 @@ def evaluate(args):
 
             # compute loss
             sample_loss = loss(sample_output, sample_flow, sample_valid)
+            sample_loss = sample_loss.detach().item()
 
             # compute metrics
             sample_metrics = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
 
+            # collect for summary
+            collectors.collect(sample_metrics)
+
             # log info about current sample
             info = [f"{k}: {v:.04f}" for k, v in sample_metrics.items()]
             logging.info(f"sample: {sample_id}, {', '.join(info)}")
+
+    # log summary
+    logging.info("summary:")
+    for collector in collectors.collectors:
+        info = [f"{k}: {v:.04f}" for k, v in collector.result().items()]
+        logging.info(f"  {collector.type}: {', '.join(info)}")
