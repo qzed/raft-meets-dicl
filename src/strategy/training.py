@@ -137,7 +137,8 @@ class TrainingContext:
 
         # set up learning-rate schedulers
         sched_vars = {
-            'n_samples': len(self.data),
+            'n_samples': len(self.data.dataset),
+            'n_batches': len(self.data),
             'n_epochs': stage.data.epochs,
             'n_accum': stage.gradient.accumulate,
             'batch_size': stage.data.batch_size,
