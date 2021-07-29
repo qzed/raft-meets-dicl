@@ -1,0 +1,23 @@
+# Datasource configuration.
+#
+# See e.g. datasource-basic.yaml for more details.
+
+type: repeat
+# Type of this datasource. Repeat the underlying datasource a specified number
+# of times.
+
+times: 5
+# The number of times to repeat the underlying datasource.
+
+source:
+  # Path to or inline-specification of the underlying datasource.
+  # See e.g. datasource-basic for more details.
+  #
+  # Paths are relative to this file.
+
+  type: dataset
+  spec: dataset-basic.yaml
+
+  parameters:
+    type: train
+    pass: clean
