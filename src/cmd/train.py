@@ -24,7 +24,7 @@ def train(args):
 
     # basic setup
     path_out = Path(args.output) / timestamp.strftime('%G.%m.%dT%H.%M.%S')
-    path_out.mkdir()
+    path_out.mkdir(parents=True)
 
     utils.logging.setup(path_out / 'main.log')
 
