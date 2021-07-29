@@ -1,0 +1,23 @@
+# Training strategy configuration.
+#
+# Specifies how to train a model. Models can be trained in multiple stages,
+# where each stage provides its own training and validation datasets, optimizer
+# specifications and parameters, as well as model and loss arguments. Also
+# specifies how these stages are connected and in which order to run them.
+
+mode: best
+# Training mode for running consecutive stages.
+#
+# Available choices:
+# - best: At the beginning of a new stage, restore the best checkpoint of the
+#   last stage.
+# - continuous: Simply continue training. Do not restore any previous
+#   checkpoint.
+
+stages:
+  # List of stages to run for training. Either paths to stage configuration
+  # files or inline stage specifications (see e.g. stage.yaml).
+
+  - stage.yaml
+  - some-yaml-stage-config.yaml
+  - some-json-stage-config.json
