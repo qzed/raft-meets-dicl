@@ -1,0 +1,144 @@
+name: Example dataset
+# Name of this dataset (used e.g. for logging).
+
+id: example
+# ID of this dataset (should be unique).
+
+path: './path/to/some/directory'
+# Base path to the dataset, relative to this file.
+
+layout:
+  # Specifies how the files of the dataset can be accessed.
+
+  type: generic
+  # Type of the layout.
+  #
+  # Possible choices are:
+  # - multi: One of multiple layouts can be selected via a parameter (e.g.
+  #   forward vs. backward flow).
+  # - generic: Generic forward-flow layout.
+  # - generic-backward: Generic backward-flow layout.
+
+  images: '{type}/{pass}/{scene}/frame_{idx:04d}.png'
+  # Pattern to access input images.
+  #
+  # The 'generic' and 'generic-backward' type layouts assume that input images
+  # and (optionally) ground-truth flow is provided as set of sequences, where
+  # each sequequence is identified by an integer sequence ID {seq} and an
+  # integer index {idx} inside this sequence. This means image pairs are
+  # retreived by taking the path specified by the pattern for any pattern,
+  # which constitutes the first image of the pair, and then taking the same
+  # path with {idx + 1} instead of {idx} to obtain the second image.
+  #
+  # Sequences may additionally be grouped by other string/generic arguments
+  # enclosed in braces, e.g. {type}, {pass}, and {scene} above. The {seq}
+  # argument is optional in case of once single continuous image sequence.
+  #
+  # Any additional argument (i.e. any argument except {idx} and {seq}) may be
+  # fixed by parameters (see below). Parameters allow choosing a different
+  # subset of a dataset when including it in a datasource specification. For
+  # example, here it allows choosing between training and test subset via the
+  # 'type' parameter
+  #
+  # This pattern specifies the image location relative to the base path
+  # specified above.
+
+  flows: '{type}/flow/{scene}/frame_{idx:04d}.flo'
+  # Pattern to access ground-truth flow images.
+  #
+  # Flow images are matched to input image pairs by matching their arguments.
+  # Note that all arguments used for specifying flow images must also be
+  # present in the image pattern, but not the other way round.
+  #
+  # This pattern specifies the flow location relative to the base path
+  # specified above.
+
+  key: '{type}/{scene}/frame_{idx:04d}'
+  # Unique identifier pattern for samples.
+  #
+  # This identifier is e.g. used for writing flow images when evaluating. It
+  # should uniquely identify a specific input sample. The sample ID is build
+  # from this pattern by applying the arguments found in the image pattern
+  # above, where {idx} refers to the first image.
+
+parameters:
+  # Specifies parameters that can be used to select a subset of this dataset.
+  #
+  # Parameters are specified when building a datasource from a dataset. See
+  # e.g. datasource-basic.yaml for an example.
+  #
+  # Some parameters can be left unspecified, in which case they behave like
+  # free arguments in the image and flow patterns.
+
+  pass:
+    # Parameter of name 'pass'.
+    #
+    # Note: the name does not have to match with the {pass} argument above.
+    # Argument substitution is specified explicitly below.
+
+    values: [ clean, final ]
+    # Possible values this parameter can take.
+
+    sub: pass
+    # Simple substitution specification.
+    #
+    # Specifies that the {pass} argument in the image and flow layout patterns
+    # should be substituted by the value chosen for this parameter.
+
+  type:
+    # Parameter of name 'type'.
+
+    values: [ train, test ]
+    # Possible values this parameter can take.
+
+    sub:
+      # Extended substitution specification.
+
+      test: { type: test }
+      # Specifies which arguments in the image and flow patterns should be
+      # substituted and by which string when the parameter value is 'test'.
+      #
+      # In this case, the {type} argument is subsituted by the string 'test'.
+
+      train: { type: training }
+      # Specifies which arguments in the image and flow patterns should be
+      # substituted and by which string when the parameter value is 'train'.
+      #
+      # In this case, the {type} argument is subsituted by the string
+      # 'training'.
+
+split:
+  # Specify subset based on some file containing simple line-separated values.
+  # This is optional.
+
+  file: './train_val.txt'
+  # Path to the split file.
+  #
+  # File containing one line per sample with a single string value per line.
+  # The value specifies which subset the corresponding sample belongs to. There
+  # may be an arbitrary number of different string values, e.g. '1' and '2' to
+  # split between training and validation set, or 'train', 'val', 'dev' to
+  # split between training, test, and validation sets.
+  #
+  # Samples are matched to lines by ordering them alphabetically by their path.
+  #
+  # The path is relative to this file.
+
+  parameter: type
+  # Name of the parameter via which one of the subsets in the specified file
+  # can be selected. Valid values for this parameter are specified in the
+  # 'values' entry below.
+
+  values:
+    # Valid values for selecting a subset and the corresponding string value
+    # they match in the split file.
+
+    train: '1'
+    # First parameter value. This specifies that the setting the 'type'
+    # parameter to 'train' selects all samples where the corresponding line in
+    # the split file matches '1'.
+
+    test: '2'
+    # First parameter value. This specifies that the setting the 'type'
+    # parameter to 'test' selects all samples where the corresponding line in
+    # the split file matches '2'.
