@@ -1,0 +1,149 @@
+# Datasource configuration.
+#
+# See e.g. datasource-basic.yaml for more details.
+
+type: augment
+# Type of this datasource. Apply the augmentations specified below to the
+# underlying datasource.
+
+augmentations:
+  # List of augmentations applied to the underlying datasource. Augmentations
+  # are applied in the order they have been specified.
+
+
+  - type: scale
+    # Type of this augmentation: Scale image and dense flow randomly in both
+    # height and width. Note: For sparse flows, the type 'scale-sparse' should
+    # be chosen instead, which has the same properties as the normal 'scale'
+    # type.
+    #
+    # Note that scaled images generally have a random size and thus may need
+    # padding or cropping before they can be batched together.
+    #
+    # The new image size is chosen uniformly based on the parameters below.
+
+    min-size: [496, 368]
+    # Minimum image size. Scaled images will not be scaled below this size.
+
+    min-scale: [0.5, 0.5]
+    # Minimum scale factors in width and height. Note that the actual minimum
+    # size is of the image is defined by the (element-wise) maximum of the
+    # sizes implied by 'min-size' and 'min-scale'.
+    #
+    # Scaling factors need to be positive. For flipping (i.e. negative scaling)
+    # see the 'flip' type augmentation.
+
+    max-scale: [2.0, 2.0]
+    # Maximum scale factors in width and height. This is the sole upper bound
+    # for the new image size.
+
+    mode: linear
+    # Interpolation mode. Specifies how input images and dense flow will be
+    # interpolated when up- or down-sampling.
+    #
+    # Note: For the 'scale-sparse' type, this mode only applies to he input
+    # images and not the flow.
+
+
+  - type: crop
+    # Type of this augmentation: Crop input to specified size. Note that if an
+    # image is smaller in any direction, that direction will not be cropped.
+    # This should generally be applied after scaling to generate images of
+    # uniform size. Note that the 'min-size' property for scaling should be set
+    # accordingly, as otherwise some images might be smaller.
+
+    size: [496, 368]
+    # The size (width, height) to crop the image to.
+
+
+  - type: flip
+    # Type of this augmentation: Flip image axes with a certain probability,
+    # reversing them.
+
+    probability: [0.5, 0.5]
+    # The probabilities for flipping horizontally (x-axis) and vertically
+    # (y-axis), respectively.
+
+
+  - type: occlusion-forward
+    # Type of this augmentation: Occlude parts of the second image by drawing
+    # one or multiple rectangular patches of specified size with the mean color
+    # value of the image onto it. The ground-truth flow is not changed.
+    #
+    # This essentially simulates occlusions in the second frame,
+    # e.g. from objects entering the view between first and second frame.
+    #
+    # There is also an 'occlusion-backward' type, where the same modification
+    # is applied to the first frame. This can be used e.g. to simulate image
+    # corruption and encourage better regularization.
+
+    probability: 0.25
+    # The probability for applying this type of augmentation.
+
+    num: [1, 3]
+    # The minimum (inclusive) and maximum (exclusive) number of patches to draw
+    # if the augmentation is applied. The actual number is chosen uniformly
+    # based on this.
+
+    min-size: [1, 1]
+    # Minimum width and height of the patches (inclusive).
+    #
+    # The actual patch size is chosen uniformly based on minimum and maximum
+    # size.
+
+    max-size: [100, 50]
+    # Maximum width and height of the patches (exclusive).
+
+
+  - type: color-jitter
+    # Type of this augmentation: Apply color jitter to the input images. Does
+    # not modify the flow.
+    #
+    # This is essentially a wrapper around torchvision.transforms.ColorJitter.
+    # See documentation of that for more details.
+
+    prob-asymmetric: 0.5
+    # The probability of applying this augmentation asymmetrically, i.e.
+    # independently to both images as opposed to applying it symmetrically,
+    # i.e. to both images in the same way.
+
+    brightness: 0.4
+    # How much to jitter the brightness (non-negative).
+
+    contrast: 0.4
+    # How much to jitter contrast (non-negative).
+
+    saturation: 0.4
+    # How much to jitter saturation (non-negative).
+
+    hue: 0.1274
+    # How much to jitter hue. Must be either float or tuple of [min, max]
+    # values. Should have 0 <= hue <= 0.5 or -0.5 <= min <= max <= 0.5.
+
+
+  - type: noise-normal
+    # Type of this augmentation: Apply additive normal-distributed noise to
+    # input images. Ground-truth flow is not affected. Noise is centered around
+    # mean zero using the given standard deviation.
+
+    stddev: 0.002
+    # Standard deviation of the normal-distributed noise.
+
+
+  - type: restrict-flow-magnitude
+    # Restrict flow magnitude to a specified maximum. This does neither change
+    # input images nor flow, but instead changes the mask of valid pixels. All
+    # pixels with flow larger than the specified magnitude are marked as
+    # invalid and should thus be excluded from loss computation etc. down the
+    # line.
+
+    maximum: 400
+    # The maximum flow magnitude. Any flow larger than or equal to this value
+    # is considered invalid and will be marked as such.
+
+
+source: datasource-basic.yaml
+# Path to or inline-specification of the underlying datasource. See e.g.
+# datasource-basic for more details.
+#
+# Paths are relative to this file.
