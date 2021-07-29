@@ -1,0 +1,179 @@
+# Specification for inspection, e.g. metrics and validation, during training.
+#
+# Specifies what types of metrics are computed during training, with which
+# frequency, and how and when evaluation is performed, as well as how and when
+# checkpoints are generated.
+
+metrics:
+  # Groups of metrics that will be computed regularly during training on the
+  # training data.
+
+  - prefix: 'Train:S{n_stage}:{id_stage}/'
+    # Prefix for this group of metrics as format-string. This is e.g. used when
+    # writing the metrics to tensorboard.
+    #
+    # The format string accepts the following arguments:
+    # - {n_stage}: The zero-based index of the current stage.
+    # - {id_stage}: The ID string of the current stage.
+    # - {n_epoch}: The current epoch index (zero-based).
+    # - {n_step}: The step/batch number over all stages and epochs (zero-based).
+
+    frequency: 1
+    # The frequency with which to run this group of metrics (as integer). The
+    # metrics will be computed for each N-th batch. The default for this value
+    # is one, meaning the metrics of this group are computed for each batch.
+
+    metrics:
+      # List of metrics to compute, per batch. See e.g. eval.yaml for more
+      # details. Note that these metrics are evaluated per batch and not per
+      # sample.
+
+      - type: epe
+      - type: fl-all
+      - type: loss
+
+      - type: learning-rate
+        # Type of this metric: Learning rate as used in the optimizer for this
+        # batch.
+
+        key: LearningRate
+        # Unique identifier for this metric (default: LearningRate).
+
+images:
+  # Save training images and flow estimation on regular interval.
+  #
+  # Specification to save the first input image pairs, ground-truth flow, and
+  # flow estimation of a training batch at regular intervals. This can be used
+  # to gain a visual estimate of network performance.
+
+  frequency: 100
+  # The frequency at which to save training images.
+
+  prefix: 'Train:S{n_stage}:{id_stage}/'
+  # Prefix for storing training images in tensorboard as format string. This
+  # format string accepts the same parameters as the format string for training
+  # metrics above.
+  #
+  # The format string accepts the following arguments:
+  # - {n_stage}: The zero-based index of the current stage.
+  # - {id_stage}: The ID string of the current stage.
+  # - {n_epoch}: The current epoch index (zero-based).
+  # - {n_step}: The step/batch number over all stages and epochs (zero-based).
+
+checkpoints:
+  # Checkpoint specification. Describes how checkpoints are stored.
+
+  path: checkpoints/
+  # Base path for storing checkpoint files. Relative to the (general) output
+  # directory.
+
+  name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
+  # Name template for checkpoint files as format string.
+  #
+  # The full path to the checkpoint file will be computed via the base path and
+  # instantiated name.
+  #
+  # Available arguments are:
+  # - {id_model}: Model ID string (some characters will be replaced).
+  # - {id_stage}: ID string of the current stage.
+  # - {n_stage}: Index of the current stage (zero-based).
+  # - {n_epoch}: Index of the current epoch (zero-based). May be set to the
+  #              number of epochs of the current stage for checkpoints at end
+  #              of that stage.
+  # - {n_step}: The step/batch number over all stages and epochs (zero-based).
+  #
+  # Additionally, any validation metric specified below (under the
+  # 'validation.metrics' key) is also available. Argument names for metrics are
+  # derived from their unique key string: They are prefixed by 'm_', followed
+  # by the metric key where every symbol that is invalid for a format argument
+  # (e.g. any of / , . : ? ! - ) has been replaced by '_'. For example, the
+  # metric 'EndPointError/mean' can be referenced via {m_EndPointError_mean}.
+
+  compare: ['100 * {m_EndPointError_mean} + 2',  '-{m_EndPointError_1px}']
+  # Mathematical expression string or list of simple mathematical expression
+  # strings, specifying how to compare checkpoints with regards to their
+  # performance. Lower means better.
+  #
+  # Before the expression is evaluated, any format argument is substituted.
+  # Available format arguments are the same as for the 'name' property.
+
+  keep:
+    # Optional specification for keeping only a selected number of checkpoints.
+    # If unspecified, all checkpoints will be kept.
+
+    latest: 2
+    # Keep the N latest checkpoints (here N = 2).
+
+    best: 2
+    # Keep the best M checkpoints (here M = 2), where best is determined
+    # according to the 'compare' property.
+
+    # If both best and latest are specified, both latest N and best M
+    # checkpoints will be kept. The number of checkpoints to be kept is then
+    # between max(N, M) and N + M (depending if latest and best overlap).
+
+validation:
+  # List of validations to run at regular intervals.
+
+  - type: strategy
+    # Type of validation: Validate on test-dataset specified in strategy (see
+    # e.g. stage.yaml).
+
+    frequency: epoch
+    # The frequency with which to run this type of validation.
+    #
+    # Available choices:
+    # - epoch: Run at the end of each epoch.
+    # - stage: Run at the end of each stage.
+    # - N as integer: Run after N steps/batches.
+
+    checkpoint: true
+    # Whether to create a new checkpoint after running this validation.
+
+    tb-metrics-prefix: Validation/
+    # Tensorboard prefix for validation metrics defined below. Will be applied
+    # to each metric key.
+
+    metrics:
+      # The metrics to compute and collect over the full validation dataset.
+      # Metrics will be computed per batch and then reduced to provide a
+      # summary for the full validation dataset.
+
+      - reduce: mean
+        # The type of reduction(s) to perform.
+        #
+        # Currently supported types:
+        # - mean: Compute mean over all validation batches.
+
+        metric:
+          # The metric to compute, see e.g. eval.yaml for more information.
+          # Note that metrics here are computed per batch, not per sample.
+
+          type: epe
+
+      - reduce: mean
+        metric:
+          type: fl-all
+
+      - reduce: mean
+        metric:
+          type: loss
+
+    images:
+      # Specifies whether and how to store images. Note that the subset of
+      # stored images can be specified via the validation specification of the
+      # current stage (see e.g. stage.yaml).
+
+      enabled: true
+      # Whether to store images.
+
+      prefix: Validation/
+      # The tensorboard prefix to store the images under.
+
+tensorboard:
+  path: 'tb.{id_model}'
+  # Path template as format-string for tensorboard output. Relative to general
+  # output directory. Defaults to 'tb.{id_model}'.
+  #
+  # Available arguments are:
+  # - {id_model}: Model ID string (some characters will be replaced).
