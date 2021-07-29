@@ -1,0 +1,60 @@
+# See dataset-basic.yaml for a general documentation.
+
+name: Example dataset with multi-layout
+id: example-multi
+path: './path/to/some/directory'
+
+layout:
+  # Specifies how the files of the dataset can be accessed.
+
+  type: multi
+  # Type of the layout.
+  #
+  # 'multi'-layout: Choose one of multiple layouts via a parameter.
+
+  parameter: direction
+  # Name of the paramter via which the instance can be selected. Valid values
+  # for this parameter are the instance names given below.
+
+  instances:
+    # Instances of this multi-layout.
+    #
+    # The number of instances is not limited and instance names can be chosen
+    # freely.
+
+    forwards:
+      # Name of the first instance.
+
+      type: generic
+      # Type of this instance. See e.g. dataset-basic.yaml for more
+      # information.
+
+      images: '{type}/{pass}/{scene}/frame_{idx:04d}.png'
+      flows: '{type}/flow/{scene}/frame_{idx:04d}-into_future.flo'
+      key: '{type}/{scene}/frame_{idx:04d}-into_future'
+
+    forwards:
+      # Name of the second instance.
+
+      type: generic-backwards
+      # Type of this instance. The generic-backwards layout is similar to the
+      # generic (forwards) layout, with the exception that the second image is
+      # chosen as image with the same path except having {idx - 1}.
+
+      images: '{type}/{pass}/{scene}/frame_{idx:04d}.png'
+      flows: '{type}/flow/{scene}/frame_{idx:04d}-into_past.flo'
+      key: '{type}/{scene}/frame_{idx:04d}-into_past'
+
+parameters:
+  # Parameters. See e.g. dataset-basic.yaml for more details.
+
+  pass:
+    values: [ clean, final ]
+    sub: pass
+
+  type:
+    values: [ train, test ]
+
+    sub:
+      test: { type: test }
+      train: { type: training }
