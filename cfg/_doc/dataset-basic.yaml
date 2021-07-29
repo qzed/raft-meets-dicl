@@ -24,9 +24,9 @@ layout:
   #
   # The 'generic' and 'generic-backward' type layouts assume that input images
   # and (optionally) ground-truth flow is provided as set of sequences, where
-  # each sequequence is identified by an integer sequence ID {seq} and an
+  # each sequence is identified by an integer sequence ID {seq} and an
   # integer index {idx} inside this sequence. This means image pairs are
-  # retreived by taking the path specified by the pattern for any pattern,
+  # retrieved by taking the path specified by the pattern for any pattern,
   # which constitutes the first image of the pair, and then taking the same
   # path with {idx + 1} instead of {idx} to obtain the second image.
   #
@@ -98,13 +98,13 @@ parameters:
       # Specifies which arguments in the image and flow patterns should be
       # substituted and by which string when the parameter value is 'test'.
       #
-      # In this case, the {type} argument is subsituted by the string 'test'.
+      # In this case, the {type} argument is substituted by the string 'test'.
 
       train: { type: training }
       # Specifies which arguments in the image and flow patterns should be
       # substituted and by which string when the parameter value is 'train'.
       #
-      # In this case, the {type} argument is subsituted by the string
+      # In this case, the {type} argument is substituted by the string
       # 'training'.
 
 split:

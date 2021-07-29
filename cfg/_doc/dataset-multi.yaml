@@ -13,7 +13,7 @@ layout:
   # 'multi'-layout: Choose one of multiple layouts via a parameter.
 
   parameter: direction
-  # Name of the paramter via which the instance can be selected. Valid values
+  # Name of the parameter via which the instance can be selected. Valid values
   # for this parameter are the instance names given below.
 
   instances:
