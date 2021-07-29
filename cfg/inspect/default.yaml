@@ -1,59 +1,43 @@
 metrics:
-  - prefix: 'Train:S{n_stage}:{id_stage}/'  # n_stage, n_epoch, id_stage, n_step
-    frequency: 1                            # every batch/step
+  - prefix: 'Train:S{n_stage}:{id_stage}/'
+    frequency: 1
     metrics:
       - type: epe
-        key: EndPointError/
-        distances: [1, 3, 5]
-
       - type: fl-all
-        key: Fl-all
-
       - type: loss
-        key: Loss
-
       - type: learning-rate
-        key: LearningRate
 
 images:
-  frequency: 100                          # every 100 steps/batches
+  frequency: 100
   prefix: 'Train:S{n_stage}:{id_stage}/'
 
 checkpoints:
   path: checkpoints/
   name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
-  compare: ['{m_EndPointError_mean}']     # expr or list of exprs
+  compare: ['{m_EndPointError_mean}']
   keep:
     latest: 2
     best: 2
 
 validation:
-  - type: strategy                        # use data specified in strategy stage
-    frequency: epoch                      # alternatives: 'stage', or steps as integer
-    checkpoint: true                      # do create checkpoints after this validation step
+  - type: strategy
+    frequency: epoch
+    checkpoint: true
 
-    tb-metrics-prefix: Validation/        # applied only to tensorboard stuff
+    tb-metrics-prefix: Validation/
 
     metrics:
       - reduce: mean
         metric:
           type: epe
-          key: EndPointError/
-          distances: [1, 3, 5]
 
       - reduce: mean
         metric:
           type: fl-all
-          key: Fl-all
 
       - reduce: mean
         metric:
           type: loss
-          key: Loss
 
     images:
-      enabled: true
       prefix: Validation/
-
-tensorboard:
-  path: 'tb.{id_model}'
