@@ -1,0 +1,119 @@
+# Model configuration.
+#
+# Specifies model, loss, and model-dependent input processing (e.g. padding).
+
+name: Example model specification
+# Name of the model, loss, and input configuration.
+
+id: example/subtype
+# Unique ID of the model, loss, and input configuration (including model and
+# loss parameters).
+
+model:
+  # Specification of the model.
+
+  type: example/some-model
+  # The type of model to use.
+
+  parameters:
+    # Model parameters.
+    #
+    # Parameters can define a sub-type of a model or specify some specific
+    # behavior. Available parameters depend on the model itself.
+    #
+    # Different parameter values represent different model sub-types which are,
+    # in general, incompatible. In other words, parameters can change the
+    # structure of a model. This means that restoring a checkpoint for the same
+    # top-level model type but different model parameters may not work
+    # outright, or may break subtly and in unexpected ways.
+    #
+    # Parameters are passed at model creation/instantiation time (i.e. to the
+    # constructor of the loss function).
+    some_parameter: true
+
+  arguments:
+    # Default model arguments.
+    #
+    # In contrast to model parameters, model arguments do not change the
+    # structure of a model. Instead, they are passed to the forward() function
+    # of the model and may be different on different invocations.
+    #
+    # Arguments can influence behavior of the model in any way that does not
+    # include changing the model structure itself, it is thus safe to restore a
+    # model from a checkpoint and use it with different arguments.
+    #
+    # Arguments can be overwritten for each training stage (see e.g.
+    # stage.yaml).
+    some_argument: 12
+
+loss:
+  # Specifies the loss function. This needs to be compatible with the model
+  # specified above. In some cases, model and loss parameters and/or arguments
+  # need to be matched as well.
+
+  type: example/some-loss
+  # The type of the loss function to use.
+
+  parameters:
+    # Loss function parameters.
+    #
+    # Similar to model parameters, they are passed at creation/instantiation
+    # time (i.e. to the constructor of the loss function) and may change the
+    # structure of internal components of the loss function.
+    some_parameter: 1.0
+
+  arguments:
+    # Loss function arguments.
+    #
+    # Similar to model arguments, they are passed at invocation time and may
+    # change the behavior of the loss function, but not its internal structure.
+    # Arguments can be overwritten for each stage, i.e. a model could be
+    # trained with different model/loss arguments for each stage (see e.g.
+    # stage.yaml) whereas parameters can not (and must not) be overwritten.
+    some_argument: 3.0
+
+input:
+  # Model input specification.
+  #
+  # This specifies minimum requirements for model inputs, such as padding, as
+  # well as other common transformations such as clipping and range scaling.
+  # This does not change data in any destructive way, nor does it provide any
+  # means of augmentations. To do that see datasource specifications (e.g.
+  # datasource-augment.yaml).
+
+  clip: [0, 1]
+  # Clip input images to specified range (default: [0, 1]). Input images are
+  # expected as floating point RGB images with each channel in range [0.0,
+  # 1.0].
+
+  range: [-1, 1]
+  # Scale RGB image channels from range [0.0, 1.0] to the specified range
+  # (default: [-1, 1]).
+
+  padding:
+    # Padding specification. This can be used to specify padding if the model
+    # expects a specific input size.
+
+    type: modulo
+    # Type of padding.
+    #
+    # Available choices:
+    # - modulo: Pad image up to the next larger size where 'image_size mod
+    #   pad_size == 0'.
+
+    mode: zeros
+    # Padding mode.
+    #
+    # Available modes:
+    # - zeros: Pad RGB images with zeros.
+    # - ones: Pad RGB images with ones.
+    # - Other modes based on np.pad: 'edge', 'maximum', 'mean', 'median',
+    #   'minimum', 'reflect', 'symmetric', 'wrap'.
+    #
+    # This is only used for padding the RGB images. The flow is padded with
+    # zeros and the valid-mask is padded with 'False', i.e. specifying that all
+    # padding pixels are 'invalid'.
+
+    size: [8, 8]
+    # Modulo size for padding (as width and height). The output size will have
+    # 'output_height mod pad_height == 0' and 'output_width mod pad_width == 0'.
