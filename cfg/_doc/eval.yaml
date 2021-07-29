@@ -1,0 +1,64 @@
+# Specification metrics used in evaluation command.
+#
+# Specifies what types of metrics are used for evaluation, how they are
+# displayed, and how a summary is computed.
+
+metrics:
+  # A list of metrics to compute for each sample.
+
+
+  - type: epe
+    # Metric type: Compute end-point error.
+    #
+    # Compute mean end-point error and proportion of pixels where the end-point
+    # error is smaller than a specified distance. Sub-metrics are named 'mean'
+    # for the mean end-point-error and 'Npx' where N is the distance for the
+    # proportions/percentage of pixels with end-point-error smaller than N
+    # pixels.
+
+    key: EndPointError/
+    # Unique identifier for this metric.
+    #
+    # For compound metrics, i.e. metrics with multiple sub-metrics like
+    # end-point-error, this is used as prefix (thus pacing the slash at the
+    # end).
+    #
+    # For the end-point error metric, this e.g. will generate
+    # 'EndPointError/mean' etc.
+
+    distances: [1, 3, 5]
+    # The distances to compute the end-point-error percentages/proportions for.
+    #
+    # This example will generate the metrics 'EndPointError/mean',
+    # 'EndPointError/1px', 'EndPointError/3px', and 'EndPointError/5px'.
+
+
+  - type: fl-all
+    # Metric type: Fl-all.
+    #
+    # Compute proportion/percentage of flow outliers according to the Fl-all
+    # metric.
+
+    key: Fl-all
+    # Unique identifier for this metric.
+    #
+    # For non-compound metrics, like fl-all and loss, this is the unique
+    # identifier used for this metric.
+
+
+  - type: loss
+    # Metric type: loss.
+    #
+    # For evaluation, this is the per-sample loss. Note that when used for
+    # inspection during training, this metric type represents the loss per
+    # batch instead.
+
+    key: Loss
+    # Unique identifier for this metric.
+
+
+summary:
+  # Collectors for computing a summary over all samples.
+
+  - type: mean
+    # Summary type: Compute mean of all metrics over samples.
