@@ -1,6 +1,4 @@
 mode: best
-# - best: use best checkpoint of previous stage
-# - continuous: use last checkpoint
 
 stages:
   - stage/dicl-sintel.yaml
