@@ -1,0 +1,59 @@
+# Datasource configuration.
+#
+# Specifies how input data is obtained. This can e.g. simply specify a subset
+# of a dataset (by selecting that subset via parameters defined in the dataset
+# specification), but it can also specify more complex transformations applied
+# to a subsequent datasource, such as randomized augmentations, repetition, and
+# filtering. Via this, datasource specifications can be combined/chained to
+# obtain a pre-processing pipeline.
+
+type: dataset
+# Type of this datasource.
+#
+# Possible choices are:
+# - dataset: Specifies a subset of a dataset.
+# - augment: Specifies augmentations to a subsequent datasource.
+# - repeat: Specifies repetitions of a subsequent datasource.
+
+spec: dataset-basic.yaml
+# Dataset specification, describing how the dataset is accessed.
+
+parameters:
+  # Parameters applied to the dataset specification. These parameters select a
+  # specific subset of the dataset. See e.g. dataset-basic.yaml for more
+  # information.
+
+  type: train
+  # Set the 'type' parameter to have the value 'train'.
+
+  pass: clean
+  # Set the 'pass' parameter to have the value 'pass'.
+
+filter:
+  # Optional filtering of the dataset.
+
+  type: file
+  # Type of the filter to be applied.
+  #
+  # Possible choices are:
+  # - file: Filter based on line-separated values in file (similar to split in
+  #   dataset specification).
+
+  file: splits/validation.txt
+  # The split-file to use for filtering.
+  #
+  # This file should contain one line per sample. Samples are matched to line
+  # by ordering them alphabetically. Each line should contain a single string
+  # value, which is matched against by the value specified below. A sample is
+  # only chosen if the value in its corresponding line matches the value
+  # specified below.
+  #
+  # This is similar to split-filtering in the dataset specification. The only
+  # difference is semantic: The 'split' in the dataset is considered an
+  # integral part of the official dataset, this file-filter on the other hand
+  # can be used to select custom subsets, e.g. for a development split.
+
+  value: 1
+  # The value to use for filtering. All samples with corresponding lines
+  # matching this value (as string) will be chosen. Non-matching samples will
+  # be discarded.
