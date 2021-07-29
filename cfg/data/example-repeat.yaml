@@ -1,9 +1,0 @@
-type: repeat
-times: 5
-
-source:
-  type: dataset
-  spec: dataset/mpi-sintel.yaml
-  parameters:
-    type: train
-    pass: clean
