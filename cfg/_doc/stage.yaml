@@ -1,0 +1,188 @@
+# Training stage specification.
+#
+# Specifies a single stage of training, including the training and validation
+# data sources to use, the optimizer to use, (optional) learning-rate
+# schedulers, and more.
+
+name: Some example stage
+# Name of this stage (e.g. used for logging).
+
+id: example/stage-0
+# Unique ID for this stage.
+
+data:
+  # Specifies the training data to use.
+
+  source: datasource-augment.yaml
+  # The datasource for training, either as path to a datasource specification
+  # file or as inline specification. See e.g. datasource-basic.yaml for more
+  # details.
+
+  epochs: 100
+  # The number of epochs to train in this stage (default: 1).
+
+  batch-size: 2
+  # The batch size to use for training (default: 1).
+
+validation:
+  # Specifies the validation data to use.
+
+  source: datasource-basic.yaml
+  # The datasource for validation, either as path to a datasource specification
+  # file or as inline specification. See e.g. datasource-basic.yaml for more
+  # details.
+
+  batch-size: 2
+  # The batch size to use for validation (default: 1).
+
+  images: [0, 10]
+  # Set of images to store in tensorboard when validating. This controls which
+  # images will be displaced, whether they will be displayed and when
+  # validation runs depends on the validation/inspection config. See e.g.
+  # inspect.yaml.
+
+optimizer:
+  # The optimizer to use for training.
+
+  type: adam-w
+  # Type of optimizer. This directly maps to a pytorch.optim optimizer.
+  #
+  # Available options:
+  # - adam-w: pytorch.optim.AdamW optimizer.
+  #
+  # See the respective pytorch documentation for more details.
+
+  parameters:
+    # Optimizer parameters. These parameters are directly forwarded to the
+    # constructor of the optimizer. See the respective pytorch optimizer
+    # documentation for more details.
+
+    lr: 0.001
+    weight_decay: 0.0001
+    eps: 1.0e-9
+
+model:
+  # Overrides for the model specification (optional).
+
+  arguments:
+    # Model arguments for this stage. Overrides the default model arguments and
+    # model arguments provided in the model specification (see e.g.
+    # model.yaml). These arguments are passed directly (with other arguments
+    # specified in the model config) to the forward() function of the model.
+
+    some_argument: 15
+
+loss:
+  # Overrides for the loss specification (optional).
+
+  arguments:
+    # Loss arguments for this stage. Overrides the default loss arguments and
+    # loss arguments provided in the model specification (see e.g.
+    # model.yaml). These arguments are passed directly (with other arguments
+    # specified in the model config) to the loss function when invoking it.
+
+    some_argument: 0.0
+    other_argument: true
+
+gradient:
+  # Options for gradient manipulation (optional).
+
+  clip:
+    # Clip gradients (optional). If specified, gradients are clipped to the
+    # specified value.
+
+    type: norm
+    # The type of clipping to perform.
+    #
+    # Available options:
+    # - norm: Clip gradient norm. See torch.nn.utils.clip_grad_norm_ for
+    #   details.
+    # - value: Clip gradient values. See torch.nn.utils.clip_grad_value_ for
+    #   details.
+
+    ord: 2
+    # The order of the norm to use for norm-based clipping (default: 2).
+
+    value: 1.0
+    # The value (or norm-value) to clip gradients to.
+
+  accumulate: 2
+  # Accumulate gradients over specified number of samples (default: 1, i.e. do
+  # not accumulate gradients over multiple samples).
+  #
+  # This can be used to artificially increase batch size, e.g. when VRAM is too
+  # small to run actual batches of the desired size.
+
+  scaler:
+    # Gradient scaling for mixed-precision training (optional). See pytorch
+    # documentation on mixed precision and documentation of
+    # torch.cuda.amp.GradScaler for more details.
+
+    enabled: true
+    # Whether to enable gradient scaling or not (default: true, if 'scaler' has
+    # been specified).
+
+    init-scale: 8192.0
+    # Initial scaling factor (default: 65536.0)
+
+    growth-factor: 2.0
+    # Scale growth factor (default: 2.0).
+
+    backoff-factor: 0.5
+    # Scale backoff factor (default: 0.5).
+
+    growth-interval: 2000
+    # Growth interval (default: 2000)
+
+lr-scheduler:
+  # Specification for learning-rate schedulers (optional).
+  #
+  # Learning-rate schedulers can be run either per instance or at the end of
+  # each epoch. Multiple schedulers can be chained to achieve more complex
+  # mechanisms for adapting the learning rate.
+
+  instance:
+    # List of learning-rate schedulers to run per training instance. Schedulers
+    # are run in the order specified in the list.
+
+    - type: one-cycle
+      # Type of learning-rate schedulers. This directly maps to
+      # torch.optim.lr_scheduler learning-rate schedulers. See the respective
+      # pytorch documentation for more information.
+      #
+      # Available options:
+      # - one-cycle: torch.optim.lr_scheduler.OneCycleLR
+
+      parameters:
+        # Parameters for the specified learning-rate schedulers passed to the
+        # constructor of the respective scheduler type.
+        #
+        # Parameters can contain expression strings, which will be evaluated
+        # before passing them to the constructor. Expression strings can
+        # contain arguments and basic mathematical operations, e.g.
+        # '{n_samples} * {n_epochs} + 100'.
+        #
+        # Available arguments are:
+        # - {n_samples}: The number of samples per epoch in this stage.
+        # - {n_batches}: The number of batches per epoch in this stage.
+        # - {n_epochs}: The number of epochs in this stage.
+        # - {n_accum}: The number of batches to use for gradient accumulation.
+        # - {batch_size}: The size of a single batch of this stage, in samples.
+
+        max_lr: 0.001
+        total_steps: '{n_samples} * {n_epochs} + 100'
+        pct_start: 0.05
+        cycle_momentum: false
+        anneal_strategy: linear
+
+  epoch:
+    # List of learning-rate schedulers to run after each epoch of training.
+    # Schedulers are run in the order specified in the list.
+
+    - type: one-cycle
+      parameters:
+        max_lr: 0.001
+        total_steps: '{n_epochs} + 100'
+        pct_start: 0.05
+        cycle_momentum: false
+        anneal_strategy: linear
