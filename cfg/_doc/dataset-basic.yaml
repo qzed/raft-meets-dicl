@@ -1,3 +1,9 @@
+# Dataset configuration.
+#
+# Describes a dataset, specifically how it can be accessed and what subsets it
+# provides. Allows specifying parameters to select those subsets when including
+# this dataset in a datasource configuration.
+
 name: Example dataset
 # Name of this dataset (used e.g. for logging).
 
