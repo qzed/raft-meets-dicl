@@ -478,11 +478,11 @@ class Scale(Augmentation):
         scale = new_size / old_size
 
         # scale images
-        img1 = cv2.resize(img1, new_size, interpolation=cv2.INTER_LINEAR)
-        img2 = cv2.resize(img2, new_size, interpolation=cv2.INTER_LINEAR)
+        img1 = cv2.resize(img1, new_size, interpolation=self.modenum)
+        img2 = cv2.resize(img2, new_size, interpolation=self.modenum)
 
         if flow is not None:
-            flow = cv2.resize(flow, new_size, interpolation=cv2.INTER_LINEAR)
+            flow = cv2.resize(flow, new_size, interpolation=self.modenum)
             flow *= scale
 
             # this is for full/non-sparse flows only...
@@ -510,8 +510,8 @@ class ScaleSparse(Scale):
         scale = new_size / old_size
 
         # scale images
-        img1 = cv2.resize(img1, new_size, interpolation=cv2.INTER_LINEAR)
-        img2 = cv2.resize(img2, new_size, interpolation=cv2.INTER_LINEAR)
+        img1 = cv2.resize(img1, new_size, interpolation=self.modenum)
+        img2 = cv2.resize(img2, new_size, interpolation=self.modenum)
 
         # buil grid of coordinates
         coords = np.meshgrid(np.arange(flow.shape[1]), np.arange(flow.shape[0]))
