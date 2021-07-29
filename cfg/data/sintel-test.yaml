@@ -1,0 +1,6 @@
+type: dataset
+spec: dataset/mpi-sintel.yaml
+
+parameters:
+  type: test
+  pass: clean
