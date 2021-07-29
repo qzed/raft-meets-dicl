@@ -2,12 +2,12 @@ name: "RAFT: MPI Sintel"
 id: raft/sintel-0
 
 data:
-  source: ../../data/train-sintel.yaml
+  source: ../../data/sintel-train.yaml
   epochs: 100
   batch-size: 1
 
 validation:
-  source: ../../data/test-sintel.yaml
+  source: ../../data/sintel-dev.yaml
   batch-size: 1
   images: [0]
 
