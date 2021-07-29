@@ -186,7 +186,7 @@ class GradientScalerSpec:
         init_scale = float(cfg.get('init-scale', 65536.0))
         growth_factor = float(cfg.get('growth-factor', 2.0))
         backoff_factor = float(cfg.get('backoff-factor', 0.5))
-        growth_interval = int(cfg.get('growth-interval', 0.5))
+        growth_interval = int(cfg.get('growth-interval', 2000))
 
         return cls(enabled, init_scale, growth_factor, backoff_factor, growth_interval)
 
