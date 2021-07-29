@@ -16,7 +16,7 @@ model:
   # The type of model to use.
 
   parameters:
-    # Model parameters.
+    # Model parameters (optional).
     #
     # Parameters can define a sub-type of a model or specify some specific
     # behavior. Available parameters depend on the model itself.
@@ -32,7 +32,7 @@ model:
     some_parameter: true
 
   arguments:
-    # Default model arguments.
+    # Default model arguments (optional).
     #
     # In contrast to model parameters, model arguments do not change the
     # structure of a model. Instead, they are passed to the forward() function
@@ -54,7 +54,7 @@ loss:
   type: example/some-loss
   # The type of the loss function to use.
 
-  parameters:
+  parameters (optional):
     # Loss function parameters.
     #
     # Similar to model parameters, they are passed at creation/instantiation
@@ -62,7 +62,7 @@ loss:
     # structure of internal components of the loss function.
     some_parameter: 1.0
 
-  arguments:
+  arguments (optional):
     # Loss function arguments.
     #
     # Similar to model arguments, they are passed at invocation time and may
@@ -91,8 +91,8 @@ input:
   # (default: [-1, 1]).
 
   padding:
-    # Padding specification. This can be used to specify padding if the model
-    # expects a specific input size.
+    # Padding specification (optional). This can be used to specify padding if
+    # the model expects a specific input size.
 
     type: modulo
     # Type of padding.
