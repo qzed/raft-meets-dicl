@@ -272,4 +272,4 @@ def save_flow_image(dir, format, sample_id, flow, visual_args):
 
 
 def save_flow_visual(path, uv, **kwargs):
-    cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs) * 255)
+    cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs)[:, :, ::-1] * 255)
