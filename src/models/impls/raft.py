@@ -1,7 +1,5 @@
 # Implementation of "RAFT: Recurrent All Pairs Field Transforms for Optical
 # Flow" by Teed and Deng, based on the original implementation for this paper.
-# The layer dimensions are taken from the paper and may be different than in
-# the original code.
 #
 # Link: https://github.com/princeton-vl/RAFT
 # License: BSD 3-Clause License
@@ -62,7 +60,7 @@ class ResidualBlock(nn.Module):
 class BasicEncoder(nn.Module):
     """Feature / context encoder network"""
 
-    def __init__(self, output_dim=256, norm_type='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0):
         super().__init__()
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
@@ -77,17 +75,17 @@ class BasicEncoder(nn.Module):
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 128)
-            ResidualBlock(64, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 128) -> (H/8, W/8, 192)
-            ResidualBlock(128, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         # output convolution            # (H/8, W/8, 192) -> (H/8, W/8, output_dim)
-        self.conv2 = nn.Conv2d(192, output_dim, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
 
         # dropout
         self.dropout = nn.Dropout2d(p=dropout)
@@ -212,16 +210,16 @@ class BasicMotionEncoder(nn.Module):
 
         # correlation input network
         self.convc1 = nn.Conv2d(corr_planes, 256, 1, padding=0)
-        self.convc2 = nn.Conv2d(256, 128, 3, padding=1)
+        self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
 
         # flow input network
         self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
         self.convf2 = nn.Conv2d(128, 64, 3, padding=1)
 
         # combination network
-        self.conv = nn.Conv2d(128 + 64, 128, 3, padding=1)
+        self.conv = nn.Conv2d(192 + 64, 128 - 2, 3, padding=1)
 
-        self.output_dim = 128 + 2
+        self.output_dim = 128                           # (128 - 2) + 2
 
     def forward(self, flow, corr):
         # correlation input network
@@ -280,7 +278,7 @@ class FlowHead(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_dim, 2, 1)
+        self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
@@ -336,7 +334,7 @@ class RaftModule(nn.Module):
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
         self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='instance', dropout=dropout)
+        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
     def freeze_batchnorm(self):
