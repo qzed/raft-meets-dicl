@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import torch
+import torch.nn as nn
 
 from .. import utils
 
@@ -108,7 +109,10 @@ class Checkpoint:
 
     def apply(self, model, optimizer=None, scaler=None, lr_sched_inst=[], lr_sched_epoch=[]):
         if model is not None:
-            model.load_state_dict(self.state.model)
+            if isinstance(model, nn.DataParallel):
+                model.module.load_state_dict(self.state.model)
+            else:
+                model.load_state_dict(self.state.model)
 
         if optimizer is not None:
             optimizer.load_state_dict(self.state.optimizer)
@@ -281,13 +285,16 @@ class CheckpointManager:
 
         log.debug(f"saving checkpoint to '{entry.path}'")
 
+        # properly handle DataParallel
+        module = ctx.model.module if isinstance(ctx.model, nn.DataParallel) else ctx.model
+
         # save actual checkpoint data
         chkpt = Checkpoint(
             model=self.model_id,
             iteration=Iteration(stage.index, epoch, step),
             metrics=metrics,
             state=State(
-                model=ctx.model.state_dict(),
+                model=module.state_dict(),
                 optimizer=ctx.optimizer.state_dict(),
                 scaler=ctx.scaler.state_dict(),
                 lr_sched_inst=[s.state_dict() for s in ctx.lr_sched_inst],

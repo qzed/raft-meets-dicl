@@ -136,7 +136,7 @@ def evaluate(args):
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 
-    model.load_state_dict(chkpt.state.model)
+    chkpt.apply(model)
     model.to(device)
     model.eval()
 
