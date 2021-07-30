@@ -98,9 +98,9 @@ class BasicEncoder(nn.Module):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
-                    nn.init.comstant_(m.weight, 1)
+                    nn.init.constant_(m.weight, 1)
                 if m.bias is not None:
-                    nn.init.comstant_(m.bias, 0)
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         # input may be tuple/list for flow network (img1, img2), combine this into single batch
