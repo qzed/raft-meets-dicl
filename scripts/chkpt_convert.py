@@ -44,11 +44,49 @@ def convert_raft(state):
     return to_checkpoint('raft/baseline', replace_pfx(state, sub))
 
 
+def convert_dicl(state):
+    import src
+
+    state = state['state_dict']
+    state = {f"module.{k}": v for k, v in state.items()}
+
+    sub = [('module.feature.conv_start.', 'module.feature.conv0.')]
+
+    sub += [(f'module.dap_layer{x}.dap_layer.conv.', f'module.lvl{x}.dap.conv1.') for x in range(2, 7)]
+    sub += [(f'module.matching{x}.', f'module.lvl{x}.mnet.') for x in range(2, 7)]
+    sub += [(f'module.context_net{x}.', f'module.lvl{x}.ctxnet.') for x in range(2, 7)]
+
+    sub += [(f'module.feature.outconv_{x}.bn.', f'module.feature.outconv{x}.1.') for x in range(2, 7)]
+    sub += [(f'module.feature.outconv_{x}.conv.', f'module.feature.outconv{x}.0.') for x in range(2, 7)]
+
+    convs = [f"conv{x}a" for x in range(1, 7)] + [f"conv0.{x}" for x in range(0, 3)]
+    sub += [(f'module.feature.{c}.bn.', f'module.feature.{c}.1.') for c in convs]
+    sub += [(f'module.feature.{c}.conv.', f'module.feature.{c}.0.') for c in convs]
+
+    convs = [f'deconv{x}a' for x in range(1, 7)]
+    convs += [f'deconv{x}b' for x in range(2, 7)]
+    convs += [f'conv{x}b' for x in range(1, 7)]
+    sub += [(f'module.feature.{c}.conv1.conv.', f'module.feature.{c}.conv1.') for c in convs]
+    sub += [(f'module.feature.{c}.conv2.bn.', f'module.feature.{c}.bn2.') for c in convs]
+    sub += [(f'module.feature.{c}.conv2.conv.', f'module.feature.{c}.conv2.') for c in convs]
+
+    for lvl in range(2, 7):
+        sub += [(f'module.lvl{lvl}.mnet.match.5.', f'module.lvl{lvl}.mnet.5.')]
+
+        sub += [(f'module.lvl{lvl}.mnet.match.{x}.bn.', f'module.lvl{lvl}.mnet.{x}.1.') for x in range(0, 6)]
+        sub += [(f'module.lvl{lvl}.mnet.match.{x}.conv.', f'module.lvl{lvl}.mnet.{x}.0.') for x in range(0, 6)]
+
+        sub += [(f'module.lvl{lvl}.ctxnet.{x}.bn.', f'module.lvl{lvl}.ctxnet.{x}.1.') for x in range(0, 6)]
+        sub += [(f'module.lvl{lvl}.ctxnet.{x}.conv.', f'module.lvl{lvl}.ctxnet.{x}.0.') for x in range(0, 6)]
+
+    return to_checkpoint('dicl/baseline', replace_pfx(state, sub))
+
+
 def main():
     # define available converters
     convert = {
         'raft': convert_raft,
-        # TODO: support DICL checkpoints
+        'dicl': convert_dicl,
     }
 
     # handle command-line input
