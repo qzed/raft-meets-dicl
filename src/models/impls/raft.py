@@ -6,8 +6,6 @@
 # Link: https://github.com/princeton-vl/RAFT
 # License: BSD 3-Clause License
 
-from typing import Union
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
