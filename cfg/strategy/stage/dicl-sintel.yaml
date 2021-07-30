@@ -2,7 +2,7 @@ name: "DICL: MPI Sintel"
 id: dicl/sintel-0
 
 data:
-  source: ../../data/train-sintel.yaml
+  source: ../../data/sintel-train.yaml
   epochs: 100
   batch-size: 1
 
