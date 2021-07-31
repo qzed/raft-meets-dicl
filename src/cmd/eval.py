@@ -208,6 +208,11 @@ def evaluate(args):
         for b in range(batch):
             # switch to batch size of one
             sample_id = meta['sample_id'][b]
+
+            size = meta['original_extents']
+            (h0, h1), (w0, w1) = size
+            size = (h0[b], h1[b]), (w0[b], w1[b])
+
             sample_final = final[b].view(1, *final.shape[1:])
 
             if flow is not None:
@@ -239,7 +244,7 @@ def evaluate(args):
             # save flow image
             if path_flow is not None:
                 est = sample_final[0].detach().cpu().permute(1, 2, 0).numpy()
-                save_flow_image(path_flow, args.flow_format, sample_id, est, flow_visual_args)
+                save_flow_image(path_flow, args.flow_format, sample_id, est, size, flow_visual_args)
 
     if compute_metrics:
         # log summary
@@ -256,7 +261,9 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, flow, visual_args):
+def save_flow_image(dir, format, sample_id, flow, size, visual_args):
+    (h0, h1), (w0, w1) = size
+
     formats = {
         'kitti': (data.io.write_flow_kitti, {}, 'png'),
         'visual': (save_flow_visual, visual_args, 'png'),
@@ -268,7 +275,7 @@ def save_flow_image(dir, format, sample_id, flow, visual_args):
     path = dir / f"{sample_id}.{ext}"
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    write(path, flow, **kwargs)
+    write(path, flow[h0:h1, w0:w1], **kwargs)
 
 
 def save_flow_visual(path, uv, **kwargs):
