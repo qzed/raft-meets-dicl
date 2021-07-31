@@ -278,8 +278,7 @@ class FlowRegression(nn.Module):
 
         # combined displacement vector
         disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv)
-        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for expansion
-        disp = disp.expand(batch, -1, -1, -1, h, w)     # expand to full batch (b, 2, du, dv, h, w)
+        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for broadcasting
 
         # compute displacement probability
         cost = cost.view(batch, du * dv, h, w)          # combine disp. dimensions for softmax
