@@ -2,7 +2,6 @@ metrics:
   - type: epe
   - type: fl-all
   - type: loss
-    key: Loss
 
 summary:
   - type: mean

@@ -10,10 +10,10 @@ class Loss(Metric):
     def from_config(cls, cfg):
         cls._typecheck(cfg)
 
-        key = cfg.get('key', 'Loss/train')
+        key = cfg.get('key', 'Loss')
         return cls(key)
 
-    def __init__(self, key: str = 'Loss/train'):
+    def __init__(self, key: str = 'Loss'):
         super().__init__()
 
         self.key = key
