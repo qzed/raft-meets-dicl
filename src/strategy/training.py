@@ -200,13 +200,13 @@ class TrainingContext:
         # compute loss
         loss = self.loss(result.output(), flow, valid, **stage.loss_args)
 
+        # backprop
+        self.scaler.scale(loss).backward()
+
         # inspection (metrics, validation, ...)
         with torch.no_grad():
             self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, meta,
                                     result, loss)
-
-        # backprop
-        self.scaler.scale(loss).backward()
 
         # accumulate gradients if specified
         if (i + 1) % stage.gradient.accumulate == 0:
