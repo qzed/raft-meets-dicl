@@ -442,15 +442,15 @@ class FlowLevel(nn.Module):
 
         # build base coordinate grid containing absolute pixel positions
         cx = torch.arange(0, w, device=img2.device)
-        cx = cx.view(1, 1, w).expand(batch, h, -1)      # expand to (batch, h, w)
+        cx = cx.view(1, w).expand(h, -1)                # expand to (h, w) for stacking
 
         cy = torch.arange(0, h, device=img2.device)
-        cy = cy.view(1, h, 1).expand(batch, -1, w)      # expand to (batch, h, w)
+        cy = cy.view(h, 1).expand(-1, w)                # expand to (h, w) for stacking
 
-        grid = torch.stack((cx, cy), dim=1).float()
+        grid = torch.stack((cx, cy), dim=0).float()     # stack to (2, h, w)
 
         # apply flow to compute updated pixel positions for sampling
-        fpos = grid + flow
+        fpos = grid + flow                              # broadcasts to (batch, 2, h, w)
         fpos = fpos.permute(0, 2, 3, 1)                 # permute for sampling (coord. dim. last)
 
         # F.grid_sample() requires positions in [-1, 1], rescale the flow positions
