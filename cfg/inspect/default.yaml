@@ -6,6 +6,7 @@ metrics:
       - type: fl-all
       - type: loss
       - type: learning-rate
+      - type: grad-norm
 
 images:
   frequency: 100

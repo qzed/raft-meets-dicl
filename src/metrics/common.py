@@ -14,12 +14,14 @@ class Metric:
     def from_config(cls, cfg):
         from . import epe
         from . import fl_all
+        from . import grad_norm
         from . import loss
         from . import lr
 
         types = [
             epe.EndPointError,
             fl_all.FlAll,
+            grad_norm.GradientNorm,
             loss.Loss,
             lr.LearningRate,
         ]
