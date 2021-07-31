@@ -268,17 +268,18 @@ class FlowRegression(nn.Module):
 
         # displacement offsets along u
         disp_u = torch.arange(-ru, ru + 1, device=cost.device, dtype=torch.float32)
-        disp_u = disp_u.view(du, 1, 1, 1)
-        disp_u = disp_u.expand(-1, dv, h, w)            # expand to matching cost size
+        disp_u = disp_u.view(du, 1)
+        disp_u = disp_u.expand(-1, dv)                  # expand for stacking
 
         # displacement offsets along v
         disp_v = torch.arange(-rv, rv + 1, device=cost.device, dtype=torch.float32)
-        disp_v = disp_v.view(1, dv, 1, 1)
-        disp_v = disp_v.expand(du, -1, h, w)            # expand to matching cost size
+        disp_v = disp_v.view(1, dv)
+        disp_v = disp_v.expand(du, -1)                  # expand for stacking
 
         # combined displacement vector
-        disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv, h, w)
-        disp = disp.expand(batch, -1, -1, -1, -1, -1)   # expand to full batch (b, 2, du, dv, h, w)
+        disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv)
+        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for expansion
+        disp = disp.expand(batch, -1, -1, -1, h, w)     # expand to full batch (b, 2, du, dv, h, w)
 
         # compute displacement probability
         cost = cost.view(batch, du * dv, h, w)          # combine disp. dimensions for softmax
