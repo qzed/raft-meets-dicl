@@ -40,8 +40,12 @@ def train(args):
         cfg_strat = config.get('strategy')
         cfg_inspc = config.get('inspect')
 
+    # load seed config
+    if args.seeds:
+        cfg_seeds = utils.config.load(args.seeds)
+
     # set seeds
-    if args.reproduce:
+    if args.reproduce or args.seeds:
         if cfg_seeds is None:
             raise ValueError("set --reproduce but no seeds specified")
 

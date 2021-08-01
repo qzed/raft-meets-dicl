@@ -43,6 +43,7 @@ def main():
     train.add_argument('-c', '--config', help='full training configuration')
     train.add_argument('-d', '--data', help='training strategy and data')
     train.add_argument('-m', '--model', help='specification of the model')
+    train.add_argument('-s', '--seeds', help='seed config for initializing RNGs')
     train.add_argument('-i', '--inspect', help='specification of metrics')
     train.add_argument('-o', '--output', default='runs', help='base output directory [default: %(default)s]')
     train.add_argument('--device', help='device to use [default: cuda:0 if available]')
