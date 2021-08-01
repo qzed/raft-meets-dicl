@@ -1,0 +1,34 @@
+type: concat
+
+sources:
+  - type: dataset
+    spec: dataset/ufreiburg-monkaa.yaml
+
+    parameters:
+      pass: final
+      direction: forwards
+      camera: left
+
+  - type: dataset
+    spec: dataset/ufreiburg-monkaa.yaml
+
+    parameters:
+      pass: final
+      direction: forwards
+      camera: right
+
+  - type: dataset
+    spec: dataset/ufreiburg-monkaa.yaml
+
+    parameters:
+      pass: final
+      direction: backwards
+      camera: left
+
+  - type: dataset
+    spec: dataset/ufreiburg-monkaa.yaml
+
+    parameters:
+      pass: final
+      direction: backwards
+      camera: right
