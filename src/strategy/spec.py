@@ -311,7 +311,7 @@ class Stage:
     optimizer: OptimizerSpec
     model_args: dict
     loss_args: dict
-    gradient: Optional[GradientSpec]
+    gradient: GradientSpec
     scheduler: MultiSchedulerSpec
 
     index: int          # set by training loop
