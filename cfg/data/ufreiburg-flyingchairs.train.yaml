@@ -1,0 +1,5 @@
+type: dataset
+spec: dataset/ufreiburg-flyingchairs.yaml
+
+parameters:
+  type: train
