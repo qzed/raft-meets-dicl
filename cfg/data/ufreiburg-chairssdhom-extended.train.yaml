@@ -1,0 +1,5 @@
+type: dataset
+spec: dataset/ufreiburg-chairssdhom-extended.yaml
+
+parameters:
+  type: train
