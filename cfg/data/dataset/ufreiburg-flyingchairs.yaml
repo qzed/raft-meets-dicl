@@ -10,6 +10,6 @@ layout:
   key: '{seq:05d}'
 
 split:
-  file: '../../../datasets/ufreiburg-flyingchairs/train_val.txt'
+  file: '../../../../datasets/ufreiburg-flyingchairs/train_val.txt'
   values: { train: '1', test: '2' }
   parameter: type
