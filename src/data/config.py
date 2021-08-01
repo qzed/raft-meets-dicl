@@ -3,6 +3,7 @@ from pathlib import Path
 from ..utils import config
 
 from . import augment
+from . import concat
 from . import dataset
 from . import repeat
 
@@ -11,6 +12,7 @@ def _load(path, cfg):
     types = [
         dataset.Dataset,
         augment.Augment,
+        concat.Concat,
         repeat.Repeat,
     ]
     types = {ty.type: ty for ty in types}
