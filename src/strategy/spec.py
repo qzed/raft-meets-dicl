@@ -229,7 +229,7 @@ class GradientSpec:
     def get_config(self):
         return {
             'accumulate': self.accumulate,
-            'clip': self.clip.get_config(),
+            'clip': self.clip.get_config() if self.clip is not None else None,
             'scaler': self.scaler.get_config(),
         }
 
