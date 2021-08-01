@@ -6,6 +6,11 @@ data:
   epochs: 100
   batch-size: 1
 
+validation:
+  source: ../../data/mpi-sintel.dev.yaml
+  batch-size: 1
+  images: [0]
+
 optimizer:
   type: adam-w
 
