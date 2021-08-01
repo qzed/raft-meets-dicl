@@ -1,0 +1,5 @@
+type: dataset
+spec: dataset/kitti-2015.yaml
+
+parameters:
+  type: train
