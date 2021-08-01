@@ -36,7 +36,7 @@ def read_flow_kitti(file):
     data = cv2.imread(str(file), cv2.IMREAD_ANYDEPTH | cv2.IMREAD_COLOR)
     data = data[:, :, ::-1]                         # imread reverses channels (BGR), undo that
     flow, valid = data[:, :, :2], data[:, :, 2]     # channel 0 and 1 are flow, 2 is valid-mask
-    return (flow.astype(np.float) - 2**15) / 64.0, valid.astype(np.bool)
+    return (flow.astype(np.float32) - 2**15) / 64.0, valid.astype(bool)
 
 
 def write_flow_kitti(file, uv, valid=None):

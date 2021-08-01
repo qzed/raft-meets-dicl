@@ -539,7 +539,7 @@ class ScaleSparse(Scale):
         new_flow[cy, cx] = flow
 
         # create new validity map
-        new_valid = np.zeros(new_size[::-1], dtype=np.bool)
+        new_valid = np.zeros(new_size[::-1], dtype=bool)
         new_valid[cy, cx] = True
 
         return img1, img2, new_flow, new_valid, meta
