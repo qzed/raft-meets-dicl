@@ -29,9 +29,7 @@ class GradientNorm(Metric):
         }
 
     def compute(self, model, optimizer, estimate, target, valid, loss):
-        norm = 0.0
-        for p in model.parameters():
-            norm += p.grad.detach().data.norm(p=self.ord)
+        norm = sum(p.grad.detach().data.norm(p=self.ord) for p in model.parameters() if p.grad is not None)
 
         result = OrderedDict()
         result[self.key] = norm
