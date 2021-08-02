@@ -187,10 +187,10 @@ class TrainingContext:
             self.optimizer.zero_grad()
 
         # move to cuda device
-        img1 = img1.to(self.device)
-        img2 = img2.to(self.device)
-        flow = flow.to(self.device)
-        valid = valid.to(self.device)
+        img1 = img1.to(self.device, non_blocking=True)
+        img2 = img2.to(self.device, non_blocking=True)
+        flow = flow.to(self.device, non_blocking=True)
+        valid = valid.to(self.device, non_blocking=True)
 
         # run model
         result = self.model(img1, img2, **stage.model_args)
