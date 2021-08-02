@@ -18,6 +18,15 @@ import torch.nn.functional as F
 from .. import Loss, Model, Result
 
 
+_default_context_scale = {
+    'level-6': 1.0,
+    'level-5': 1.0,
+    'level-4': 1.0,
+    'level-3': 1.0,
+    'level-2': 1.0,
+}
+
+
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
@@ -346,7 +355,7 @@ class CtfContextNet6(nn.Sequential):
 
 
 class FlowLevel(nn.Module):
-    def __init__(self, level, maxdisp, scale):
+    def __init__(self, level, maxdisp):
         super().__init__()
 
         ctxnets_by_level = {
@@ -359,7 +368,6 @@ class FlowLevel(nn.Module):
 
         self.level = level
         self.maxdisp = maxdisp
-        self.scale = scale
 
         self.mnet = MatchingNet()
         self.dap = DisplacementAwareProjection(maxdisp)
@@ -367,7 +375,7 @@ class FlowLevel(nn.Module):
         self.entropy = FlowEntropy()
         self.ctxnet = ctxnets_by_level[level]()
 
-    def forward(self, img1, feat1, feat2, flow_coarse, raw=False):
+    def forward(self, img1, feat1, feat2, flow_coarse, raw=False, scale=1.0):
         batch, _c, h, w = feat1.shape
 
         flow_up = None
@@ -380,9 +388,9 @@ class FlowLevel(nn.Module):
             feat2, _mask = self.warp(feat2, flow_up)
 
         # compute flow for this level
-        return self.compute_flow(img1, feat1, feat2, flow_up, raw)
+        return self.compute_flow(img1, feat1, feat2, flow_up, raw, scale)
 
-    def compute_flow(self, img1, feat1, feat2, flow_coarse, raw):
+    def compute_flow(self, img1, feat1, feat2, flow_coarse, raw, scale):
         batch, _c, h, w = feat1.shape                   # shape of this level
 
         # compute matching cost
@@ -402,7 +410,7 @@ class FlowLevel(nn.Module):
         ctxf = torch.cat((flow.detach(), entr.detach(), feat1, img1), dim=1)
 
         # run context network to get refined flow
-        flow = flow + self.ctxnet(ctxf) * self.scale
+        flow = flow + self.ctxnet(ctxf) * scale
 
         return flow, flow_raw
 
@@ -469,7 +477,7 @@ class FlowLevel(nn.Module):
 
 
 class DiclModule(nn.Module):
-    def __init__(self, disp_ranges, ctx_scale, dap_init='identity'):
+    def __init__(self, disp_ranges, dap_init='identity'):
         super().__init__()
 
         if dap_init not in ['identity', 'standard']:
@@ -479,11 +487,11 @@ class DiclModule(nn.Module):
         self.feature = FeatureNet()
 
         # coarse-to-fine flow levels
-        self.lvl6 = FlowLevel(6, disp_ranges[6], ctx_scale[6])
-        self.lvl5 = FlowLevel(5, disp_ranges[5], ctx_scale[5])
-        self.lvl4 = FlowLevel(4, disp_ranges[4], ctx_scale[4])
-        self.lvl3 = FlowLevel(3, disp_ranges[3], ctx_scale[3])
-        self.lvl2 = FlowLevel(2, disp_ranges[2], ctx_scale[2])
+        self.lvl6 = FlowLevel(6, disp_ranges['level-6'])
+        self.lvl5 = FlowLevel(5, disp_ranges['level-5'])
+        self.lvl4 = FlowLevel(4, disp_ranges['level-4'])
+        self.lvl3 = FlowLevel(3, disp_ranges['level-3'])
+        self.lvl2 = FlowLevel(2, disp_ranges['level-2'])
 
         # initialize weights
         for m in self.modules():
@@ -499,17 +507,17 @@ class DiclModule(nn.Module):
                 if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
-    def forward(self, img1, img2, raw=False):
+    def forward(self, img1, img2, raw=False, context_scale=_default_context_scale):
         # perform feature extraction
         i1f2, i1f3, i1f4, i1f5, i1f6 = self.feature(img1)
         i2f2, i2f3, i2f4, i2f5, i2f6 = self.feature(img2)
 
         # coarse to fine matching
-        flow6, flow6_raw = self.lvl6(img1, i1f6, i2f6, None, raw)
-        flow5, flow5_raw = self.lvl5(img1, i1f5, i2f5, flow6, raw)
-        flow4, flow4_raw = self.lvl4(img1, i1f4, i2f4, flow5, raw)
-        flow3, flow3_raw = self.lvl3(img1, i1f3, i2f3, flow4, raw)
-        flow2, flow2_raw = self.lvl2(img1, i1f2, i2f2, flow3, raw)
+        flow6, flow6_raw = self.lvl6(img1, i1f6, i2f6, None, raw, context_scale['level-6'])
+        flow5, flow5_raw = self.lvl5(img1, i1f5, i2f5, flow6, raw, context_scale['level-5'])
+        flow4, flow4_raw = self.lvl4(img1, i1f4, i2f4, flow5, raw, context_scale['level-4'])
+        flow3, flow3_raw = self.lvl3(img1, i1f3, i2f3, flow4, raw, context_scale['level-3'])
+        flow2, flow2_raw = self.lvl2(img1, i1f2, i2f2, flow3, raw, context_scale['level-2'])
 
         # note: flow2 is returned at 1/4th resolution of input image
 
@@ -541,38 +549,35 @@ class Dicl(Model):
             return levels
 
         param_cfg = cfg['parameters']
-        disp_ranges = parse_level_list(param_cfg['displacement-range'])
-        ctx_scale = parse_level_list(param_cfg['context-scale'])
+        disp_ranges = param_cfg['displacement-range']
         dap_init = param_cfg.get('dap-init', 'identity')
         args = cfg.get('arguments', {})
 
-        return cls(disp_ranges, ctx_scale, dap_init, args)
+        return cls(disp_ranges, dap_init, args)
 
-    def __init__(self, disp_ranges, ctx_scale, dap_init='identity', arguments={}):
-        self.ctx_scale = ctx_scale
+    def __init__(self, disp_ranges, dap_init='identity', arguments={}):
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
 
-        super().__init__(DiclModule(disp_ranges, ctx_scale, dap_init), arguments)
+        super().__init__(DiclModule(disp_ranges, dap_init), arguments)
 
     def get_config(self):
-        default_args = {'raw': False}
-
-        disp = [(f"level-{k}", v) for k, v in self.disp_ranges.items()]
-        scale = [(f"level-{k}", v) for k, v in self.ctx_scale.items()]
+        default_args = {
+            'raw': False,
+            'context_scale': _default_context_scale,
+        }
 
         return {
             'type': self.type,
             'parameters': {
-                'displacement-range': OrderedDict(sorted(disp, reverse=True)),
-                'context-scale': OrderedDict(sorted(scale, reverse=True)),
+                'displacement-range': self.disp_ranges,
                 'dap-init': self.dap_init,
             },
             'arguments': default_args | self.arguments,
         }
 
-    def forward(self, img1, img2, raw=False):
-        return DiclResult(self.module(img1, img2, raw), img1.shape)
+    def forward(self, img1, img2, raw=False, context_scale=_default_context_scale):
+        return DiclResult(self.module(img1, img2, raw, context_scale), img1.shape)
 
 
 class DiclResult(Result):

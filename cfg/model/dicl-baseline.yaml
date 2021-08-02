@@ -12,17 +12,17 @@ model:
       level-3: [3, 3]
       level-2: [3, 3]
 
-    context-scale:
+    dap-init: identity
+
+  arguments:
+    raw: true
+
+    context_scale:
       level-6: 0.03125
       level-5: 0.0625
       level-4: 0.125
       level-3: 0.25
       level-2: 0.5
-
-    dap-init: identity
-
-  arguments:
-    raw: true
 
 loss:
   type: dicl/multiscale
