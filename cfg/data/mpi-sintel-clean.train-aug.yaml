@@ -3,7 +3,7 @@ type: augment
 augmentations:
   - type: translate
     min-size: &img_size [768, 384]
-    delta: [30, 30]
+    delta: [10, 10]
 
   - type: scale
     min-size: *img_size
