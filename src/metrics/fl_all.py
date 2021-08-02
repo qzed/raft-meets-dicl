@@ -40,4 +40,4 @@ class FlAll(Metric):
         fl_all = torch.logical_or(epe > 3, epe > 0.05 * tgt)
 
         # compute metrics based on end-point error means
-        return {self.key: fl_all.float().mean().item()}
+        return {self.key: fl_all.float().mean()}

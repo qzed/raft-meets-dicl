@@ -222,7 +222,7 @@ def evaluate(args):
 
                 # compute loss
                 sample_loss = loss(sample_output, sample_flow, sample_valid)
-                sample_loss = sample_loss.detach().item()
+                sample_loss = sample_loss.detach()
 
                 # compute metrics
                 sample_metrs = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)

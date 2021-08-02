@@ -170,7 +170,7 @@ class ValidationMetric:
         mtx = self.metric(model, optimizer, estimate, target, valid, loss)
 
         for k, v in mtx.items():
-            self.values[k].append(v)
+            self.values[k].append(v.cpu())
 
     def result(self):
         if self.reduce == 'mean':
@@ -349,7 +349,7 @@ class StrategyValidation(Validation):
             est = result.final()
 
             for m in metrics:
-                m.add(ctx.model, ctx.optimizer, est, flow, valid, loss.detach().item())
+                m.add(ctx.model, ctx.optimizer, est, flow, valid, loss.detach())
 
             for j in images:        # note: we expect this to be a small set
                 j_min = i * stage.validation.batch_size
@@ -456,8 +456,8 @@ class SummaryInspector(strategy.Inspector):
                 if ctx.step % m.frequency != 0:
                     continue
 
-                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid,
-                                    loss.detach().item(), fmtargs)
+                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid, loss.detach(),
+                                    fmtargs)
 
                 for k, v in metrics.items():
                     self.writer.add_scalar(k, v, ctx.step)

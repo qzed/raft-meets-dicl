@@ -42,8 +42,8 @@ class EndPointError(Metric):
 
         # compute metrics based on end-point error means
         result = OrderedDict()
-        result[f'{self.key}mean'] = epe.mean().item()
+        result[f'{self.key}mean'] = epe.mean()
         for d in self.distances:
-            result[f'{self.key}{d}px'] = (epe < d).float().mean().item()
+            result[f'{self.key}{d}px'] = (epe < d).float().mean()
 
         return result
