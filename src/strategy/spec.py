@@ -266,14 +266,22 @@ class SchedulerSpec:
         # build
         return types[self.type](optimizer, **params)
 
-    def _eval_param(self, value, variables):
+    def _eval_param(self, value, vars):
+        # handle dicts recursively
+        if isinstance(value, dict):
+            return {self._eval_param(k, vars): self._eval_param(v, vars) for k, v in value.items()}
+
+        # handle lists/tuples recursively
+        if isinstance(value, (tuple, list)):
+            return [self._eval_param(v, vars) for v in value]
+
         # only strings can be expressions
         if not isinstance(value, str):
             return value
 
         # try to evaluate, if we fail this is probably not an expression
         try:
-            return utils.expr.eval_math_expr(value, variables)
+            return utils.expr.eval_math_expr(value, vars)
         except TypeError:
             return value
 
