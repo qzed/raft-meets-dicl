@@ -73,7 +73,12 @@ class Checkpoint:
 
     @classmethod
     def from_dict(cls, cfg):
-        pass
+        return cls(
+            model=cfg['model'],
+            iteration=Iteration.from_dict(cfg['iteration']),
+            metrics=cfg['metrics'],
+            state=State.from_dict(cfg['state']),
+        )
 
     @classmethod
     def load(cls, path, **kwargs):
