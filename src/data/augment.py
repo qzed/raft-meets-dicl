@@ -545,6 +545,64 @@ class ScaleSparse(Scale):
         return img1, img2, new_flow, new_valid, meta
 
 
+class Translate(Augmentation):
+    type = 'translate'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        min_size = list(cfg.get('min-size', [0, 0]))
+        if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
+            raise ValueError('invalid min-size, expected list with two unsigned integers')
+
+        delta = [*map(int, list(cfg.get('delta', [10, 10])))]
+        if len(delta) != 2 or delta[0] < 0 or delta[1] < 0:
+            raise ValueError('invalid delta, expected list with two unsigned integers')
+
+        return cls(min_size, delta)
+
+    def __init__(self, min_size, delta):
+        super().__init__()
+
+        self.min_size = min_size
+        self.delta = delta
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'min-size': self.min_size,
+            'delta': self.delta,
+        }
+
+    def process(self, img1, img2, flow, valid, meta):
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[1] >= self.min_size[0] and img1.shape[0] >= self.min_size[1]
+
+        h, w, _ = img1.shape
+
+        # get maximum translation
+        dx = np.clip(w - self.min_size[0], 0, self.delta[0])
+        dy = np.clip(h - self.min_size[1], 0, self.delta[1])
+
+        # draw actual translation vector
+        tx, ty = np.random.randint((-dx, -dy), (dx + 1, dy + 1))
+
+        # perform translation
+        img1 = img1[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
+        img2 = img2[max(0, -ty):min(h, h - ty), max(0, -tx):min(w, w - tx)]
+        flow = flow[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)] + np.array([tx, ty])
+        valid = valid[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
+
+        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[1] >= self.min_size[0] and img1.shape[0] >= self.min_size[1]
+
+        # update metadata
+        meta['original_extents'] = ((0, img1.shape[0]), (0, img1.shape[1]))
+
+        return img1, img2, flow, valid, meta
+
+
 def _build_augmentation(cfg):
     types = [
         ColorJitter,
@@ -556,6 +614,7 @@ def _build_augmentation(cfg):
         RestrictFlowMagnitude,
         Scale,
         ScaleSparse,
+        Translate,
     ]
 
     types = {cls.type: cls for cls in types}

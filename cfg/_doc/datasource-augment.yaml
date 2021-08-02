@@ -11,6 +11,24 @@ augmentations:
   # are applied in the order they have been specified.
 
 
+  - type: translate
+    # Type of this augmentation: Add random constant flow bias, i.e. translate
+    # second image by a random vector.
+
+    delta: [10, 10]
+    # Maxium translation, i.e maxium flow bias to add. Only integer values are
+    # supported.
+
+    min-size: [496, 368]
+    # Minimum size of the resulting image pairs and flow field: Flow
+    # translation will lead to borders opposite to the translation vector. To
+    # ensure that the input only contains valid (i.e. non-border) pixels, it
+    # will be cropped. This is the minimum size of that crop.
+    #
+    # Note that this directly influences the maximum translation as the border
+    # size is exaclty the translation delta.
+
+
   - type: scale
     # Type of this augmentation: Scale image and dense flow randomly in both
     # height and width. Note: For sparse flows, the type 'scale-sparse' should

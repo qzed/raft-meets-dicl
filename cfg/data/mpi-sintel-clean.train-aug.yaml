@@ -1,8 +1,12 @@
 type: augment
 
 augmentations:
-  - type: scale
+  - type: translate
     min-size: &img_size [768, 384]
+    delta: [30, 30]
+
+  - type: scale
+    min-size: *img_size
     min-scale: [0.5, 0.5]
     max-scale: [2.0, 2.0]
     mode: linear
