@@ -14,7 +14,7 @@ class EndPointError(Metric):
         cls._typecheck(cfg)
 
         key = cfg.get('key', 'EndPointError/')
-        dist = list(cfg.get('distances', [1, 3, 4]))
+        dist = list(cfg.get('distances', [1, 3, 5]))
 
         return cls(dist, key)
 
