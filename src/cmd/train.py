@@ -156,6 +156,10 @@ def train(args):
 
         chkpt = strategy.Checkpoint.load(args.resume, map_location='cpu')
 
+    # enable automatic per-device tuning
+    if device == torch.device('cuda:0'):
+        torch.backends.cudnn.benchmark = True
+
     # training loop
     loader_args = {'num_workers': 4, 'pin_memory': True}
 
