@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 from pickle import UnpicklingError
 import re
 
@@ -70,6 +71,7 @@ class Checkpoint:
     iteration: Iteration
     metrics: Dict[str, float]
     state: State
+    metadata: Dict[str, Any]
 
     @classmethod
     def from_dict(cls, cfg):
@@ -78,6 +80,7 @@ class Checkpoint:
             iteration=Iteration.from_dict(cfg['iteration']),
             metrics=cfg['metrics'],
             state=State.from_dict(cfg['state']),
+            metadata=cfg.get('metadata', {}),
         )
 
     @classmethod
@@ -89,6 +92,7 @@ class Checkpoint:
             iteration=Iteration.from_dict(chkpt['iteration']),
             metrics=chkpt['metrics'],
             state=State.from_dict(chkpt['state']),
+            metadata=chkpt.get('metadata', {}),
         )
 
     def to_dict(self):
@@ -97,6 +101,7 @@ class Checkpoint:
             'iteration': self.iteration.to_dict(),
             'metrics': self.metrics,
             'state': self.state.to_dict(),
+            'metadata': self.metadata,
         }
 
     def to_entry(self, path):
@@ -305,6 +310,10 @@ class CheckpointManager:
                 lr_sched_inst=[s.state_dict() for s in ctx.lr_sched_inst],
                 lr_sched_epoch=[s.state_dict() for s in ctx.lr_sched_epoch],
             ),
+            metadata={
+                'timestamp':  datetime.now().isoformat(),
+                'source': 'training',
+            },
         )
 
         chkpt.save(entry.path)

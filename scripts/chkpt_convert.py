@@ -6,6 +6,7 @@
 import argparse
 import sys
 
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -14,11 +15,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.strategy.checkpoint import Checkpoint, Iteration, State
 
 
-def to_checkpoint(model_id, state):
+def to_checkpoint(model_id, state, metadata):
     iter = Iteration(0, 0, 0)
     state = State(state, None, None, [], [])
 
-    return Checkpoint(model_id, iter, {}, state)
+    return Checkpoint(model_id, iter, {}, state, metadata)
 
 
 def replace_pfx(state, sub):
@@ -35,16 +36,16 @@ def replace_pfx(state, sub):
     return result
 
 
-def convert_raft(state):
+def convert_raft(state, metadata):
     sub = [
         ('module.update_block.encoder.', 'module.update_block.enc.'),
         ('module.update_block.flow_head.', 'module.update_block.flow.'),
     ]
 
-    return to_checkpoint('raft/baseline', replace_pfx(state, sub))
+    return to_checkpoint('raft/baseline', replace_pfx(state, sub), metadata)
 
 
-def convert_dicl(state):
+def convert_dicl(state, metadata):
     import src
 
     state = state['state_dict']
@@ -79,7 +80,7 @@ def convert_dicl(state):
         sub += [(f'module.lvl{lvl}.ctxnet.{x}.bn.', f'module.lvl{lvl}.ctxnet.{x}.1.') for x in range(0, 6)]
         sub += [(f'module.lvl{lvl}.ctxnet.{x}.conv.', f'module.lvl{lvl}.ctxnet.{x}.0.') for x in range(0, 6)]
 
-    return to_checkpoint('dicl/baseline', replace_pfx(state, sub))
+    return to_checkpoint('dicl/baseline', replace_pfx(state, sub), metadata)
 
 
 def main():
@@ -99,11 +100,17 @@ def main():
 
     args = parser.parse_args()
 
+    # create metadata dict
+    metadata = {
+        'timestamp':  datetime.now().isoformat(),
+        'source': f'file://{Path(args.input).resolve()}',
+    }
+
     # load checkpoint
     chkpt = torch.load(args.input, map_location='cpu')
 
     # convert
-    chkpt = convert[args.format](chkpt)
+    chkpt = convert[args.format](chkpt, metadata)
 
     # save checkpoint
     chkpt.save(args.output)
