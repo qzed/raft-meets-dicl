@@ -46,8 +46,6 @@ def convert_raft(state, metadata):
 
 
 def convert_dicl(state, metadata):
-    import src
-
     state = state['state_dict']
     state = {f"module.{k}": v for k, v in state.items()}
 
