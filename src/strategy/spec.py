@@ -257,6 +257,7 @@ class SchedulerSpec:
     def build(self, optimizer, variables):
         types = {
             'one-cycle': optim.lr_scheduler.OneCycleLR,
+            'multi-step': optim.lr_scheduler.MultiStepLR,
         }
 
         # evaluate parameters
