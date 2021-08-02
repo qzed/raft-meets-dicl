@@ -15,9 +15,11 @@ data:
         min-size: &img_size [768, 384]
 
       - type: scale
-        min-scale: [0.87, 0.87]
-        max-scale: [1.75, 1.75]
+        min-scale: 0.87
+        max-scale: 1.75
         min-size: *img_size
+        max-stretch: 0.2
+        prob-stretch: 0.8
 
       - type: crop
         size: *img_size

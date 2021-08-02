@@ -7,8 +7,10 @@ augmentations:
 
   - type: scale
     min-size: *img_size
-    min-scale: [0.5, 0.5]
-    max-scale: [2.0, 2.0]
+    min-scale: 0.5
+    max-scale: 2.0
+    max-stretch: 0.2
+    prob-stretch: 0.8
     mode: linear
 
   - type: crop

@@ -17,8 +17,10 @@ data:
           augmentations:
             - type: scale
               min-size: &img_size [768, 368]
-              min-scale: [0.87, 0.87]
-              max-scale: [1.52, 1.52]
+              min-scale: 0.87
+              max-scale: 1.52
+              max-stretch: 0.2
+              prob-stretch: 0.8
 
           source:               # 100 * sintel_clean + 100 * sintel_final + things
             type: concat
@@ -40,8 +42,10 @@ data:
               augmentations:
                 - type: scale-sparse
                   min-size: *img_size
-                  min-scale: [0.81, 0.81]
-                  max-scale: [1.41, 1.41]
+                  min-scale: 0.81
+                  max-scale: 1.41
+                  max-stretch: 0.2
+                  prob-stretch: 0.8
 
               source:
                 type: repeat
@@ -53,8 +57,10 @@ data:
               augmentations:
                 - type: scale-sparse
                   min-size: *img_size
-                  min-scale: [0.71, 0.71]
-                  max-scale: [1.15, 1.15]
+                  min-scale: 0.71
+                  max-scale: 1.15
+                  max-stretch: 0.2
+                  prob-stretch: 0.8
 
               source:
                 type: repeat

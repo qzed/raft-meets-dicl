@@ -421,27 +421,37 @@ class Scale(Augmentation):
         if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
             raise ValueError('invalid min-size, expected list with two unsigned integers')
 
-        min_scale = list(cfg['min-scale'])
-        if len(min_scale) != 2 or min_scale[0] < 0 or min_scale[1] < 0:
-            raise ValueError('invalid min-scale, expected list with two unsigned floats')
+        min_scale = float(cfg['min-scale'])
+        if min_scale <= 0:
+            raise ValueError('invalid min-scale, expected positive float')
 
-        max_scale = list(cfg['max-scale'])
-        if len(max_scale) != 2 or max_scale[0] < 0 or max_scale[1] < 0:
-            raise ValueError('invalid max-scale, expected list with two unsigned floats')
+        max_scale = float(cfg['max-scale'])
+        if max_scale <= 0:
+            raise ValueError('invalid max-scale, expected positive float')
 
-        if min_scale[0] > max_scale[0] or min_scale[1] > max_scale[1]:
+        if min_scale > max_scale:
             raise ValueError('min-scale must be smaller than or equal to max-scale')
+
+        max_stretch = float(cfg['max-stretch'])
+        if max_stretch < 0:
+            raise ValueError('stretch must be non-negative')
+
+        prob_stretch = float(cfg.get('prob-stretch', 1.0))
+        if prob_stretch < 0:
+            raise ValueError('prob-stretch must be non-negative')
 
         mode = cfg.get('mode', 'linear')
 
-        return cls(min_size, min_scale, max_scale, mode)
+        return cls(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
 
-    def __init__(self, min_size, min_scale, max_scale, mode):
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
         super().__init__()
 
         self.min_size = min_size
         self.min_scale = min_scale
         self.max_scale = max_scale
+        self.max_stretch = max_stretch
+        self.prob_stretch = prob_stretch
         self.mode = mode
 
         if mode == 'nearest':
@@ -461,28 +471,48 @@ class Scale(Augmentation):
             'min-size': self.min_size,
             'min-scale': self.min_scale,
             'max-scale': self.max_scale,
+            'max-stretch': self.max_stretch,
+            'prob-stretch': self.prob_stretch,
             'mode': self.mode,
         }
+
+    def _get_new_size(self, input_size):
+        # draw random scale factor
+        scale = np.random.uniform(self.min_scale, self.max_scale)
+
+        # draw random stretch factor
+        stretch = 0.0
+        if np.random.rand() < self.prob_stretch:
+            stretch = np.random.uniform(-self.max_stretch, self.max_stretch)
+
+        # apply stretch to scale, new aspect ratio will be 2**stretch
+        sx = scale * 2**(stretch / 2)
+        sy = scale * 2**-(stretch / 2)
+
+        # calculate new size and actual/clipped scale (store as width, height)
+        old_size = np.array(input_size)[::-1]
+        new_size = np.clip(np.ceil(old_size * [sx, sy]).astype(np.int32), self.min_size, None)
+        scale = new_size / old_size
+
+        # Note: Clipping can violate the maximum stretch factor. In that case,
+        # however, the minimum size itself violates the stretch factor
+        # constraint. We assume that this is never the case.
+
+        return new_size, scale
 
     def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:2] == img2.shape[:2]
         assert np.all(valid)        # full flows only!
 
-        # draw random scale candidates
-        sx = np.random.uniform(self.min_scale[0], self.max_scale[0])
-        sy = np.random.uniform(self.min_scale[1], self.max_scale[1])
-
-        # calculate new size and actual/clipped scale (store as width, height)
-        old_size = np.array(img1.shape[:2])[::-1]
-        new_size = np.clip(np.ceil(old_size * [sx, sy]).astype(np.int32), self.min_size, None)
-        scale = new_size / old_size
+        # draw random but valid scale factors
+        size, scale = self._get_new_size(img1.shape[:2])
 
         # scale images
-        img1 = cv2.resize(img1, new_size, interpolation=self.modenum)
-        img2 = cv2.resize(img2, new_size, interpolation=self.modenum)
+        img1 = cv2.resize(img1, size, interpolation=self.modenum)
+        img2 = cv2.resize(img2, size, interpolation=self.modenum)
 
         if flow is not None:
-            flow = cv2.resize(flow, new_size, interpolation=self.modenum)
+            flow = cv2.resize(flow, size, interpolation=self.modenum)
             flow *= scale
 
             # this is for full/non-sparse flows only...
@@ -500,18 +530,12 @@ class ScaleSparse(Scale):
     def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
 
-        # draw random scale candidates
-        sx = np.random.uniform(self.min_scale[0], self.max_scale[0])
-        sy = np.random.uniform(self.min_scale[1], self.max_scale[1])
-
-        # calculate new size and actual/clipped scale (store as width, height)
-        old_size = np.array(img1.shape[:2])[::-1]
-        new_size = np.clip(np.ceil(old_size * [sx, sy]).astype(np.int32), self.min_size, None)
-        scale = new_size / old_size
+        # draw random but valid scale factors
+        size, scale = self._get_new_size(img1.shape[:2])
 
         # scale images
-        img1 = cv2.resize(img1, new_size, interpolation=self.modenum)
-        img2 = cv2.resize(img2, new_size, interpolation=self.modenum)
+        img1 = cv2.resize(img1, size, interpolation=self.modenum)
+        img2 = cv2.resize(img2, size, interpolation=self.modenum)
 
         # buil grid of coordinates
         coords = np.meshgrid(np.arange(flow.shape[1]), np.arange(flow.shape[0]))
@@ -530,16 +554,16 @@ class ScaleSparse(Scale):
         cx, cy = coords[:, 0], coords[:, 1]
 
         # filter new flow coordinates to ensure they are still in range
-        cv = (cx >= 0) & (cx < new_size[0]) & (cy >= 0) & (cy < new_size[1])
+        cv = (cx >= 0) & (cx < size[0]) & (cy >= 0) & (cy < size[1])
         coords = coords[cv]
         flow = flow[cv]
 
         # map sparse flow back onto full image
-        new_flow = np.zeros((*new_size[::-1], 2), dtype=np.float32)
+        new_flow = np.zeros((*size[::-1], 2), dtype=np.float32)
         new_flow[cy, cx] = flow
 
         # create new validity map
-        new_valid = np.zeros(new_size[::-1], dtype=bool)
+        new_valid = np.zeros(size[::-1], dtype=bool)
         new_valid[cy, cx] = True
 
         return img1, img2, new_flow, new_valid, meta

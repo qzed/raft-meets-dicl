@@ -12,8 +12,10 @@ data:
     augmentations:
       - type: scale
         min-size: &img_size [496, 368]
-        min-scale: [0.9, 0.9]
-        max-scale: [2.0, 2.0]
+        min-scale: 0.9
+        max-scale: 2.0
+        max-stretch: 0.2
+        prob-stretch: 0.8
 
       - type: crop
         size: *img_size

@@ -37,23 +37,28 @@ augmentations:
     #
     # Note that scaled images generally have a random size and thus may need
     # padding or cropping before they can be batched together.
-    #
-    # The new image size is chosen uniformly based on the parameters below.
 
     min-size: [496, 368]
     # Minimum image size. Scaled images will not be scaled below this size.
 
-    min-scale: [0.5, 0.5]
-    # Minimum scale factors in width and height. Note that the actual minimum
-    # size is of the image is defined by the (element-wise) maximum of the
-    # sizes implied by 'min-size' and 'min-scale'.
+    min-scale: 0.5
+    # Minimum uniform scale factor. Note that the actual minimum size is of the
+    # image is defined by the (element-wise) maximum of the sizes implied by
+    # 'min-size' and 'min-scale'.
     #
     # Scaling factors need to be positive. For flipping (i.e. negative scaling)
     # see the 'flip' type augmentation.
 
-    max-scale: [2.0, 2.0]
-    # Maximum scale factors in width and height. This is the sole upper bound
-    # for the new image size.
+    max-scale: 2.0
+    # Maximum uniform scale factor. This is the sole upper bound for the new
+    # image size.
+
+    max-stretch: 0.2
+    # Maximum stretch factor. The aspect ratio of the final images will be
+    # bounded by 2**(-max_stretch) and 2**max_stretch.
+
+    prob-stretch: 0.5
+    # Probability of stretching images, i.e. scaling non-uniformly.
 
     mode: linear
     # Interpolation mode. Specifies how input images and dense flow will be
