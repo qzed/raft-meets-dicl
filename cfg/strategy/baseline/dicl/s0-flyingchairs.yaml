@@ -1,0 +1,73 @@
+name: "DICL: Stage 0: Uni Freiburg FlyingChairs (simple augmentations only, no context, no DAP)"
+id: dicl/s0-chairs
+
+data:
+  epochs: 5         # > 50k steps pre-training with simple augmentations
+  batch-size: 3     # original: 8 per GPU
+
+  source:
+    type: augment
+    source: ../../../data/ufreiburg-flyingchairs.train.yaml
+
+    augmentations:
+      - type: translate
+        delta: [10, 10]
+        min-size: &img_size [384, 256]
+
+      - type: crop
+        size: *img_size
+
+      - type: flip
+        probability: [0.5, 0.5]
+
+validation:
+  source: ../../../data/ufreiburg-flyingchairs.test.yaml
+  batch-size: 1
+  images: [0]
+
+model:
+  arguments:
+    raw: false
+    dap: false
+    ctx: false
+
+    context_scale:
+      level-6: 1.0
+      level-5: 1.0
+      level-4: 1.0
+      level-3: 1.0
+      level-2: 1.0
+
+loss:
+  arguments:
+    ord: 2
+    mode: bilinear
+
+    weights:
+      - 1.0
+      - 0.75
+      - 0.50
+      - 0.25
+      - 0.25
+
+    valid_range:
+      - [372, 372]
+      - [360, 360]
+      - [336, 336]
+      - [288, 288]
+      - [192, 192]
+
+optimizer:
+  type: adam
+
+  parameters:
+    lr: 0.001
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+
+lr-scheduler:
+  epoch:
+    - type: multi-step
+      parameters:
+        milestones: [300, 500, 1000]
+        gamma: 0.5

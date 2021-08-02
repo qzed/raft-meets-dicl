@@ -1,0 +1,9 @@
+mode: best
+
+stages:
+  - dicl/s0-flyingchairs.yaml
+  - dicl/s1-flyingchairs.yaml
+  - dicl/s2-flyingchairs.yaml
+  - dicl/s3-flyingthings.yaml
+  - dicl/s4-sintel.yaml
+  - dicl/s4-kitti.yaml         # note: parallel to Sintel in original impl.

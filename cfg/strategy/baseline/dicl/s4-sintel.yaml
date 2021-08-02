@@ -1,0 +1,110 @@
+name: "DICL: Stage 4: MPI Sintel"
+id: dicl/s4-sintel
+
+data:
+  epochs: 60        # > 60k steps
+  batch-size: 1     # original: 64
+
+  source:
+    type: augment
+    source:
+      type: concat
+      sources:
+        - ../../../data/mpi-sintel-clean.train.yaml
+        - ../../../data/mpi-sintel-final.train.yaml
+
+    augmentations:
+      - type: translate
+        delta: [10, 10]
+        min-size: &img_size [768, 384]
+
+      - type: scale
+        min-scale: [0.87, 0.87]
+        max-scale: [2.00, 2.00]
+        min-size: *img_size
+
+      - type: crop
+        size: *img_size
+
+      - type: flip
+        probability: [0.5, 0.1]
+
+      - type: color-jitter
+        prob-asymmetric: 0.2
+        brightness: 0.4
+        contrast: 0.4
+        saturation: 0.4
+        hue: 0.1592   # 0.5 / pi
+
+      - type: occlusion-forward
+        probability: 0.5
+        num: [1, 3]
+        min-size: [1, 1]
+        max-size: [100, 50]
+
+validation:
+  source:
+    type: concat
+    sources:
+      - ../../../data/mpi-sintel-clean.train.yaml
+      - ../../../data/mpi-sintel-final.train.yaml
+
+  batch-size: 1
+  images: [0]
+
+model:
+  arguments:
+    raw: true
+    dap: true
+    ctx: true
+
+    context_scale:
+      level-6: 0.03125
+      level-5: 0.0625
+      level-4: 0.125
+      level-3: 0.25
+      level-2: 0.5
+
+loss:
+  arguments:
+    ord: 2
+    mode: bilinear
+
+    weights:
+      - 1.0
+      - 0.8
+      - 0.75
+      - 0.6
+      - 0.5
+      - 0.4
+      - 0.5
+      - 0.4
+      - 0.5
+      - 0.4
+
+    valid_range:
+      - [372, 372]
+      - [372, 372]
+      - [360, 360]
+      - [360, 360]
+      - [336, 336]
+      - [336, 336]
+      - [288, 288]
+      - [288, 288]
+      - [192, 192]
+      - [192, 192]
+
+optimizer:
+  type: adam
+
+  parameters:
+    lr: 0.00025
+    weight_decay: 0.0
+    betas: [0.9, 0.999]
+
+lr-scheduler:
+  epoch:
+    - type: multi-step
+      parameters:
+        milestones: [30, 50]
+        gamma: 0.5
