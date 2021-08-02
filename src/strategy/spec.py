@@ -89,6 +89,7 @@ class OptimizerSpec:
 
     def build(self, params):
         types = {
+            'adam': torch.optim.Adam,
             'adam-w': torch.optim.AdamW,
         }
 
