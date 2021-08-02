@@ -174,7 +174,7 @@ class ValidationMetric:
 
     def result(self):
         if self.reduce == 'mean':
-            return [(k, np.mean(vs)) for k, vs in self.values.items()]
+            return [(k, np.mean(vs, axis=0)) for k, vs in self.values.items()]
         else:
             raise ValueError("unsupported reduction type")
 
