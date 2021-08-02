@@ -91,6 +91,7 @@ class OptimizerSpec:
         types = {
             'adam': torch.optim.Adam,
             'adam-w': torch.optim.AdamW,
+            'sgd': torch.optim.SGD,
         }
 
         return types[self.type](params, **self.parameters)
