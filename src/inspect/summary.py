@@ -502,7 +502,7 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     ft = visual.flow_to_rgb(ft, mask=mask)
 
     fe = estimate.detach().cpu().permute(1, 2, 0).numpy()
-    fe = visual.flow_to_rgb(fe, mask=mask)
+    fe = visual.flow_to_rgb(fe)
 
     i1 = (img1.detach().cpu() + 1) / 2
     i2 = (img2.detach().cpu() + 1) / 2
