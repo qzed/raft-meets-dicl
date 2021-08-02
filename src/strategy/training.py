@@ -127,7 +127,7 @@ class TrainingContext:
                                   shuffle=stage.data.shuffle, drop_last=stage.data.drop_last,
                                   **self.loader_args)
 
-        log.info(f"dataset loaded: have {len(self.data)} samples")
+        log.info(f"dataset loaded: have {len(self.data)} batches over {len(input)} samples")
 
         # set up optimizer
         log.info("setting up optimizer")
