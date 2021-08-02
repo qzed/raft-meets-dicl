@@ -16,6 +16,7 @@ model:
 
   arguments:
     raw: true
+    dap: true
 
     context_scale:
       level-6: 0.03125
