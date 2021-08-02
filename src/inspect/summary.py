@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 import numpy as np
 
+import torch
 import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
@@ -275,6 +276,7 @@ class StrategyValidation(Validation):
             'images': self.images.get_config(),
         }
 
+    @torch.no_grad()
     def run(self, log, ctx, writer, chkpt, stage, epoch):
         # evaluate model
         metrics = self._evaluate(log, ctx, writer, stage, epoch)
@@ -440,6 +442,7 @@ class SummaryInspector(strategy.Inspector):
         self.val_epoch = [v for v in validation if v.frequency == 'epoch']
         self.val_stage = [v for v in validation if v.frequency == 'stage']
 
+    @torch.no_grad()
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta, result, loss):
         # get final result (performs upsampling if necessary)
         final = result.final()
@@ -475,10 +478,12 @@ class SummaryInspector(strategy.Inspector):
             if ctx.step > 0 and ctx.step % val.frequency == 0:
                 val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
+    @torch.no_grad()
     def on_epoch(self, log, ctx, stage, epoch):
         for val in self.val_epoch:
             val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
+    @torch.no_grad()
     def on_stage(self, log, ctx, stage):
         for val in self.val_stage:
             val.run(log, ctx, self.writer, self.checkpoints, stage, None)

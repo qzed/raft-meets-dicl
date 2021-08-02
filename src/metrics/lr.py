@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+import torch
+
 from .common import Metric
 
 
@@ -24,6 +26,7 @@ class LearningRate(Metric):
             'key': self.key,
         }
 
+    @torch.no_grad()
     def compute(self, model, optimizer, estimate, target, valid, loss):
         result = OrderedDict()
         result[self.key] = optimizer.param_groups[0]['lr']

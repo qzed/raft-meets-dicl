@@ -161,8 +161,7 @@ class TrainingContext:
             self.run_epoch(log_, stage, epoch)
 
         # inspection and validation
-        with torch.no_grad():
-            self.inspector.on_stage(log, self, stage)
+        self.inspector.on_stage(log, self, stage)
 
     def run_epoch(self, log, stage, epoch):
         # set up progress bar
@@ -180,8 +179,7 @@ class TrainingContext:
             s.step()
 
         # inspection and validation
-        with torch.no_grad():
-            self.inspector.on_epoch(log, self, stage, epoch)
+        self.inspector.on_epoch(log, self, stage, epoch)
 
     def run_instance(self, log, stage, epoch, i, img1, img2, flow, valid, meta):
         # reset gradients
@@ -204,9 +202,7 @@ class TrainingContext:
         self.scaler.scale(loss).backward()
 
         # inspection (metrics, validation, ...)
-        with torch.no_grad():
-            self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, meta,
-                                    result, loss)
+        self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, meta, result, loss)
 
         # accumulate gradients if specified
         if (i + 1) % stage.gradient.accumulate == 0:

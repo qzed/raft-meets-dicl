@@ -31,6 +31,7 @@ class EndPointError(Metric):
             'distances': self.distances,
         }
 
+    @torch.no_grad()
     def compute(self, model, optimizer, estimate, target, valid, loss):
         # end-point error for each individual pixel
         # note: input may be batch or single instance, thus use dim=-3

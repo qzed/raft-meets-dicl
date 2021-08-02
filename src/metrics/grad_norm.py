@@ -28,6 +28,7 @@ class GradientNorm(Metric):
             'key': self.key,
         }
 
+    @torch.no_grad()
     def compute(self, model, optimizer, estimate, target, valid, loss):
         norm = sum(p.grad.detach().data.norm(p=self.ord) for p in model.parameters() if p.grad is not None)
 
