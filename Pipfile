@@ -16,6 +16,7 @@ tqdm = "*"
 
 [dev-packages]
 pycodestyle = "*"
+torch-tb-profiler = "*"
 
 [requires]
 python_version = "3.9"
