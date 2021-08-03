@@ -1,4 +1,5 @@
 from . import config
+from . import debug
 from . import expr
 from . import logging
 from . import model

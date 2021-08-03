@@ -14,7 +14,7 @@ from .. import inspect
 from ..strategy.training import TrainingContext
 
 
-def train(args):
+def _train(args):
     timestamp = datetime.datetime.now()
 
     cfg_seeds = None
@@ -166,3 +166,7 @@ def train(args):
     log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
     tctx.run(args.start_stage, args.start_epoch, chkpt)
+
+
+def train(args):
+    utils.debug.run(_train, args, debug=args.debug)
