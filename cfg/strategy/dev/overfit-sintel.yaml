@@ -1,0 +1,32 @@
+mode: continuous
+
+stages:
+  - name: "MPI Sintel (overfit)"
+    id: dev/sintel-0
+
+    data:
+      epochs: 100
+      batch-size: 1
+
+      source:
+        type: repeat
+        times: 400
+        source: ../../data/mpi-sintel-clean.overfit.yaml
+
+    validation:
+      source: ../../data/mpi-sintel-clean.overfit.yaml
+      batch-size: 1
+      images: [0, 1, 2, 3]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: 0.0001125
+        weight_decay: 0.00001
+        eps: 1.0e-9
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
