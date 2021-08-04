@@ -172,7 +172,7 @@ def evaluate(args):
         flow_visual_args['gamma'] = float(args.flow_gamma)
 
     # handle arguments for epe-visualization
-    flow_epe_args = {'vmin': 0.0}
+    flow_epe_args = {}
 
     if args.epe_cmap is not None:
         flow_epe_args['cmap'] = args.epe_cmap
