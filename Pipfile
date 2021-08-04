@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 gitpython = "*"
+matplotlib = "*"
 numpy = "*"
 opencv-python = "*"
 parse = "*"

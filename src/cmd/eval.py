@@ -214,6 +214,7 @@ def evaluate(args):
             size = (h0[b], h1[b]), (w0[b], w1[b])
 
             sample_final = final[b].view(1, *final.shape[1:])
+            sample_flow = None
 
             if flow is not None:
                 sample_output = result.output(b)
@@ -244,7 +245,12 @@ def evaluate(args):
             # save flow image
             if path_flow is not None:
                 est = sample_final[0].detach().cpu().permute(1, 2, 0).numpy()
-                save_flow_image(path_flow, args.flow_format, sample_id, est, size, flow_visual_args)
+
+                tgt = None
+                if sample_flow is not None:
+                    tgt = sample_flow[0].detach().cpu().permute(1, 2, 0).numpy()
+
+                save_flow_image(path_flow, args.flow_format, sample_id, tgt, est, size, flow_visual_args)
 
     if compute_metrics:
         # log summary
@@ -261,22 +267,37 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, flow, size, visual_args):
+def save_flow_image(dir, format, sample_id, target, flow, size, visual_args):
     (h0, h1), (w0, w1) = size
+    flow = flow[h0:h1, w0:w1]
+    target = target[h0:h1, w0:w1]
 
     formats = {
-        'kitti': (data.io.write_flow_kitti, {}, 'png'),
-        'visual': (save_flow_visual, visual_args, 'png'),
-        'flo': (data.io.write_flow_mb, {}, 'flo'),
+        'kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
+        'flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
+        'visual': (save_flow_visual, [flow], visual_args, 'png'),
+        'visual/epe': (save_flow_visual_epe, [flow, target], visual_args, 'png'),
     }
 
-    write, kwargs, ext = formats[format]
+    write, args, kwargs, ext = formats[format]
 
     path = dir / f"{sample_id}.{ext}"
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    write(path, flow[h0:h1, w0:w1], **kwargs)
+    write(path, *args, **kwargs)
 
 
 def save_flow_visual(path, uv, **kwargs):
     cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs)[:, :, ::-1] * 255)
+
+
+def save_flow_visual_epe(path, uv, uv_target, **kwargs):
+    rgba = visual.end_point_error(uv, uv_target, **kwargs)
+
+    bgra = np.zeros_like(rgba)
+    bgra[:, :, 0] = rgba[:, :, 2]
+    bgra[:, :, 1] = rgba[:, :, 1]
+    bgra[:, :, 2] = rgba[:, :, 0]
+    bgra[:, :, 3] = rgba[:, :, 3]
+
+    cv2.imwrite(str(path), bgra * 255)
