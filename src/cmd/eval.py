@@ -177,6 +177,15 @@ def evaluate(args):
     if args.flow_gamma:
         flow_visual_args['gamma'] = float(args.flow_gamma)
 
+    # handle arguments for epe-visualization
+    flow_epe_args = {'vmin': 0.0}
+
+    if args.epe_cmap is not None:
+        flow_epe_args['cmap'] = args.epe_cmap
+
+    if args.epe_max is not None:
+        flow_epe_args['vmax'] = float(args.epe_max)
+
     # run evaluation
     logging.info(f"evaluating {len(dataset)} samples")
 
@@ -250,7 +259,8 @@ def evaluate(args):
                 if sample_flow is not None:
                     tgt = sample_flow[0].detach().cpu().permute(1, 2, 0).numpy()
 
-                save_flow_image(path_flow, args.flow_format, sample_id, tgt, est, size, flow_visual_args)
+                save_flow_image(path_flow, args.flow_format, sample_id, tgt, est, size,
+                                flow_visual_args, flow_epe_args)
 
     if compute_metrics:
         # log summary
@@ -267,7 +277,7 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, target, flow, size, visual_args):
+def save_flow_image(dir, format, sample_id, target, flow, size, visual_args, epe_args):
     (h0, h1), (w0, w1) = size
     flow = flow[h0:h1, w0:w1]
     target = target[h0:h1, w0:w1]
@@ -276,7 +286,7 @@ def save_flow_image(dir, format, sample_id, target, flow, size, visual_args):
         'kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
         'flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
         'visual': (save_flow_visual, [flow], visual_args, 'png'),
-        'visual/epe': (save_flow_visual_epe, [flow, target], visual_args, 'png'),
+        'visual/epe': (save_flow_visual_epe, [flow, target], epe_args, 'png'),
     }
 
     write, args, kwargs, ext = formats[format]
