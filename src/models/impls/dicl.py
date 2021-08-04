@@ -5,8 +5,6 @@
 # Link: https://github.com/jytime/DICL-Flow
 
 import itertools
-from collections import OrderedDict
-from typing import List, Union
 
 import numpy as np
 import parse
