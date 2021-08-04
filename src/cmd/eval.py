@@ -63,13 +63,13 @@ class MeanCollector(Collector):
             if k not in self.results:
                 self.results[k] = list()
 
-            self.results[k].append(v)
+            self.results[k].append(v.item())
 
     def result(self):
         results = OrderedDict()
 
         for k, vs in self.results.items():
-            results[k] = np.mean(vs).item()
+            results[k] = np.mean(vs)
 
         return results
 
