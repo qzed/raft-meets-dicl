@@ -221,11 +221,13 @@ def evaluate(args):
         if path_flow is not None:
             est = est[0].detach().cpu().permute(1, 2, 0).numpy()
 
-            tgt = None
             if target is not None:
-                tgt = target[0].detach().cpu().permute(1, 2, 0).numpy()
+                target = target[0].detach().cpu().permute(1, 2, 0).numpy()
 
-            save_flow_image(path_flow, args.flow_format, meta['sample_id'], tgt, est,
+            if valid is not None:
+                valid = valid[0].detach().cpu().numpy()
+
+            save_flow_image(path_flow, args.flow_format, meta['sample_id'], target, valid, est,
                             meta['original_extents'], flow_visual_args, flow_epe_args)
 
     if compute_metrics:
@@ -243,18 +245,21 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, target, flow, size, visual_args, epe_args):
+def save_flow_image(dir, format, sample_id, target, valid, flow, size, visual_args, epe_args):
     (h0, h1), (w0, w1) = size
     flow = flow[h0:h1, w0:w1]
 
     if target is not None:
         target = target[h0:h1, w0:w1]
 
+    if valid is not None:
+        valid = valid[h0:h1, w0:w1]
+
     formats = {
         'kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
         'flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
         'visual': (save_flow_visual, [flow], visual_args, 'png'),
-        'visual/epe': (save_flow_visual_epe, [flow, target], epe_args, 'png'),
+        'visual/epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
     }
 
     write, args, kwargs, ext = formats[format]
@@ -269,8 +274,8 @@ def save_flow_visual(path, uv, **kwargs):
     cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs)[:, :, ::-1] * 255)
 
 
-def save_flow_visual_epe(path, uv, uv_target, **kwargs):
-    rgba = visual.end_point_error(uv, uv_target, **kwargs)
+def save_flow_visual_epe(path, uv, uv_target, mask, **kwargs):
+    rgba = visual.end_point_error(uv, uv_target, mask, **kwargs)
 
     bgra = np.zeros_like(rgba)
     bgra[:, :, 0] = rgba[:, :, 2]
