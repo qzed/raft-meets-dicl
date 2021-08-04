@@ -246,7 +246,9 @@ def evaluate(args):
 def save_flow_image(dir, format, sample_id, target, flow, size, visual_args, epe_args):
     (h0, h1), (w0, w1) = size
     flow = flow[h0:h1, w0:w1]
-    target = target[h0:h1, w0:w1]
+
+    if target is not None:
+        target = target[h0:h1, w0:w1]
 
     formats = {
         'kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
