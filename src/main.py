@@ -64,7 +64,7 @@ def main():
     eval.add_argument('-x', '--metrics', help='specification of metrics to use for evaluation')
     eval.add_argument('-o', '--output', help='write detailed output to this file (json or yaml)')
     eval.add_argument('-f', '--flow', help='compute and write flow images to specified directory')
-    eval.add_argument('--flow-format', default='visual', help='output format for flow images [default: visual]')
+    eval.add_argument('--flow-format', default='visual:flow', help='output format for flow images [default: visual:flow]')
     eval.add_argument('--flow-mrm', type=float, help='maximum range of motion for visual flow image output')
     eval.add_argument('--flow-gamma', type=float, help='gamma for visual flow image output')
     eval.add_argument('--flow-only', action='store_true', help='only compute flow images, do not evaluate metrics')

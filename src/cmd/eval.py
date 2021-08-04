@@ -256,10 +256,10 @@ def save_flow_image(dir, format, sample_id, target, valid, flow, size, visual_ar
         valid = valid[h0:h1, w0:w1]
 
     formats = {
-        'kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
-        'flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
-        'visual': (save_flow_visual, [flow], visual_args, 'png'),
-        'visual/epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
+        'flow:flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
+        'flow:kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
+        'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
+        'visual:epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
     }
 
     write, args, kwargs, ext = formats[format]
