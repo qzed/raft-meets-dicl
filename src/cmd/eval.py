@@ -4,16 +4,14 @@ from typing import List
 
 import logging
 
-from tqdm import tqdm
-
 import cv2
 import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 
 from .. import data
+from .. import evaluation
 from .. import metrics
 from .. import models
 from .. import strategy
@@ -137,8 +135,6 @@ def evaluate(args):
         model = nn.DataParallel(model, device_ids)
 
     chkpt.apply(model)
-    model.to(device)
-    model.eval()
 
     # load metrics
     metrics_path = args.metrics
@@ -158,8 +154,6 @@ def evaluate(args):
 
     dataset = data.load(args.data)
     dataset = input.apply(dataset).torch(compute_metrics)
-    samples = DataLoader(dataset, args.batch_size, drop_last=False, num_workers=4, pin_memory=True)
-    samples = tqdm(samples, unit='batch', leave=False)
 
     # prepare output directories
     path_out = Path(args.output) if args.output else None
@@ -192,75 +186,47 @@ def evaluate(args):
     torch.set_grad_enabled(False)
 
     output = []
-    for sample in samples:
-        # not all evaluation datasets have ground-truth
-        if compute_metrics:
-            img1, img2, flow, valid, meta = sample
+    evtor = evaluation.evaluate(model, dataset, device, args.batch_size)
+
+    for _img1, _img2, target, valid, est, out, meta in evtor:
+        # eval returns per-sample data, add fake batch
+        target = target.view(1, *target.shape) if target is not None else None
+        valid = valid.view(1, *valid.shape) if valid is not None else None
+        out = out.view(1, *out.shape)
+        est = est.view(1, *est.shape) if est is not None else None
+
+        if target is not None:
+            # compute loss
+            sample_loss = loss(out, target, valid)
+            sample_loss = sample_loss.detach()
+
+            # compute metrics
+            sample_metrs = metrics(model, est, target, valid, sample_loss)
+
+            # collect for output
+            output.append({'id': meta['sample_id'], 'metrics': sample_metrs})
+
+            # collect for summary
+            collectors.collect(sample_metrs)
+
+            # log info about current sample
+            info = [f"{k}: {v:.04f}" for k, v in sample_metrs.items()]
+            logging.info(f"sample: {meta['sample_id']}, {', '.join(info)}")
+
         else:
-            (img1, img2, meta), flow, valid = sample, None, None
+            # log info about current sample
+            logging.info(f"sample: {meta['sample_id']}")
 
-        batch, _, _, _ = img1.shape
+        # save flow image
+        if path_flow is not None:
+            est = est[0].detach().cpu().permute(1, 2, 0).numpy()
 
-        # move to device
-        img1 = img1.to(device)
-        img2 = img2.to(device)
+            tgt = None
+            if target is not None:
+                tgt = target[0].detach().cpu().permute(1, 2, 0).numpy()
 
-        if flow is not None:
-            flow = flow.to(device)
-            valid = valid.to(device)
-
-        # run model
-        result = model(img1, img2)
-        final = result.final()
-
-        # run evaluation per-sample instead of per-batch
-        for b in range(batch):
-            # switch to batch size of one
-            sample_id = meta['sample_id'][b]
-
-            size = meta['original_extents']
-            (h0, h1), (w0, w1) = size
-            size = (h0[b], h1[b]), (w0[b], w1[b])
-
-            sample_final = final[b].view(1, *final.shape[1:])
-            sample_flow = None
-
-            if flow is not None:
-                sample_output = result.output(b)
-                sample_flow = flow[b].view(1, *flow.shape[1:])
-                sample_valid = valid[b].view(1, *valid.shape[1:])
-
-                # compute loss
-                sample_loss = loss(sample_output, sample_flow, sample_valid)
-                sample_loss = sample_loss.detach()
-
-                # compute metrics
-                sample_metrs = metrics(model, sample_final, sample_flow, sample_valid, sample_loss)
-
-                # collect for output
-                output.append({'id': sample_id, 'metrics': sample_metrs})
-
-                # collect for summary
-                collectors.collect(sample_metrs)
-
-                # log info about current sample
-                info = [f"{k}: {v:.04f}" for k, v in sample_metrs.items()]
-                logging.info(f"sample: {sample_id}, {', '.join(info)}")
-
-            else:
-                # log info about current sample
-                logging.info(f"sample: {sample_id}")
-
-            # save flow image
-            if path_flow is not None:
-                est = sample_final[0].detach().cpu().permute(1, 2, 0).numpy()
-
-                tgt = None
-                if sample_flow is not None:
-                    tgt = sample_flow[0].detach().cpu().permute(1, 2, 0).numpy()
-
-                save_flow_image(path_flow, args.flow_format, sample_id, tgt, est, size,
-                                flow_visual_args, flow_epe_args)
+            save_flow_image(path_flow, args.flow_format, meta['sample_id'], tgt, est,
+                            meta['original_extents'], flow_visual_args, flow_epe_args)
 
     if compute_metrics:
         # log summary
