@@ -4,7 +4,7 @@ import matplotlib.colors
 import numpy as np
 
 
-def end_point_error(uv, uv_target, mask=None, ord=2, cmap='gray', vmin=None, vmax=None, mask_color=(0, 0, 0, 1)):
+def end_point_error(uv, uv_target, mask=None, ord=2, cmap='gray', vmin=0.0, vmax=None, mask_color=(0, 0, 0, 1)):
     cmap = matplotlib.cm.get_cmap(cmap)
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
 
