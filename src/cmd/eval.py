@@ -171,6 +171,18 @@ def evaluate(args):
     if args.flow_gamma:
         flow_visual_args['gamma'] = float(args.flow_gamma)
 
+    # handle arguments for flow image
+    flow_visual_dark_args = {}
+
+    if args.flow_mrm:
+        flow_visual_dark_args['mrm'] = float(args.flow_mrm)
+
+    if args.flow_gamma:
+        flow_visual_dark_args['gamma'] = float(args.flow_gamma)
+
+    if args.flow_transform:
+        flow_visual_dark_args['transform'] = float(args.flow_transform)
+
     # handle arguments for epe-visualization
     flow_epe_args = {}
 
@@ -230,7 +242,8 @@ def evaluate(args):
                 valid = valid[0].detach().cpu().numpy()
 
             save_flow_image(path_flow, args.flow_format, meta['sample_id'], img1, img2, target,
-                            valid, est, meta['original_extents'], flow_visual_args, flow_epe_args)
+                            valid, est, meta['original_extents'], flow_visual_args,
+                            flow_visual_dark_args, flow_epe_args)
 
     if compute_metrics:
         # log summary
@@ -247,7 +260,8 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, size, visual_args, epe_args):
+def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, size,
+                    visual_args, visual_dark_args, epe_args):
     (h0, h1), (w0, w1) = size
     flow = flow[h0:h1, w0:w1]
 
@@ -261,6 +275,7 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
         'flow:flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
         'flow:kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
         'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
+        'visual:flow:dark': (save_flow_visual_dark, [flow], visual_dark_args, 'png'),
         'visual:epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
         'visual:warp:backwards': (save_flow_visual_warp_backwards, [img2, flow], {}, 'png'),
     }
@@ -275,6 +290,10 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
 
 def save_flow_visual(path, uv, **kwargs):
     cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs)[:, :, ::-1] * 255)
+
+
+def save_flow_visual_dark(path, uv, **kwargs):
+    cv2.imwrite(str(path), visual.flow_to_rgb_dark(uv, **kwargs)[:, :, ::-1] * 255)
 
 
 def save_flow_visual_epe(path, uv, uv_target, mask, **kwargs):
