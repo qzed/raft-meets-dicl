@@ -275,6 +275,7 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
         'flow:flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
         'flow:kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
         'visual:epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
+        'visual:bp-fl': (save_flow_visual_fl_error, [flow, target, valid], {}, 'png'),
         'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
         'visual:flow:dark': (save_flow_visual_dark, [flow], visual_dark_args, 'png'),
         'visual:warp:backwards': (save_flow_visual_warp_backwards, [img2, flow], {}, 'png'),
@@ -302,6 +303,11 @@ def save_flow_visual_epe(path, uv, uv_target, mask, cmap='gray', **kwargs):
     else:
         rgba = visual.end_point_error(uv, uv_target, mask, cmap=cmap, **kwargs)
 
+    cv2.imwrite(str(path), visual.utils.rgba_to_bgra(rgba) * 255)
+
+
+def save_flow_visual_fl_error(path, uv, uv_target, mask):
+    rgba = visual.fl_error(uv, uv_target, mask)
     cv2.imwrite(str(path), visual.utils.rgba_to_bgra(rgba) * 255)
 
 
