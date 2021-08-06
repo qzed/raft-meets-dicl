@@ -73,10 +73,11 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     # Handle bogus flow fields: This is an indication of network collapse, emit
     # a warning but set to zero so that we don't fail with index errors later
     # on.
-    if (not np.isfinite(u).all()) or (not np.isfinite(v).all()):
+    nan = ~np.isfinite(u) | ~np.isfinite(v)
+    if nan.any():
         warnings.warn("encountered non-finite values in flow field", RuntimeWarning, stacklevel=2)
-        u[~np.isfinite(u)] = 0.0
-        v[~np.isfinite(v)] = 0.0
+        u[nan] = 0.0
+        v[nan] = 0.0
 
     # calculate polar representation
     angle = np.arctan2(-v, -u) / np.pi
@@ -104,4 +105,4 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     col = 1.0 - length[:, :, None] * (1.0 - col)
 
     # mask and return
-    return col * np.asarray(mask)[:, :, None] if mask is not None else col
+    return col * ~nan * np.asarray(mask)[:, :, None] if mask is not None else col
