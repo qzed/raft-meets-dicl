@@ -1,6 +1,6 @@
 import cv2
 
-from . import flow as flowvis
+from . import flow_mb as flowvis
 
 
 class ImageWindow:
