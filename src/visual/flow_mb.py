@@ -60,7 +60,8 @@ def generate_color_wheel():
     return colorwheel
 
 
-def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
+def flow_to_rgba(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5, mask_color=(0, 0, 0, 1),
+                 nan_color=(0, 0, 0, 1)):
     global COLORWHEEL
 
     uv = np.array(uv)
@@ -99,11 +100,19 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     # interpolate
     alpha = idx - idx0
     col0, col1 = COLORWHEEL[idx0, :], COLORWHEEL[idx1, :]
-    col = (1.0 - alpha)[:, :, None] * col0 + alpha[:, :, None] * col1
+    rgb = (1.0 - alpha)[:, :, None] * col0 + alpha[:, :, None] * col1
 
     # scale by magnitude/length of motion
-    col = 1.0 - length[:, :, None] * (1.0 - col)
+    rgb = 1.0 - length[:, :, None] * (1.0 - rgb)
 
-    # mask and return
-    col = col * np.asarray(mask)[:, :, None] if mask is not None else col
-    return col * ~nan[:, :, None]
+    # convert to rgba
+    rgba = np.concatenate((rgb, np.ones(rgb.shape[:2])[:, :, None]), axis=2)
+
+    # handle NaN/infinite values
+    rgba[nan, :] = np.asanyarray(nan_color)
+
+    # apply mask
+    if mask is not None:
+        rgba[~mask, :] = np.asanyarray(mask_color)
+
+    return rgba

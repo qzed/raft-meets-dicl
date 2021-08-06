@@ -290,7 +290,8 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
 
 
 def save_flow_visual(path, uv, **kwargs):
-    cv2.imwrite(str(path), visual.flow_to_rgb(uv, **kwargs)[:, :, ::-1] * 255)
+    rgba = visual.flow_to_rgba(uv, **kwargs)
+    cv2.imwrite(str(path), visual.utils.rgba_to_bgra(rgba) * 255)
 
 
 def save_flow_visual_dark(path, uv, **kwargs):
