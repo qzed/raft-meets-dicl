@@ -302,13 +302,7 @@ def save_flow_visual_epe(path, uv, uv_target, mask, cmap='gray', **kwargs):
     else:
         rgba = visual.end_point_error(uv, uv_target, mask, cmap=cmap, **kwargs)
 
-    bgra = np.zeros_like(rgba)
-    bgra[:, :, 0] = rgba[:, :, 2]
-    bgra[:, :, 1] = rgba[:, :, 1]
-    bgra[:, :, 2] = rgba[:, :, 0]
-    bgra[:, :, 3] = rgba[:, :, 3]
-
-    cv2.imwrite(str(path), bgra * 255)
+    cv2.imwrite(str(path), visual.utils.rgba_to_bgra(rgba) * 255)
 
 
 def save_flow_visual_warp_backwards(path, img2, flow):
