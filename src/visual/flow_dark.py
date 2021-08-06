@@ -6,7 +6,8 @@ import numpy as np
 import warnings
 
 
-def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, transform=None):
+def flow_to_rgba(uv, mask=None, mrm=None, gamma=1.0, transform=None, mask_color=(0, 0, 0, 1),
+                 nan_color=(0, 0, 0, 1)):
     uv = np.array(uv)
     mask = np.asanyarray(mask) if mask is not None else None
 
@@ -58,6 +59,14 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, transform=None):
     hsv = np.stack((hue, sat, value), axis=-1)
     rgb = matplotlib.colors.hsv_to_rgb(hsv)
 
-    # mask and return
-    rgb = rgb * np.asarray(mask)[:, :, None] if mask is not None else rgb
-    return rgb * ~nan[:, :, None]
+    # convert to rgba
+    rgba = np.concatenate((rgb, np.ones(rgb.shape[:2])[:, :, None]), axis=2)
+
+    # handle NaN/infinite values
+    rgba[nan, :] = np.asanyarray(nan_color)
+
+    # apply mask
+    if mask is not None:
+        rgba[~mask, :] = np.asanyarray(mask_color)
+
+    return rgba

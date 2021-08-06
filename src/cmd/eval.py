@@ -294,7 +294,8 @@ def save_flow_visual(path, uv, **kwargs):
 
 
 def save_flow_visual_dark(path, uv, **kwargs):
-    cv2.imwrite(str(path), visual.flow_to_rgb_dark(uv, **kwargs)[:, :, ::-1] * 255)
+    rgba = visual.flow_to_rgba_dark(uv, **kwargs)
+    cv2.imwrite(str(path), visual.utils.rgba_to_bgra(rgba) * 255)
 
 
 def save_flow_visual_epe(path, uv, uv_target, mask, cmap='gray', **kwargs):

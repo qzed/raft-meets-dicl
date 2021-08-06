@@ -11,7 +11,7 @@ end_point_error = epe.end_point_error
 end_point_error_abs = epe.end_point_error_abs
 fl_error = bad_pixel.fl_error
 flow_to_rgb = flow_mb.flow_to_rgb
-flow_to_rgb_dark = flow_dark.flow_to_rgb
+flow_to_rgba_dark = flow_dark.flow_to_rgba
 warp_backwards = warp.warp_backwards
 
 show_image = imshow.show_image
