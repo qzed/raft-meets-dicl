@@ -105,4 +105,5 @@ def flow_to_rgb(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5):
     col = 1.0 - length[:, :, None] * (1.0 - col)
 
     # mask and return
-    return col * ~nan * np.asarray(mask)[:, :, None] if mask is not None else col
+    col = col * np.asarray(mask)[:, :, None] if mask is not None else col
+    return col * ~nan[:, :, None]
