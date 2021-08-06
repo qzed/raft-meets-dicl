@@ -274,9 +274,9 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
     formats = {
         'flow:flo': (data.io.write_flow_mb, [flow], {}, 'flo'),
         'flow:kitti': (data.io.write_flow_kitti, [flow], {}, 'png'),
+        'visual:epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
         'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
         'visual:flow:dark': (save_flow_visual_dark, [flow], visual_dark_args, 'png'),
-        'visual:epe': (save_flow_visual_epe, [flow, target, valid], epe_args, 'png'),
         'visual:warp:backwards': (save_flow_visual_warp_backwards, [img2, flow], {}, 'png'),
     }
 
