@@ -12,6 +12,7 @@ class Metric:
 
     @classmethod
     def from_config(cls, cfg):
+        from . import aae
         from . import epe
         from . import fl_all
         from . import grad_norm
@@ -19,6 +20,7 @@ class Metric:
         from . import lr
 
         types = [
+            aae.AverageAngularError,
             epe.EndPointError,
             fl_all.FlAll,
             grad_norm.GradientNorm,

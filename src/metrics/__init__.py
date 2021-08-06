@@ -1,4 +1,6 @@
 from .common import Metric, Collection
+
+from .aae import AverageAngularError
 from .epe import EndPointError
 from .fl_all import FlAll
 from .grad_norm import GradientNorm
