@@ -5,6 +5,7 @@ from . import imshow
 from . import warp
 
 end_point_error = epe.end_point_error
+end_point_error_abs = epe.end_point_error_abs
 flow_to_rgb = flow_mb.flow_to_rgb
 flow_to_rgb_dark = flow_dark.flow_to_rgb
 warp_backwards = warp.warp_backwards

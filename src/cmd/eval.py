@@ -296,8 +296,11 @@ def save_flow_visual_dark(path, uv, **kwargs):
     cv2.imwrite(str(path), visual.flow_to_rgb_dark(uv, **kwargs)[:, :, ::-1] * 255)
 
 
-def save_flow_visual_epe(path, uv, uv_target, mask, **kwargs):
-    rgba = visual.end_point_error(uv, uv_target, mask, **kwargs)
+def save_flow_visual_epe(path, uv, uv_target, mask, cmap='gray', **kwargs):
+    if cmap == 'absflow':
+        rgba = visual.end_point_error_abs(uv, uv_target, mask)
+    else:
+        rgba = visual.end_point_error(uv, uv_target, mask, cmap=cmap, **kwargs)
 
     bgra = np.zeros_like(rgba)
     bgra[:, :, 0] = rgba[:, :, 2]
