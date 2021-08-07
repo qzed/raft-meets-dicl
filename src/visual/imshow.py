@@ -28,12 +28,12 @@ def show_image(title, rgb):
 
 
 def show_flow(title, flow, *args, **kwargs):
-    flow = flowvis.flow_to_rgb(flow, *args, **kwargs)
+    flow = flowvis.flow_to_rgba(flow, *args, **kwargs)
 
     return show_image(title, flow)
 
 
 def show_flow_dark(title, flow, *args, **kwargs):
-    flow = flowvis_dark.flow_to_rgb(flow, *args, **kwargs)
+    flow = flowvis_dark.flow_to_rgba(flow, *args, **kwargs)
 
     return show_image(title, flow)
