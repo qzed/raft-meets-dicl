@@ -138,19 +138,19 @@ class FeatureNet(nn.Module):
         self.conv6b = GaConv2xBlock(160, 192)
 
         self.deconv6b = GaDeconv2xBlock(192, 160)
-        self.outconv6 = ConvBlock(160, 32, kernel_size=3,  padding=1)
+        self.outconv6 = ConvBlock(160, 32, kernel_size=3, padding=1)
 
         self.deconv5b = GaDeconv2xBlock(160, 128)
-        self.outconv5 = ConvBlock(128, 32, kernel_size=3,  padding=1)
+        self.outconv5 = ConvBlock(128, 32, kernel_size=3, padding=1)
 
         self.deconv4b = GaDeconv2xBlock(128, 96)
-        self.outconv4 = ConvBlock(96, 32, kernel_size=3,  padding=1)
+        self.outconv4 = ConvBlock(96, 32, kernel_size=3, padding=1)
 
         self.deconv3b = GaDeconv2xBlock(96, 64)
-        self.outconv3 = ConvBlock(64, 32, kernel_size=3,  padding=1)
+        self.outconv3 = ConvBlock(64, 32, kernel_size=3, padding=1)
 
         self.deconv2b = GaDeconv2xBlock(64, 48)
-        self.outconv2 = ConvBlock(48, 32, kernel_size=3,  padding=1)
+        self.outconv2 = ConvBlock(48, 32, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = res0 = self.conv0(x)
