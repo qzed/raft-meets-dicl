@@ -153,43 +153,43 @@ class FeatureNet(nn.Module):
         self.outconv2 = ConvBlock(48, 32, kernel_size=3, padding=1)
 
     def forward(self, x):
-        x = res0 = self.conv0(x)
+        x = res0 = self.conv0(x)                # -> 32, H/2, W/2
 
-        x = res1 = self.conv1a(x)
-        x = res2 = self.conv2a(x)
-        x = res3 = self.conv3a(x)
-        x = res4 = self.conv4a(x)
-        x = res5 = self.conv5a(x)
-        x = res6 = self.conv6a(x)
+        x = res1 = self.conv1a(x)               # -> 48, H/4, W/4
+        x = res2 = self.conv2a(x)               # -> 64, H/8, W/8
+        x = res3 = self.conv3a(x)               # -> 96, H/16, W/16
+        x = res4 = self.conv4a(x)               # -> 128, H/32, W/32
+        x = res5 = self.conv5a(x)               # -> 160, H/64, W/64
+        x = res6 = self.conv6a(x)               # -> 192, H/128, W/128
 
-        x = res5 = self.deconv6a(x, res5)
-        x = res4 = self.deconv5a(x, res4)
-        x = res3 = self.deconv4a(x, res3)
-        x = res2 = self.deconv3a(x, res2)
-        x = res1 = self.deconv2a(x, res1)
-        x = res0 = self.deconv1a(x, res0)
+        x = res5 = self.deconv6a(x, res5)       # -> 160, H/64, W/64
+        x = res4 = self.deconv5a(x, res4)       # -> 128, H/32, W/32
+        x = res3 = self.deconv4a(x, res3)       # -> 96, H/16, W/16
+        x = res2 = self.deconv3a(x, res2)       # -> 64, H/8, W/8
+        x = res1 = self.deconv2a(x, res1)       # -> 48, H/4, W/4
+        x = res0 = self.deconv1a(x, res0)       # -> 32, H/2, W/2
 
-        x = res1 = self.conv1b(x, res1)
-        x = res2 = self.conv2b(x, res2)
-        x = res3 = self.conv3b(x, res3)
-        x = res4 = self.conv4b(x, res4)
-        x = res5 = self.conv5b(x, res5)
-        x = res6 = self.conv6b(x, res6)
+        x = res1 = self.conv1b(x, res1)         # -> 48, H/4, W/4
+        x = res2 = self.conv2b(x, res2)         # -> 64, H/8, W/8
+        x = res3 = self.conv3b(x, res3)         # -> 96, H/16, W/16
+        x = res4 = self.conv4b(x, res4)         # -> 128, H/32, W/32
+        x = res5 = self.conv5b(x, res5)         # -> 160, H/64, W/64
+        x = res6 = self.conv6b(x, res6)         # -> 192, H/128, W/128
 
-        x = self.deconv6b(x, res5)
-        x6 = self.outconv6(x)
+        x = self.deconv6b(x, res5)              # -> 160, H/64, W/64
+        x6 = self.outconv6(x)                   # -> 32, H/64, W/64
 
-        x = self.deconv5b(x, res4)
-        x5 = self.outconv5(x)
+        x = self.deconv5b(x, res4)              # -> 128, H/32, W/32
+        x5 = self.outconv5(x)                   # -> 32, H/32, W/32
 
-        x = self.deconv4b(x, res3)
-        x4 = self.outconv4(x)
+        x = self.deconv4b(x, res3)              # -> 96, H/16, W/16
+        x4 = self.outconv4(x)                   # -> 32, H/16, W/16
 
-        x = self.deconv3b(x, res2)
-        x3 = self.outconv3(x)
+        x = self.deconv3b(x, res2)              # -> 64, H/8, W/8
+        x3 = self.outconv3(x)                   # -> 32, H/8, W/8
 
-        x = self.deconv2b(x, res1)
-        x2 = self.outconv2(x)
+        x = self.deconv2b(x, res1)              # -> 48, H/4, W/4
+        x2 = self.outconv2(x)                   # -> 32, H/4, W/4
 
         return x2, x3, x4, x5, x6
 
