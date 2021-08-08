@@ -10,7 +10,7 @@ stages:
 
       source:
         type: repeat
-        times: 400
+        times: 100
         source: ../../data/mpi-sintel-clean.overfit.yaml
 
     validation:
