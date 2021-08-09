@@ -41,6 +41,7 @@ def load_loss(cfg) -> model.Loss:
     types = [
         m.dicl.MultiscaleLoss,
         m.raft.SequenceLoss,
+        m.wip_down32.SequenceLoss,
     ]
     types = {cls.type: cls for cls in types}
 
@@ -53,6 +54,7 @@ def load_model(cfg) -> model.Model:
         m.dicl.Dicl,
         m.raft.Raft,
         m.raft_down32.Raft,
+        m.wip_down32.Wip,
     ]
     types = {cls.type: cls for cls in types}
 
