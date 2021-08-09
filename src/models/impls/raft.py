@@ -288,7 +288,7 @@ class FlowHead(nn.Module):
 class BasicUpdateBlock(nn.Module):
     """Network to compute single flow update delta"""
 
-    def __init__(self, corr_planes, input_dim=128, hidden_dim=128):
+    def __init__(self, corr_planes, input_dim=128, hidden_dim=128, upnet=True):
         super().__init__()
 
         # network for flow update delta
@@ -297,11 +297,13 @@ class BasicUpdateBlock(nn.Module):
         self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256)
 
         # mask for upsampling
-        self.mask = nn.Sequential(
-            nn.Conv2d(128, 256, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
-        )
+        self.mask = None
+        if upnet:
+            self.mask = nn.Sequential(
+                nn.Conv2d(128, 256, 3, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
+            )
 
     def forward(self, h, x, corr, flow):
         # compute GRU input from flow
@@ -313,7 +315,10 @@ class BasicUpdateBlock(nn.Module):
         d = self.flow(h)                    # compute flow delta from hidden state (N, 2, h/8, w/8)
 
         # compute mask for upscaling
-        mask = 0.25 * self.mask(h)          # scale to balance gradiens, dim (N, 8*8*9, h/8, w/8)
+        if self.mask is not None:
+            mask = 0.25 * self.mask(h)      # scale to balance gradiens, dim (N, 8*8*9, h/8, w/8)
+        else:
+            mask = None
 
         return h, mask, d
 
@@ -321,7 +326,7 @@ class BasicUpdateBlock(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -335,7 +340,7 @@ class RaftModule(nn.Module):
 
         self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
-        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -412,7 +417,10 @@ class RaftModule(nn.Module):
             coords1 = coords1 + d
 
             # upsample flow estimate
-            flow_up = self.upsample_flow(coords1 - coords0, mask.float())
+            if mask is not None:
+                flow_up = self.upsample_flow(coords1 - coords0, mask.float())
+            else:
+                flow_up = F.interpolate(coords1 - coords0, img1.shape[2:], mode='bilinear', align_corners=True)
 
             out.append(flow_up)
 
@@ -429,15 +437,17 @@ class Raft(Model):
         param_cfg = cfg['parameters']
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
+        upnet = bool(param_cfg.get('upnet', True))
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, args)
+        return cls(dropout, mixed_precision, upnet, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, arguments={}):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
+        self.upnet = upnet
 
-        super().__init__(RaftModule(dropout, mixed_precision), arguments)
+        super().__init__(RaftModule(dropout, mixed_precision, upnet), arguments)
 
     def get_config(self):
         default_args = {'iterations': 12}
@@ -447,6 +457,7 @@ class Raft(Model):
             'parameters': {
                 'dropout': self.dropout,
                 'mixed-precision': self.mixed_precision,
+                'upnet': self.upnet
             },
             'arguments': default_args | self.arguments,
         }
