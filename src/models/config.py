@@ -52,6 +52,7 @@ def load_model(cfg) -> model.Model:
     types = [
         m.dicl.Dicl,
         m.raft.Raft,
+        m.raft_down32.Raft,
     ]
     types = {cls.type: cls for cls in types}
 

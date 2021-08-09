@@ -1,0 +1,28 @@
+name: Downsized RAFT (/32)
+id: raft/down32
+
+model:
+  type: raft/down32
+
+  parameters:
+    droput: 0.0
+    mixed-precision: false
+
+  arguments:
+    iterations: 12
+
+loss:
+  type: raft/sequence
+
+  arguments:
+    ord: 1
+    gamma: 0.85
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [32, 32]
