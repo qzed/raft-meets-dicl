@@ -4,8 +4,3 @@ spec: dataset/mpi-sintel.yaml
 parameters:
   type: train
   pass: clean
-
-filter:
-  type: file
-  file: splits/mpi-sintel.dev.txt
-  value: 0

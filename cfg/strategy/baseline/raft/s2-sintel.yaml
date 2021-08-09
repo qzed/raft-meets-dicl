@@ -27,11 +27,11 @@ data:
             sources:
               - type: repeat
                 times: 100
-                source: ../../../data/mpi-sintel-clean.train.yaml
+                source: ../../../data/mpi-sintel-clean.train-full.yaml
 
               - type: repeat
                 times: 100
-                source: ../../../data/mpi-sintel-final.train.yaml
+                source: ../../../data/mpi-sintel-final.train-full.yaml
 
               - ../../../data/ufreiburg-flyingthings3d-clean.train.yaml
 
@@ -91,8 +91,8 @@ validation:
   source:
     type: concat
     sources:
-      - ../../../data/mpi-sintel-clean.train.yaml
-      - ../../../data/mpi-sintel-final.train.yaml
+      - ../../../data/mpi-sintel-clean.train-full.yaml
+      - ../../../data/mpi-sintel-final.train-full.yaml
 
   batch-size: 2
   images: [0, 1042]
