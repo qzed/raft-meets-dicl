@@ -467,7 +467,9 @@ class Raft(Model):
 
     def train(self, mode: bool = True):
         super().train(mode)
-        self.module.freeze_batchnorm()
+
+        if mode:
+            self.module.freeze_batchnorm()
 
 
 class RaftResult(Result):
