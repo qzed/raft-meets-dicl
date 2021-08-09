@@ -376,8 +376,8 @@ class WipModule(nn.Module):
     def __init__(self, disp_range=(5, 5)):
         super().__init__()
 
-        self.c_feat = 24
-        self.c_ctx = 24
+        self.c_feat = 32
+        self.c_ctx = 32
         self.c_hidden = 64
 
         self.fnet = FeatureEncoder(self.c_feat)
