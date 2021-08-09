@@ -1,0 +1,31 @@
+name: Work in progress
+id: wip/down32
+
+model:
+  type: wip/warp/1
+
+  parameters:
+    disp-range: [5, 5]
+
+loss:
+  type: wip/warp/multiscale
+
+  arguments:
+    ord: 2
+    mode: bilinear
+
+    weights:
+      - 1.0
+      - 0.85
+      - 0.75
+      - 0.50
+      - 0.25
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [128, 128]
