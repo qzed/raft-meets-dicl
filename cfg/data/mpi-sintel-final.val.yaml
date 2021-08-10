@@ -7,5 +7,5 @@ parameters:
 
 filter:
   type: file
-  file: splits/mpi-sintel.dev.txt
+  file: splits/mpi-sintel.mfnval.txt
   value: 1

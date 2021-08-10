@@ -7,7 +7,7 @@ data:
   batch-size: 1
 
 validation:
-  source: ../../data/mpi-sintel-clean.dev.yaml
+  source: ../../data/mpi-sintel-clean.val.yaml
   batch-size: 1
   images: [0]
 
