@@ -20,18 +20,20 @@ def main():
     parser.add_argument('-o', '--output', required=True, help='output file')
     parser.add_argument('-n', '--number', type=int, metavar='N', help='select exactly N elements at random')
     parser.add_argument('-p', '--probability', type=float, metavar='P', help='select elements with probability')
+    parser.add_argument('-k', '--key', metavar='K', help='select elements by key part')
 
     args = parser.parse_args()
 
     # validate parameters
-    if args.number and args.probability:
-        raise ValueError('cannot set both --number and --probability at the same time')
+    if sum([bool(args.number), bool(args.probability), bool(args.key)]) > 1:
+        raise ValueError('cannot set multiple methods at the same time')
 
-    if not args.number and not args.probability:
+    if sum([bool(args.number), bool(args.probability), bool(args.key)]) == 0:
         raise ValueError('either --number or --probability needs to be set')
 
     # load data, get number of samples
-    source_len = len(data.load(args.data))
+    source = data.load(args.data)
+    source_len = len(source)
 
     # generate random split
     if args.number:
@@ -43,6 +45,10 @@ def main():
 
     elif args.probability:
         split = np.random.rand(source_len) < args.probability
+
+    elif args.key:
+        keys = args.key.split(',')
+        split = [int(any(k in meta['sample_id'] for k in keys)) for _, _, _, _, meta in source]
 
     # write output file
     with open(args.output, 'w') as fd:
