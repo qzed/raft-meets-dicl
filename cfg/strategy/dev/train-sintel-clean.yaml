@@ -1,0 +1,28 @@
+mode: continuous
+
+stages:
+  - name: "MPI Sintel"
+    id: train/sintel-0
+
+    data:
+      source: ../../data/mpi-sintel-clean.train-aug.yaml
+      epochs: 100
+      batch-size: 1
+
+    validation:
+      source: ../../data/mpi-sintel-clean.val.yaml
+      batch-size: 1
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: 0.0001125
+        weight_decay: 0.00001
+        eps: 1.0e-9
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
