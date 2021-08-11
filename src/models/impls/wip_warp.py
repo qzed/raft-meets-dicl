@@ -460,13 +460,15 @@ class WipModule(nn.Module):
         hidden, flow3 = self.rlu(i1f3, i2f3_1, ctx3, hidden, flow3)
         flow3_1 = self.upsample_flow_toplevel(flow3, self.mask(hidden))
 
-        # level 3 iteration 2 (h/8, w/8)
-        i2f3_1, _mask = common.warp.warp_backwards(i2f3, flow3.detach())
+        return flow3_1, flow4, flow5, flow6
 
-        hidden, flow3 = self.rlu(i1f3, i2f3_1, ctx3, hidden, flow3)
-        flow3_2 = self.upsample_flow_toplevel(flow3, self.mask(hidden))
+        # # level 3 iteration 2 (h/8, w/8)
+        # i2f3_1, _mask = common.warp.warp_backwards(i2f3, flow3.detach())
 
-        return (flow3_2, flow3_1, flow4, flow5, flow6)
+        # hidden, flow3 = self.rlu(i1f3, i2f3_1, ctx3, hidden, flow3)
+        # flow3_2 = self.upsample_flow_toplevel(flow3, self.mask(hidden))
+
+        # return (flow3_2, flow3_1, flow4, flow5, flow6)
 
         # # level 2 (h/4, w/4)
         # flow2 = self.upsample_flow(flow5, (batch, 2, h // 4, w // 4))
