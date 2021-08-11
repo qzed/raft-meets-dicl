@@ -54,6 +54,7 @@ def main():
     train.add_argument('--start-epoch', type=int, help='start with sepcified epoch and skip previous')
     train.add_argument('--reproduce', action='store_true', help='use seeds from config')
     train.add_argument('--debug', action='store_true', help='enter debugger on exception')
+    train.add_argument('--detect-anomaly', action='store_true', help='enable pytorch anomaly detection')
 
     # subcommand: eval[uate]
     eval = subp.add_parser('evaluate', aliases=['e', 'eval'], formatter_class=fmtcls, help='evaluate model')
