@@ -305,13 +305,6 @@ class BasicUpdateBlock(nn.Module):
         self.gru = SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
         self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256)
 
-        # mask for upsampling
-        self.mask = nn.Sequential(
-            nn.Conv2d(128, 256, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
-        )
-
     def forward(self, h, x, corr, flow):
         # compute GRU input from flow
         m = self.enc(flow, corr)            # motion features
@@ -321,10 +314,7 @@ class BasicUpdateBlock(nn.Module):
         h = self.gru(h, x)                  # update hidden state (N, hidden, h/8, w/8)
         d = self.flow(h)                    # compute flow delta from hidden state (N, 2, h/8, w/8)
 
-        # compute mask for upscaling
-        mask = 0.25 * self.mask(h)          # scale to balance gradiens, dim (N, 8*8*9, h/8, w/8)
-
-        return h, mask, d
+        return h, d
 
 
 class RaftModule(nn.Module):
@@ -407,7 +397,7 @@ class RaftModule(nn.Module):
             # estimate delta for flow update
             flow = coords1 - coords0
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-                h, mask, d = self.update_block(h, x, corr, flow)
+                h, d = self.update_block(h, x, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
