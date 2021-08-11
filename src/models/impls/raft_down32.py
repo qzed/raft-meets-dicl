@@ -81,12 +81,12 @@ class BasicEncoder(nn.Module):
             ResidualBlock(128, 128, norm_type, stride=1),
         )
 
-        self.layer4 = nn.Sequential(    # (H/4, W/4, 96) -> (H/16, W/16, 128)
+        self.layer4 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, W/16, 128)
             ResidualBlock(128, 128, norm_type, stride=2),
             ResidualBlock(128, 128, norm_type, stride=1),
         )
 
-        self.layer5 = nn.Sequential(    # (H/4, W/4, 96) -> (H/32, W/32, 128)
+        self.layer5 = nn.Sequential(    # (H/16, W/16, 128) -> (H/32, W/32, 128)
             ResidualBlock(128, 128, norm_type, stride=2),
             ResidualBlock(128, 128, norm_type, stride=1),
         )
