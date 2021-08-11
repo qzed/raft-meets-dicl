@@ -328,7 +328,7 @@ class RaftModule(nn.Module):
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        self.corr_levels = 4
+        self.corr_levels = 3
         self.corr_radius = 4
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
