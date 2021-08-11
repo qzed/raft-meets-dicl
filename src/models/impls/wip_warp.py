@@ -330,6 +330,41 @@ class SepConvGru(nn.Module):
         return h
 
 
+class FlowRegression(nn.Module):
+    """Soft-argmin flow regression"""
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, cost):
+        batch, du, dv, h, w = cost.shape
+        ru, rv = (du - 1) // 2, (dv - 1) // 2           # displacement range
+
+        # displacement offsets along u
+        disp_u = torch.arange(-ru, ru + 1, device=cost.device, dtype=torch.float32)
+        disp_u = disp_u.view(du, 1)
+        disp_u = disp_u.expand(-1, dv)                  # expand for stacking
+
+        # displacement offsets along v
+        disp_v = torch.arange(-rv, rv + 1, device=cost.device, dtype=torch.float32)
+        disp_v = disp_v.view(1, dv)
+        disp_v = disp_v.expand(du, -1)                  # expand for stacking
+
+        # combined displacement vector
+        disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv)
+        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for broadcasting
+
+        # compute displacement probability
+        cost = cost.view(batch, du * dv, h, w)          # combine disp. dimensions for softmax
+        prob = F.softmax(cost, dim=1)                   # softmax along displacement dimensions
+        prob = prob.view(batch, 1, du, dv, h, w)        # reshape for broadcasting
+
+        # compute flow as weighted sum over displacement vectors
+        flow = (prob * disp).sum(dim=(2, 3))            # weighted sum over displacements (du/dv)
+
+        return flow                                     # shape (batch, 2, h, w)
+
+
 class FlowHead(nn.Module):
     """Head to compute delta-flow from GRU hidden-state"""
 
@@ -338,7 +373,7 @@ class FlowHead(nn.Module):
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(hidden_dim, 2, kernel_size=3, padding=1)
-        self.relu = nn.LeakyReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x)))
@@ -348,13 +383,14 @@ class RecurrentLevelUnit(nn.Module):
     def __init__(self, disp_range, feat_channels, ctx_channels, hidden_dim):
         super().__init__()
 
-        mf_channels = 128
+        mf_channels = 64
 
         self.cvnet = CorrelationVolume(disp_range, feat_channels)
         self.dap = DisplacementAwareProjection(disp_range)
-        self.menet = MotionEncoder(disp_range, ctx_channels, mf_channels - 2)
+        self.menet = MotionEncoder(disp_range, ctx_channels, mf_channels - 2 - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
+        self.flow = FlowRegression()
 
     def forward(self, fmap1, fmap2, cmap, h, flow):
         # build cost volume
@@ -363,7 +399,7 @@ class RecurrentLevelUnit(nn.Module):
 
         # compute motion features
         x = self.menet(cvol, cmap, flow)
-        x = torch.cat((x, flow), dim=1)
+        x = torch.cat((x, flow, self.flow(cvol)), dim=1)
 
         # update hidden state and compute flow delta
         h = self.gru(h, x)
