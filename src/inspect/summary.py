@@ -509,8 +509,8 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     fe = estimate.detach().cpu().permute(1, 2, 0).numpy()
     fe = visual.flow_to_rgba(fe)
 
-    i1 = (img1.detach().cpu() + 1) / 2
-    i2 = (img2.detach().cpu() + 1) / 2
+    i1 = (img1.detach().cpu().permute(1, 2, 0).numpy() + 1) / 2
+    i2 = (img2.detach().cpu().permute(1, 2, 0).numpy() + 1) / 2
 
     # remove padding
     i1 = i1[h0:h1, w0:w1]
@@ -520,7 +520,7 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     mask = mask[h0:h1, w0:w1]
 
     # write images
-    writer.add_image(f"{pfx}img1", i1, step, dataformats='CHW')
-    writer.add_image(f"{pfx}img2", i2, step, dataformats='CHW')
+    writer.add_image(f"{pfx}img1", i1, step, dataformats='HWC')
+    writer.add_image(f"{pfx}img2", i2, step, dataformats='HWC')
     writer.add_image(f"{pfx}flow-gt", ft, step, dataformats='HWC')
     writer.add_image(f"{pfx}flow-est", fe, step, dataformats='HWC')
