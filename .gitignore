@@ -14,3 +14,7 @@ __pycache__/
 # output directories
 runs/
 chkpt/
+
+# checkpoints and binary data
+*.pth
+*.npy
