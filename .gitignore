@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# python notebooks
+.ipynb_checkpoints/
+
 # python-üipenv
 .venv/
 
