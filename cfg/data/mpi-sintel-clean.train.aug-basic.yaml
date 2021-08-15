@@ -1,0 +1,17 @@
+type: augment
+
+augmentations:
+  - type: translate
+    min-size: &img_size [768, 384]
+    delta: [5, 5]
+
+  - type: crop
+    size: *img_size
+
+  - type: flip
+    probability: [0.5, 0.5]
+
+  - type: restrict-flow-magnitude
+    maximum: 400
+
+source: mpi-sintel-clean.train.yaml
