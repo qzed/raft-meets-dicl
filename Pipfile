@@ -16,6 +16,8 @@ torchvision = "*"
 tqdm = "*"
 
 [dev-packages]
+ipykernel = "*"
+ipympl = "*"
 pycodestyle = "*"
 torch-tb-profiler = "*"
 
