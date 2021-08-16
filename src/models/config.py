@@ -52,6 +52,7 @@ def load_loss(cfg) -> model.Loss:
 def load_model(cfg) -> model.Model:
     types = [
         m.dicl.Dicl,
+        m.dicl_down32.Dicl,
         m.raft.Raft,
         m.raft_down32.Raft,
         m.wip_down32.Wip,
