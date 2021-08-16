@@ -107,7 +107,7 @@ class GaDeconv2xBlock(nn.Module):
 class FeatureNet(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
-    def __init__(self):
+    def __init__(self, output_channels):
         super().__init__()
 
         self.conv0 = nn.Sequential(
@@ -138,19 +138,19 @@ class FeatureNet(nn.Module):
         self.conv6b = GaConv2xBlock(160, 192)
 
         self.deconv6b = GaDeconv2xBlock(192, 160)
-        self.outconv6 = ConvBlock(160, 32, kernel_size=3, padding=1)
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
 
         self.deconv5b = GaDeconv2xBlock(160, 128)
-        self.outconv5 = ConvBlock(128, 32, kernel_size=3, padding=1)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
 
         self.deconv4b = GaDeconv2xBlock(128, 96)
-        self.outconv4 = ConvBlock(96, 32, kernel_size=3, padding=1)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
 
         self.deconv3b = GaDeconv2xBlock(96, 64)
-        self.outconv3 = ConvBlock(64, 32, kernel_size=3, padding=1)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
         self.deconv2b = GaDeconv2xBlock(64, 48)
-        self.outconv2 = ConvBlock(48, 32, kernel_size=3, padding=1)
+        self.outconv2 = ConvBlock(48, output_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -197,9 +197,9 @@ class FeatureNet(nn.Module):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self):
+    def __init__(self, feature_channels):
         super().__init__(
-            ConvBlock(64, 96, kernel_size=3, padding=1),
+            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1),
             ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
             ConvBlock(128, 128, kernel_size=3, padding=1),
             ConvBlock(128, 64, kernel_size=3, padding=1),
@@ -302,9 +302,11 @@ class FlowRegression(nn.Module):
 class CtfContextNet(nn.Sequential):
     """Context network"""
 
-    def __init__(self):
+    def __init__(self, feature_channels):
+        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
+
         super().__init__(
-            ConvBlock(38, 64, kernel_size=3, padding=1, dilation=1),
+            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
             ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
             ConvBlock(128, 128, kernel_size=3, padding=4, dilation=4),
             ConvBlock(128, 96, kernel_size=3, padding=8, dilation=8),
@@ -317,9 +319,11 @@ class CtfContextNet(nn.Sequential):
 class CtfContextNet4(nn.Sequential):
     """Context network for level 4 with reduced layers"""
 
-    def __init__(self):
+    def __init__(self, feature_channels):
+        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
+
         super().__init__(
-            ConvBlock(38, 64, kernel_size=3, padding=1, dilation=1),
+            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
             ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
             ConvBlock(128, 128, kernel_size=3, padding=4, dilation=4),
             ConvBlock(128, 64, kernel_size=3, padding=8, dilation=8),
@@ -331,9 +335,11 @@ class CtfContextNet4(nn.Sequential):
 class CtfContextNet5(nn.Sequential):
     """Context network for level 5 with reduced layers"""
 
-    def __init__(self):
+    def __init__(self, feature_channels):
+        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
+
         super().__init__(
-            ConvBlock(38, 64, kernel_size=3, padding=1, dilation=1),
+            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
             ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
             ConvBlock(128, 64, kernel_size=3, padding=4, dilation=4),
             ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
@@ -344,9 +350,11 @@ class CtfContextNet5(nn.Sequential):
 class CtfContextNet6(nn.Sequential):
     """Context network for level 6 with reduced layers"""
 
-    def __init__(self):
+    def __init__(self, feature_channels):
+        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
+
         super().__init__(
-            ConvBlock(38, 64, kernel_size=3, padding=1, dilation=1),
+            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
             ConvBlock(64, 64, kernel_size=3, padding=2, dilation=2),
             ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
             nn.Conv2d(32, 2, kernel_size=3, padding=1),     # note: with bias
@@ -354,7 +362,7 @@ class CtfContextNet6(nn.Sequential):
 
 
 class FlowLevel(nn.Module):
-    def __init__(self, level, maxdisp):
+    def __init__(self, feature_channels, level, maxdisp):
         super().__init__()
 
         ctxnets_by_level = {
@@ -368,11 +376,11 @@ class FlowLevel(nn.Module):
         self.level = level
         self.maxdisp = maxdisp
 
-        self.mnet = MatchingNet()
+        self.mnet = MatchingNet(feature_channels)
         self.dap = DisplacementAwareProjection(maxdisp)
         self.flow = FlowRegression()
         self.entropy = FlowEntropy()
-        self.ctxnet = ctxnets_by_level[level]()
+        self.ctxnet = ctxnets_by_level[level](feature_channels)
 
     def forward(self, img1, feat1, feat2, flow_coarse, raw=False, dap=True, ctx=True, scale=1.0):
         batch, _c, h, w = feat1.shape
@@ -448,21 +456,21 @@ class FlowLevel(nn.Module):
 
 
 class DiclModule(nn.Module):
-    def __init__(self, disp_ranges, dap_init='identity'):
+    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32):
         super().__init__()
 
         if dap_init not in ['identity', 'standard']:
             raise ValueError(f"unknown dap_init value '{dap_init}'")
 
         # feature network
-        self.feature = FeatureNet()
+        self.feature = FeatureNet(feature_channels)
 
         # coarse-to-fine flow levels
-        self.lvl6 = FlowLevel(6, disp_ranges['level-6'])
-        self.lvl5 = FlowLevel(5, disp_ranges['level-5'])
-        self.lvl4 = FlowLevel(4, disp_ranges['level-4'])
-        self.lvl3 = FlowLevel(3, disp_ranges['level-3'])
-        self.lvl2 = FlowLevel(2, disp_ranges['level-2'])
+        self.lvl6 = FlowLevel(feature_channels, 6, disp_ranges['level-6'])
+        self.lvl5 = FlowLevel(feature_channels, 5, disp_ranges['level-5'])
+        self.lvl4 = FlowLevel(feature_channels, 4, disp_ranges['level-4'])
+        self.lvl3 = FlowLevel(feature_channels, 3, disp_ranges['level-3'])
+        self.lvl2 = FlowLevel(feature_channels, 2, disp_ranges['level-2'])
 
         # initialize weights
         for m in self.modules():
@@ -522,15 +530,16 @@ class Dicl(Model):
         param_cfg = cfg['parameters']
         disp_ranges = param_cfg['displacement-range']
         dap_init = param_cfg.get('dap-init', 'identity')
+        feature_channels = param_cfg.get('feature-channels', 32)
         args = cfg.get('arguments', {})
 
-        return cls(disp_ranges, dap_init, args)
+        return cls(disp_ranges, dap_init, feature_channels, args)
 
-    def __init__(self, disp_ranges, dap_init='identity', arguments={}):
+    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, arguments={}):
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
 
-        super().__init__(DiclModule(disp_ranges, dap_init), arguments)
+        super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
 
     def get_config(self):
         default_args = {
