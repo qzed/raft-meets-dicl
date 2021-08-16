@@ -452,6 +452,7 @@ class Dicl(Model):
     def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, arguments={}):
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
+        self.feature_channels = feature_channels
 
         super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
 
@@ -465,6 +466,7 @@ class Dicl(Model):
         return {
             'type': self.type,
             'parameters': {
+                'feature-channels': self.feature_channels,
                 'displacement-range': self.disp_ranges,
                 'dap-init': self.dap_init,
             },
