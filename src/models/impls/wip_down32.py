@@ -10,59 +10,13 @@ from .. import common
 from .. import Loss, Model, Result
 
 
-def _make_norm2d(ty, num_channels, num_groups):
-    if ty == 'group':
-        return nn.GroupNorm(num_groups=num_groups, num_channels=num_channels)
-    elif ty == 'batch':
-        return nn.BatchNorm2d(num_channels)
-    elif ty == 'instance':
-        return nn.InstanceNorm2d(num_channels)
-    elif ty == 'none':
-        return nn.Sequential()
-    else:
-        raise ValueError(f"unknown norm type '{ty}'")
-
-
-class ResidualBlock(nn.Module):
-    """Residual block for feature / context encoder"""
-
-    def __init__(self, in_planes, out_planes, norm_type='group', stride=1):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
-        self.relu = nn.LeakyReLU(inplace=True)
-
-        self.norm1 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        self.norm2 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        if stride > 1:
-            self.norm3 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-
-        self.downsample = None
-        if stride > 1:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride),
-                self.norm3,
-            )
-
-    def forward(self, x):
-        y = x
-        y = self.relu(self.norm1(self.conv1(y)))
-        y = self.relu(self.norm2(self.conv2(y)))
-
-        if self.downsample is not None:
-            x = self.downsample(x)
-
-        return self.relu(x + y)
-
-
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            nn.InstanceNorm2d(c_out),
             nn.LeakyReLU(inplace=True),
         )
 
@@ -73,90 +27,137 @@ class DeconvBlock(nn.Sequential):
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            nn.InstanceNorm2d(c_out),
             nn.LeakyReLU(inplace=True),
         )
 
 
-class FeatureEncoder(nn.Module):
-    """Feature encoder based on RAFT feature encoder"""
+class GaConv2xBlock(nn.Module):
+    """2x convolution block for GA-Net based feature encoder"""
 
-    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0):
+    def __init__(self, c_in, c_out):
         super().__init__()
 
-        self.output_dim = output_dim
+        self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
+        self.relu1 = nn.ReLU(inplace=True)
 
-        # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
-        self.norm1 = _make_norm2d(norm_type, num_channels=64, num_groups=8)
-        self.relu1 = nn.LeakyReLU(inplace=True)
+        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
+        self.bn2 = nn.InstanceNorm2d(c_out)
+        self.relu2 = nn.ReLU(inplace=True)
 
-        # residual blocks
-        self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
-        )
+    def forward(self, x, res):
+        x = self.conv1(x)
+        x = self.relu1(x)
 
-        self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
-        )
+        assert x.shape == res.shape
 
-        self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
-        )
+        x = torch.cat((x, res), dim=1)
 
-        self.layer4 = nn.Sequential(    # (H/4, W/4, 96) -> (H/16, W/16, 128)
-            ResidualBlock(128, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
-        )
-
-        self.layer5 = nn.Sequential(    # (H/4, W/4, 96) -> (H/32, W/32, 128)
-            ResidualBlock(128, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
-        )
-
-        # output convolution            # (H/32, W/32, 128) -> (H/32, W/32, output_dim)
-        self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
-
-        # dropout
-        self.dropout = nn.Dropout2d(p=dropout)
-
-        # initialize weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        # input may be tuple/list for flow network (img1, img2), combine this into single batch
-        is_list = isinstance(x, tuple) or isinstance(x, list)
-        if is_list:
-            batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
-
-        # input layer
-        x = self.relu1(self.norm1(self.conv1(x)))
-
-        # residual blocks
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        x = self.layer5(x)
-
-        # output layer
-        x = self.dropout(self.conv2(x))
-
-        if is_list:
-            x = torch.split(x, (batch_dim, batch_dim), dim=0)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
 
         return x
+
+
+class GaDeconv2xBlock(nn.Module):
+    """Deconvolution + convolution block for GA-Net based feature encoder"""
+
+    def __init__(self, c_in, c_out):
+        super().__init__()
+
+        self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
+        self.bn2 = nn.InstanceNorm2d(c_out)
+        self.relu2 = nn.ReLU(inplace=True)
+
+    def forward(self, x, res):
+        x = self.conv1(x)
+        x = self.relu1(x)
+
+        assert x.shape == res.shape
+
+        x = torch.cat((x, res), dim=1)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
+
+        return x
+
+
+class FeatureEncoder(nn.Module):
+    """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
+
+    def __init__(self, output_channels):
+        super().__init__()
+
+        self.conv0 = nn.Sequential(
+            ConvBlock(3, 32, kernel_size=3, padding=1),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
+            ConvBlock(32, 32, kernel_size=3, padding=1),
+        )
+
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
+        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
+        self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
+
+        self.deconv6a = GaDeconv2xBlock(192, 160)
+        self.deconv5a = GaDeconv2xBlock(160, 128)
+        self.deconv4a = GaDeconv2xBlock(128, 96)
+        self.deconv3a = GaDeconv2xBlock(96, 64)
+        self.deconv2a = GaDeconv2xBlock(64, 48)
+        self.deconv1a = GaDeconv2xBlock(48, 32)
+
+        self.conv1b = GaConv2xBlock(32, 48)
+        self.conv2b = GaConv2xBlock(48, 64)
+        self.conv3b = GaConv2xBlock(64, 96)
+        self.conv4b = GaConv2xBlock(96, 128)
+        self.conv5b = GaConv2xBlock(128, 160)
+        self.conv6b = GaConv2xBlock(160, 192)
+
+        self.deconv6b = GaDeconv2xBlock(192, 160)
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+
+        self.deconv5b = GaDeconv2xBlock(160, 128)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        x = res0 = self.conv0(x)                # -> 32, H/2, W/2
+
+        x = res1 = self.conv1a(x)               # -> 48, H/4, W/4
+        x = res2 = self.conv2a(x)               # -> 64, H/8, W/8
+        x = res3 = self.conv3a(x)               # -> 96, H/16, W/16
+        x = res4 = self.conv4a(x)               # -> 128, H/32, W/32
+        x = res5 = self.conv5a(x)               # -> 160, H/64, W/64
+        x = res6 = self.conv6a(x)               # -> 192, H/128, W/128
+
+        x = res5 = self.deconv6a(x, res5)       # -> 160, H/64, W/64
+        x = res4 = self.deconv5a(x, res4)       # -> 128, H/32, W/32
+        x = res3 = self.deconv4a(x, res3)       # -> 96, H/16, W/16
+        x = res2 = self.deconv3a(x, res2)       # -> 64, H/8, W/8
+        x = res1 = self.deconv2a(x, res1)       # -> 48, H/4, W/4
+        x = res0 = self.deconv1a(x, res0)       # -> 32, H/2, W/2
+
+        x = res1 = self.conv1b(x, res1)         # -> 48, H/4, W/4
+        x = res2 = self.conv2b(x, res2)         # -> 64, H/8, W/8
+        x = res3 = self.conv3b(x, res3)         # -> 96, H/16, W/16
+        x = res4 = self.conv4b(x, res4)         # -> 128, H/32, W/32
+        x = res5 = self.conv5b(x, res5)         # -> 160, H/64, W/64
+        x = res6 = self.conv6b(x, res6)         # -> 192, H/128, W/128
+
+        x = self.deconv6b(x, res5)              # -> 160, H/64, W/64
+        x6 = self.outconv6(x)                   # -> 24, H/64, W/64
+
+        x = self.deconv5b(x, res4)              # -> 128, H/32, W/32
+        x5 = self.outconv5(x)                   # -> 24, H/32, W/32
+
+        return x6, x5
 
 
 class MatchingNet(nn.Sequential):
@@ -247,17 +248,16 @@ class DisplacementAwareProjection(nn.Module):
         return x
 
 
-class MotionEncoder(nn.Module):
+class MotionEncoder(nn.Sequential):
     def __init__(self, disp_range, ctx_channels, output_channels):
-        super().__init__()
-
         disp_range = np.asarray(disp_range)
         input_channels = np.prod(2 * disp_range + 1) + ctx_channels + 2
         hidden_channels = 128
 
-        self.enc = nn.Sequential(
+        super().__init__(
             nn.Conv2d(input_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.BatchNorm2d(hidden_channels),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(hidden_channels, output_channels, kernel_size=3, padding=1),
         )
@@ -271,7 +271,7 @@ class MotionEncoder(nn.Module):
         mvol = torch.cat((cvol, cmap, flow), dim=1)
 
         # run actual encoder network
-        return self.enc(mvol)
+        return super().forward(mvol)
 
 
 class SepConvGru(nn.Module):
@@ -308,33 +308,32 @@ class SepConvGru(nn.Module):
         return h
 
 
-class FlowHead(nn.Module):
+class FlowHead(nn.Sequential):
     """Head to compute delta-flow from GRU hidden-state"""
 
     def __init__(self, input_dim=128, hidden_dim=256):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_dim, 2, kernel_size=3, padding=1)
-        self.relu = nn.LeakyReLU(inplace=True)
-
-    def forward(self, x):
-        return self.conv2(self.relu(self.conv1(x)))
+        super().__init__(
+            nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_dim, 2, kernel_size=3, padding=1),
+        )
 
 
 class RecurrentLevelUnit(nn.Module):
-    def __init__(self, disp_range, feat_channels, ctx_channels, hidden_dim):
+    def __init__(self, disp_range, feat_channels, hidden_dim):
         super().__init__()
 
         mf_channels = 128
 
         self.cvnet = CorrelationVolume(disp_range, feat_channels)
         self.dap = DisplacementAwareProjection(disp_range)
-        self.menet = MotionEncoder(disp_range, ctx_channels, mf_channels - 2)
+        self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
 
-    def forward(self, fmap1, fmap2, cmap, h, flow):
+    def forward(self, fmap1, fmap2, h, flow):
         # warp features backwards
         fmap2, _mask = common.warp.warp_backwards(fmap2, flow.detach())
 
@@ -343,62 +342,76 @@ class RecurrentLevelUnit(nn.Module):
         cvol = self.dap(cvol)                           # projected cost volume
 
         # compute motion features
-        x = self.menet(cvol, cmap, flow)
+        x = self.menet(cvol, fmap1, flow)
         x = torch.cat((x, flow), dim=1)
 
         # update hidden state and compute flow delta
         h = self.gru(h, x)
-        flow = flow + self.fhead(h)
+        d = self.fhead(h)
 
-        return h, flow
+        return h, flow + d
 
 
 class WipModule(nn.Module):
-    def __init__(self, disp_range=(5, 5), dropout=0.0):
+    def __init__(self, disp_range=(6, 6), dap_init='identity'):
         super().__init__()
 
-        self.c_feat = 128
-        self.c_ctx = 128
-        self.c_hidden = 128
+        self.c_feat = 32
+        self.c_hidden = 96
 
-        self.fnet = FeatureEncoder(output_dim=self.c_feat, norm_type='instance', dropout=dropout)
-        self.cnet = FeatureEncoder(output_dim=self.c_ctx+self.c_hidden, norm_type='batch', dropout=dropout)
-        self.rlu1 = RecurrentLevelUnit(disp_range, self.c_feat, self.c_ctx, self.c_hidden)
+        self.fnet = FeatureEncoder(self.c_feat)
+        self.rlu = RecurrentLevelUnit(disp_range, self.c_feat, self.c_hidden)
 
-    def freeze_batchnorm(self):
+        # initialize weights
         for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
 
-    def upsample(self, flow, shape, mode='bilinear'):
-        _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = shape
+        # initialize DAP layers via identity matrices if specified
+        if dap_init == 'identity':
+            for m in self.modules():
+                if isinstance(m, DisplacementAwareProjection):
+                    nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
-        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
-        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
-        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
+    def forward(self, img1, img2, iterations=2):
+        out = []
 
-        return flow
-
-    def forward(self, img1, img2, iterations=12):
         # compute feature maps
-        fmap1, fmap2 = self.fnet((img1, img2))
+        i1f6, i1f5 = self.fnet(img1)
+        i2f6, i2f5 = self.fnet(img2)
 
         # initialize flow
-        batch, _, h, w = fmap1.shape
+        batch, _, h, w = i1f6.shape
         flow = torch.zeros((batch, 2, h, w), device=img1.device)
 
-        # compute ecntext feature map and initial hidden state
-        h, cmap = torch.split(self.cnet(img1), (self.c_hidden, self.c_ctx), dim=1)
-        h, cmap = torch.tanh(h), torch.relu(cmap)
+        # initialize hidden state
+        h = torch.zeros((batch, self.c_hidden, *i1f6.shape[2:]), device=img1.device)
 
-        # run recurrent level unit
-        out = []
-        for _ in range(iterations):
-            h, flow = self.rlu1(fmap1, fmap2, cmap, h, flow)
+        # level 6
+        h, flow = self.rlu(i1f6, i2f6, h, flow)
+        out.append(flow)
 
-            # upsample flow
-            out.append(self.upsample(flow, shape=img1.shape))
+        h, flow = self.rlu(i1f6, i2f6, h, flow)
+        out.append(flow)
+
+        # upsample flow
+        flow = 2.0 * F.interpolate(flow, i1f5.shape[2:], mode='bilinear', align_corners=True)
+
+        # upsample hidden state
+        c = self.c_hidden // 2
+        h1 = F.interpolate(h[:, :c, :, :], i1f5.shape[2:], mode='nearest')
+        h2 = F.interpolate(h[:, c:, :, :], i1f5.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        h = torch.cat((h1, h2), dim=1)
+
+        # level 5
+        h, flow = self.rlu(i1f5, i2f5, h, flow)
+        out.append(flow)
+
+        h, flow = self.rlu(i1f5, i2f5, h, flow)
+        out.append(flow)
 
         return out
 
@@ -411,94 +424,56 @@ class Wip(Model):
         cls._typecheck(cfg)
 
         param_cfg = cfg['parameters']
-        dropout = float(param_cfg.get('dropout', 0.0))
         disp_range = param_cfg.get('disp-range', (5, 5))
         args = cfg.get('arguments', {})
 
-        return cls(disp_range, dropout, args)
+        return cls(disp_range, args)
 
-    def __init__(self, disp_range, dropout=0.0, arguments={}):
+    def __init__(self, disp_range, arguments={}):
         self.disp_range = disp_range
-        self.dropout = dropout
 
-        super().__init__(WipModule(disp_range, dropout), arguments)
+        super().__init__(WipModule(disp_range), arguments)
 
     def get_config(self):
-        default_args = {'iterations': 12}
+        default_args = {'iterations': 2}
 
         return {
             'type': self.type,
             'parameters': {
-                'dropout': self.dropout,
                 'disp-range': self.disp_range,
             },
             'arguments': default_args | self.arguments,
         }
 
     def forward(self, img1, img2, iterations=12):
-        return WipResult(self.module(img1, img2, iterations))
+        return WipResult(self.module(img1, img2, iterations), img1.shape)
 
     def train(self, mode: bool = True):
         super().train(mode)
 
-        if mode:
-            self.module.freeze_batchnorm()
-
 
 class WipResult(Result):
-    def __init__(self, output):
+    def __init__(self, output, target_shape):
         super().__init__()
 
         self.result = output
+        self.shape = target_shape
+        self.mode = 'bilinear'
 
     def output(self, batch_index=None):
         if batch_index is None:
             return self.result
 
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
+        return reversed([x[batch_index].view(1, *x.shape[1:]) for x in self.result])
 
     def final(self):
-        return self.result[-1]
+        flow = self.result[-1]
 
+        _b, _c, fh, fw = flow.shape
+        _b, _c, th, tw = self.shape
 
-class SequenceLoss(Loss):
-    type = 'wip/down32/sequence'
+        flow = F.interpolate(flow.detach(), (th, tw), mode=self.mode, align_corners=True)
+        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
+        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
-    @classmethod
-    def from_config(cls, cfg):
-        cls._typecheck(cfg)
-
-        return cls(cfg.get('arguments', {}))
-
-    def __init__(self, arguments={}):
-        super().__init__(arguments)
-
-    def get_config(self):
-        default_args = {'ord': 1, 'gamma': 0.8}
-
-        return {
-            'type': self.type,
-            'arguments': default_args | self.arguments,
-        }
-
-    def compute(self, result, target, valid, ord=1, gamma=0.8):
-        n_predictions = len(result)
-
-        loss = 0.0
-        for i, flow in enumerate(result):
-            # compute weight for sequence index
-            weight = gamma**(n_predictions - i - 1)
-
-            # compute flow distance according to specified norm (L1 in orig. impl.)
-            dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
-
-            # Only calculate error for valid pixels. N.b.: This is a difference
-            # to the original implementation, where invalid pixels are included
-            # in the mean as zero loss, skewing it (this should not make much
-            # of a difference wrt. optimization).
-            dist = dist[valid]
-
-            # update loss
-            loss = loss + weight * dist.mean()
-
-        return loss
+        return flow
