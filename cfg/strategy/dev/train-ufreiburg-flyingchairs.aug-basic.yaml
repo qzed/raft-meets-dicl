@@ -7,7 +7,7 @@ stages:
     data:
       source: ../../data/ufreiburg-flyingchairs.train.aug-basic.yaml
       epochs: 25
-      batch-size: 8
+      batch-size: 4
 
     validation:
       source: ../../data/ufreiburg-flyingchairs.test.yaml
