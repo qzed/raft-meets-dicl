@@ -1,5 +1,6 @@
 import datetime
 import logging
+import re
 
 from pathlib import Path
 
@@ -23,7 +24,11 @@ def _train(args):
     cfg_inspc = None
 
     # basic setup
-    path_out = Path(args.output) / timestamp.strftime('%G.%m.%dT%H.%M.%S')
+    suffix = ''
+    if args.suffix:
+        suffix = args.suffix if re.match(r"^[./_-].*$", args.suffix) else f"-{args.suffix}"
+
+    path_out = Path(args.output) / (timestamp.strftime('%G.%m.%dT%H.%M.%S') + suffix)
     path_out.mkdir(parents=True)
 
     utils.logging.setup(path_out / 'main.log')
