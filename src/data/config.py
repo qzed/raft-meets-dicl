@@ -5,6 +5,7 @@ from ..utils import config
 from . import augment
 from . import concat
 from . import dataset
+from . import fw_bw_batch
 from . import repeat
 
 
@@ -13,6 +14,7 @@ def _load(path, cfg):
         dataset.Dataset,
         augment.Augment,
         concat.Concat,
+        fw_bw_batch.ForwardsBackwardsBatch,
         repeat.Repeat,
     ]
     types = {ty.type: ty for ty in types}

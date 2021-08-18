@@ -185,35 +185,58 @@ class TorchAdapter:
     def __len__(self):
         return len(self.source)
 
-    def loader(self, batch_size=1, pin_memory=True, num_workers=4, **loader_args):
-        return DataLoader(self, batch_size=batch_size, pin_memory=pin_memory,
-                          num_workers=num_workers, **loader_args, collate_fn=_collate)
+    def loader(self, batch_size=1, shuffle=False, num_workers=4, pin_memory=True, **loader_args):
+        collate_fn = Collate(shuffle)
+
+        return DataLoader(self, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory,
+                          num_workers=num_workers, **loader_args, collate_fn=collate_fn)
 
 
-def _collate(samples):
-    img1_batch = []
-    img2_batch = []
-    flow_batch = []
-    valid_batch = []
-    meta_batch = []
+class Collate:
+    def __init__(self, shuffle):
+        self.shuffle = shuffle
 
-    for img1, img2, flow, valid, meta in samples:
-        img1_batch += [img1]
-        img2_batch += [img2]
+    def __call__(self, samples):
+        img1_batch = []
+        img2_batch = []
+        flow_batch = []
+        valid_batch = []
+        meta_batch = []
+
+        for img1, img2, flow, valid, meta in samples:
+            img1_batch += [img1]
+            img2_batch += [img2]
+
+            if flow is not None:
+                flow_batch += [flow]
+                valid_batch += [valid]
+
+            meta_batch += meta
+
+        img1 = torch.cat(img1_batch, dim=0)
+        img2 = torch.cat(img2_batch, dim=0)
+
+        if flow_batch:
+            flow = torch.cat(flow_batch, dim=0)
+            valid = torch.cat(valid_batch, dim=0)
+        else:
+            flow, valid = None, None
+
+        return self._shuffle_batch(img1, img2, flow, valid, meta_batch)
+
+    def _shuffle_batch(self, img1, img2, flow, valid, meta):
+        if not self.shuffle or img1.shape[0] <= 1:
+            return img1, img2, flow, valid, meta
+
+        perm = torch.randperm(img1.shape[0])
+
+        img1 = img1[perm]
+        img2 = img2[perm]
 
         if flow is not None:
-            flow_batch += [flow]
-            valid_batch += [valid]
+            flow = flow[perm]
+            valid = valid[perm]
 
-        meta_batch += [meta]
+        meta = [meta[i] for i in perm]
 
-    img1 = torch.cat(img1_batch, dim=0)
-    img2 = torch.cat(img2_batch, dim=0)
-
-    if flow_batch:
-        flow = torch.cat(flow_batch, dim=0)
-        valid = torch.cat(valid_batch, dim=0)
-    else:
-        flow, valid = None, None
-
-    return img1, img2, flow, valid, meta
+        return img1, img2, flow, valid, meta
