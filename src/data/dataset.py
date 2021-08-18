@@ -108,17 +108,6 @@ class Dataset(Collection):
     def __len__(self):
         return len(self.files)
 
-    def validate_files(self):
-        for img1, img2, flow in self.files:
-            if not img1.exists():
-                return False
-            if not img2.exists():
-                return False
-            if not flow.exists():
-                return False
-
-        return True
-
 
 class Layout:
     type = None
