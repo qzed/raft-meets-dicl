@@ -3,11 +3,23 @@ id: ufreiburg-flyingchairs2
 path: '../../../../datasets/ufreiburg-flyingchairs2/data'
 
 layout:
-  type: generic
+  type: multi
+  parameter: direction
 
-  images: '{type}/{seq:07d}-img_{idx:d}.png'
-  flows: '{type}/{seq:07d}-flow_01.flo'
-  key: '{type}/{seq:07d}'
+  instances:
+    forwards:
+      type: generic
+
+      images: '{type}/{seq:07d}-img_{idx:d}.png'
+      flows: '{type}/{seq:07d}-flow_01.flo'
+      key: '{type}/{seq:07d}'
+
+    backwards:
+      type: generic-backwards
+
+      images: '{type}/{seq:07d}-img_{idx:d}.png'
+      flows: '{type}/{seq:07d}-flow_10.flo'
+      key: '{type}/{seq:07d}'
 
 parameters:
   type:

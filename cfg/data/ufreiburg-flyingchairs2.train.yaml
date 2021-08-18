@@ -1,5 +1,14 @@
-type: dataset
-spec: dataset/ufreiburg-flyingchairs2.yaml
+sources:
+  - type: dataset
+    spec: dataset/ufreiburg-flyingchairs2.yaml
 
-parameters:
-  type: train
+    parameters:
+      type: train
+      direction: forwards
+
+  - type: dataset
+    spec: dataset/ufreiburg-flyingchairs2.yaml
+
+    parameters:
+      type: train
+      direction: forwards
