@@ -497,7 +497,7 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     valid = valid[i]
     meta = meta[i]
 
-    (h0, h1), (w0, w1) = meta['original_extents']
+    (h0, h1), (w0, w1) = meta.original_extents
 
     # move data to CPU
     mask = valid.detach().cpu()

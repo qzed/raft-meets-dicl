@@ -1,11 +1,20 @@
 import numpy as np
 import parse
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Tuple
 
 from . import io
 from .collection import Collection
 from ..utils import config
+
+
+@dataclass
+class Metadata:
+    dataset_id: str
+    sample_id: str
+    original_extents: Tuple[Tuple[int, int], Tuple[int, int]]
 
 
 class Dataset(Collection):
@@ -81,7 +90,7 @@ class Dataset(Collection):
         else:
             flow, valid = None, None
 
-        meta = dict(
+        meta = Metadata(
             dataset_id=self.id,
             sample_id=key,
             original_extents=((0, img1.shape[0]), (0, img1.shape[1])),

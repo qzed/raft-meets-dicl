@@ -48,7 +48,7 @@ def main():
 
     elif args.key:
         keys = args.key.split(',')
-        split = [int(any(k in meta['sample_id'] for k in keys)) for _, _, _, _, meta in source]
+        split = [int(any(k in meta.sample_id for k in keys)) for _, _, _, _, meta in source]
 
     # write output file
     with open(args.output, 'w') as fd:

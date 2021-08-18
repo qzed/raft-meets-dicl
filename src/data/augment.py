@@ -230,7 +230,7 @@ class Crop(Augmentation):
             valid = valid[:, y0:y0+self.size[1], x0:x0+self.size[0]]
 
         for m in meta:
-            m['original_extents'] = ((0, self.size[1]), (0, self.size[0]))
+            m.original_extents = ((0, self.size[1]), (0, self.size[0]))
 
         return img1, img2, flow, valid, meta
 
@@ -568,7 +568,7 @@ class Scale(Augmentation):
             valid = np.ones(img1.shape[:3], dtype=bool)
 
         for m in meta:
-            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
+            m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, flow, valid, meta
 
@@ -633,7 +633,7 @@ class ScaleSparse(Scale):
         valid = np.stack(valid_out, axis=0)
 
         for m in meta:
-            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
+            m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, new_flow, new_valid, meta
 
@@ -694,7 +694,7 @@ class Translate(Augmentation):
 
         # update metadata
         for m in meta:
-            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
+            m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, flow, valid, meta
 

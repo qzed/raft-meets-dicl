@@ -216,18 +216,18 @@ def evaluate(args):
             sample_metrs = metrics(model, est, target, valid, sample_loss)
 
             # collect for output
-            output.append({'id': meta['sample_id'], 'metrics': sample_metrs})
+            output.append({'id': meta.sample_id, 'metrics': sample_metrs})
 
             # collect for summary
             collectors.collect(sample_metrs)
 
             # log info about current sample
             info = [f"{k}: {v:.04f}" for k, v in sample_metrs.items()]
-            logging.info(f"sample: {meta['sample_id']}, {', '.join(info)}")
+            logging.info(f"sample: {meta.sample_id}, {', '.join(info)}")
 
         else:
             # log info about current sample
-            logging.info(f"sample: {meta['sample_id']}")
+            logging.info(f"sample: {meta.sample_id}")
 
         # save flow image
         if path_flow is not None:
@@ -241,8 +241,8 @@ def evaluate(args):
             if valid is not None:
                 valid = valid[0].detach().cpu().numpy()
 
-            save_flow_image(path_flow, args.flow_format, meta['sample_id'], img1, img2, target,
-                            valid, est, meta['original_extents'], flow_visual_args,
+            save_flow_image(path_flow, args.flow_format, meta.sample_id, img1, img2, target,
+                            valid, est, meta.original_extents, flow_visual_args,
                             flow_visual_dark_args, flow_epe_args)
 
     if compute_metrics:
