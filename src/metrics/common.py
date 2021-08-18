@@ -15,6 +15,7 @@ class Metric:
         from . import aae
         from . import epe
         from . import fl_all
+        from . import flow_mag
         from . import grad_norm
         from . import loss
         from . import lr
@@ -23,6 +24,7 @@ class Metric:
             aae.AverageAngularError,
             epe.EndPointError,
             fl_all.FlAll,
+            flow_mag.FlowMagnitude,
             grad_norm.GradientNorm,
             loss.Loss,
             lr.LearningRate,
