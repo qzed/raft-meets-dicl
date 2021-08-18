@@ -3,7 +3,7 @@ import parse
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, List, Tuple, Union
 
 from . import io
 from .collection import Collection
@@ -11,9 +11,25 @@ from ..utils import config
 
 
 @dataclass
+class SampleArgs:
+    args: List[Union[str, int]]
+    kwargs: Dict[str, Union[str, int]]
+
+
+@dataclass
+class SampleId:
+    format: str
+    img1: SampleArgs
+    img2: SampleArgs
+
+    def __str__(self):
+        return self.format.format(*self.img1.args, **self.img1.kwargs)
+
+
+@dataclass
 class Metadata:
     dataset_id: str
-    sample_id: str
+    sample_id: SampleId
     original_extents: Tuple[Tuple[int, int], Tuple[int, int]]
 
 
@@ -227,11 +243,16 @@ class GenericLayout(Layout):
             img1 = self.pat_img.format(*positional, idx=idx, **named)
             img2 = self.pat_img.format(*positional, idx=idx+1, **named)
             flow = self.pat_flow.format(*positional, idx=idx, **named)
-            key = self.pat_key.format(*positional, idx=idx, **named)
+
+            key = SampleId(
+                format=self.pat_key,
+                img1=SampleArgs(positional, named | {'idx': idx}),
+                img2=SampleArgs(positional, named | {'idx': idx+1}),
+            )
 
             files += [(path / img1, path / img2, path / flow, key)]
 
-        return sorted(files, key=lambda x: x[3])
+        return sorted(files, key=lambda x: str(x[3]))
 
 
 class GenericBackwardsLayout(Layout):
@@ -307,11 +328,16 @@ class GenericBackwardsLayout(Layout):
             img1 = self.pat_img.format(*positional, idx=idx, **named)
             img2 = self.pat_img.format(*positional, idx=idx-1, **named)
             flow = self.pat_flow.format(*positional, idx=idx, **named)
-            key = self.pat_key.format(*positional, idx=idx, **named)
+
+            key = SampleId(
+                format=self.pat_key,
+                img1=SampleArgs(positional, named | {'idx': idx}),
+                img2=SampleArgs(positional, named | {'idx': idx-1}),
+            )
 
             files += [(path / img1, path / img2, path / flow, key)]
 
-        return sorted(files, key=lambda x: x[3])
+        return sorted(files, key=lambda x: str(x[3]))
 
 
 class MultiLayout(Layout):
