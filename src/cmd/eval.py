@@ -153,7 +153,7 @@ def evaluate(args):
     compute_metrics = not args.flow_only
 
     dataset = data.load(args.data)
-    dataset = input.apply(dataset).torch(compute_metrics)
+    dataset = input.apply(dataset).torch(compute_metrics).loader(batch_size=args.batch_size)
 
     # prepare output directories
     path_out = Path(args.output) if args.output else None
@@ -198,7 +198,7 @@ def evaluate(args):
     torch.set_grad_enabled(False)
 
     output = []
-    evtor = evaluation.evaluate(model, dataset, device, args.batch_size)
+    evtor = evaluation.evaluate(model, dataset, device)
 
     for img1, img2, target, valid, est, out, meta in evtor:
         # eval returns per-sample data, add fake batch

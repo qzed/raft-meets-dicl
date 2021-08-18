@@ -23,6 +23,7 @@ class Augment(Collection):
 
         augs = cfg['augmentations']
         source = cfg['source']
+        sync = cfg.get('sync', True)
 
         # build augmentations
         if augs is None:
@@ -32,25 +33,66 @@ class Augment(Collection):
 
         return Augment(augs, config.load(path, source))
 
-    def __init__(self, augmentations, source):
+    def __init__(self, augmentations, source, sync=True):
         super().__init__()
 
         self.source = source
         self.augmentations = augmentations
+        self.sync = sync
 
     def get_config(self):
         return {
             'type': self.type,
             'augmentations': [a.get_config() for a in self.augmentations],
             'source': self.source.get_config(),
+            'sync': self.sync,
         }
 
     def __getitem__(self, index):
         img1, img2, flow, valid, meta = self.source[index]
 
         # perform augmentations
-        for aug in self.augmentations:
-            img1, img2, flow, valid, meta = aug(img1, img2, flow, valid, meta)
+        if self.sync:       # handle batches
+            for aug in self.augmentations:
+                img1, img2, flow, valid, meta = aug(img1, img2, flow, valid, meta)
+
+        else:               # split batches up into individual samples
+            batch, h, w, c = img1.shape
+
+            out_img1, out_img2, out_flow, out_valid, out_meta = [], [], [], [], []
+            for i in range(batch):
+                img1_i = img1[i].reshape(1, h, w, c)
+                img2_i = img2[i].reshape(1, h, w, c)
+
+                flow_i = None
+                valid_i = None
+
+                if flow is not None:
+                    flow_i = flow[i].reshape(1, h, w, 2)
+                    valid_i = valid[i].reshape(1, h, w)
+
+                meta_i = [meta[i]]
+
+                for aug in self.augmentations:
+                    img1_i, img2_i, flow_i, valid_i, meta_i = aug(img1_i, img2_i, flow_i, valid_i, meta_i)
+
+                out_img1 += [img1_i]
+                out_img2 += [img2_i]
+
+                if flow is not None:
+                    out_flow += [flow_i]
+                    out_valid += [valid_i]
+
+                out_meta += [meta_i]
+
+            img1 = np.concatenate(out_img1, axis=0)
+            img2 = np.concatenate(out_img2, axis=0)
+
+            if flow is not None:
+                flow = np.concatenate(out_flow, axis=0)
+                valid = np.concatenate(out_valid, axis=0)
+
+            meta = out_meta
 
         # ensure that we have contiguous memory for torch later on
         img1 = np.ascontiguousarray(img1)
@@ -131,18 +173,18 @@ class ColorJitter(Augmentation):
 
     def process(self, img1, img2, flow, valid, meta):
         # convert to torch tensors
-        img1 = torch.from_numpy(np.ascontiguousarray(img1)).permute(2, 0, 1)
-        img2 = torch.from_numpy(np.ascontiguousarray(img2)).permute(2, 0, 1)
+        img1 = torch.from_numpy(np.ascontiguousarray(img1)).permute(0, 3, 1, 2)
+        img2 = torch.from_numpy(np.ascontiguousarray(img2)).permute(0, 3, 1, 2)
 
         # apply color transform
         if np.random.rand() < self.prob_asymmetric:     # asymmetric
-            img1 = np.array(self.transform(img1).permute(1, 2, 0))
-            img2 = np.array(self.transform(img2).permute(1, 2, 0))
+            img1 = np.array(self.transform(img1).permute(0, 2, 3, 1))
+            img2 = np.array(self.transform(img2).permute(0, 2, 3, 1))
         else:                                           # symmetric
-            # stack images height-wise and apply transform to combined image
-            stack = torch.cat((img1, img2), dim=-2)
-            stack = np.array(self.transform(stack).permute(1, 2, 0))
-            img1, img2 = np.split(stack, 2, axis=0)
+            # stack images and apply transform to combined image tensor
+            stack = torch.stack((img1, img2), dim=0)
+            stack = np.array(self.transform(stack).permute(0, 1, 3, 4, 2))
+            img1, img2 = stack[0], stack[1]
 
         return img1, img2, flow, valid, meta
 
@@ -172,22 +214,23 @@ class Crop(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2]
+        assert img1.shape[:3] == img2.shape[:3]
 
         # draw new upper-right corner coordinate randomly
-        mx, my = img1.shape[1] - self.size[0], img1.shape[0] - self.size[1]
+        mx, my = img1.shape[2] - self.size[0], img1.shape[1] - self.size[1]
         x0 = np.random.randint(0, mx) if mx > 0 else 0
         y0 = np.random.randint(0, my) if my > 0 else 0
 
         # perform crop
-        img1 = img1[y0:y0+self.size[1], x0:x0+self.size[0]]
-        img2 = img2[y0:y0+self.size[1], x0:x0+self.size[0]]
+        img1 = img1[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+        img2 = img2[:, y0:y0+self.size[1], x0:x0+self.size[0]]
 
         if flow is not None:
-            flow = flow[y0:y0+self.size[1], x0:x0+self.size[0]]
-            valid = valid[y0:y0+self.size[1], x0:x0+self.size[0]]
+            flow = flow[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+            valid = valid[:, y0:y0+self.size[1], x0:x0+self.size[0]]
 
-        meta['original_extents'] = ((0, self.size[1]), (0, self.size[0]))
+        for m in meta:
+            m['original_extents'] = ((0, self.size[1]), (0, self.size[0]))
 
         return img1, img2, flow, valid, meta
 
@@ -219,21 +262,21 @@ class Flip(Augmentation):
     def process(self, img1, img2, flow, valid, meta):
         # horizontal flip
         if np.random.rand() < self.probability[0]:
-            img1 = img1[:, ::-1]
-            img2 = img2[:, ::-1]
+            img1 = img1[:, :, ::-1]
+            img2 = img2[:, :, ::-1]
 
             if flow is not None:
-                flow = flow[:, ::-1] * (-1.0, 1.0)
-                valid = valid[:, ::-1]
+                flow = flow[:, :, ::-1] * (-1.0, 1.0)
+                valid = valid[:, :, ::-1]
 
         # vertical flip
         if np.random.rand() < self.probability[1]:
-            img1 = img1[::-1, :]
-            img2 = img2[::-1, :]
+            img1 = img1[:, ::-1, :]
+            img2 = img2[:, ::-1, :]
 
             if flow is not None:
-                flow = flow[::-1, :] * (1.0, -1.0)
-                valid = valid[::-1, :]
+                flow = flow[:, ::-1, :] * (1.0, -1.0)
+                valid = valid[:, ::-1, :]
 
         return img1, img2, flow, valid, meta
 
@@ -335,22 +378,20 @@ class Occlusion(Augmentation):
         else:
             num = np.random.randint(self.num[0], self.num[1])
 
-        # patch is filled with mean value
-        color = np.mean(img, axis=(0, 1))
-
         # draw and apply patches
         for _ in range(num):
             dx, dy = np.random.randint(self.min_size, self.max_size)
 
             # allow drawing accross border to not skew distribution
-            y0, x0 = np.random.randint((-dy, -dx), np.array(img.shape[:2]))
+            y0, x0 = np.random.randint((-dy, -dx), np.array(img.shape[1:3]))
 
             # clip to borders
-            y0, x0 = np.clip([y0, x0], [0, 0], img.shape[:2])
-            y1, x1 = np.clip([y0 + dy, x0 + dy], [0, 0], img.shape[:2])
+            y0, x0 = np.clip([y0, x0], [0, 0], img.shape[1:3])
+            y1, x1 = np.clip([y0 + dy, x0 + dy], [0, 0], img.shape[1:3])
 
             # apply patch
-            img[y0:y1, x0:x1, :] = color
+            for i in range(img.shape[0]):
+                img[i, y0:y1, x0:x1, :] = np.mean(img[i], axis=(0, 1))
 
         return img
 
@@ -501,22 +542,33 @@ class Scale(Augmentation):
         return new_size, scale
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2]
+        assert img1.shape[:3] == img2.shape[:3]
         assert np.all(valid)        # full flows only!
 
         # draw random but valid scale factors
-        size, scale = self._get_new_size(img1.shape[:2])
+        size, scale = self._get_new_size(img1.shape[1:3])
 
         # scale images
-        img1 = cv2.resize(img1, size, interpolation=self.modenum)
-        img2 = cv2.resize(img2, size, interpolation=self.modenum)
+        img1_out, img2_out = [], []
+        for i in range(img1.shape[0]):
+            img1_out += [cv2.resize(img1[i], size, interpolation=self.modenum)]
+            img2_out += [cv2.resize(img2[i], size, interpolation=self.modenum)]
+
+        img1 = np.stack(img1_out, axis=0)
+        img2 = np.stack(img2_out, axis=0)
 
         if flow is not None:
-            flow = cv2.resize(flow, size, interpolation=self.modenum)
-            flow *= scale
+            flow_out = []
+            for i in range(flow.shape[0]):
+                flow_out += [cv2.resize(flow[i], size, interpolation=self.modenum) * scale]
+
+            flow = np.stack(flow_out, axis=0)
 
             # this is for full/non-sparse flows only...
-            valid = np.ones(img1.shape[:2], dtype=bool)
+            valid = np.ones(img1.shape[:3], dtype=bool)
+
+        for m in meta:
+            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, flow, valid, meta
 
@@ -528,43 +580,60 @@ class ScaleSparse(Scale):
         super().__init__(min_size, min_scale, max_scale, mode)
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
+        assert img1.shape[:3] == img2.shape[:3] == flow.shape[:3] == valid.shape[:3]
 
         # draw random but valid scale factors
-        size, scale = self._get_new_size(img1.shape[:2])
+        size, scale = self._get_new_size(img1.shape[1:3])
 
         # scale images
-        img1 = cv2.resize(img1, size, interpolation=self.modenum)
-        img2 = cv2.resize(img2, size, interpolation=self.modenum)
+        img1_out, img2_out = [], []
+        for i in range(img1.shape[0]):
+            img1_out += [cv2.resize(img1[i], size, interpolation=self.modenum)]
+            img2_out += [cv2.resize(img2[i], size, interpolation=self.modenum)]
 
-        # buil grid of coordinates
-        coords = np.meshgrid(np.arange(flow.shape[1]), np.arange(flow.shape[0]))
-        coords = np.stack(coords, axis=-1).astype(np.float32)
+        img1 = np.stack(img1_out, axis=0)
+        img2 = np.stack(img2_out, axis=0)
 
-        # filter for valid ones (note: this reshapes into list of values/tuples)
-        coords = coords[valid]
-        flow = flow[valid]
+        # scale flow
+        flow_out, valid_out = [], []
+        for i in range(flow.shape[0]):
+            # buil grid of coordinates
+            coords = np.meshgrid(np.arange(flow.shape[2]), np.arange(flow.shape[1]))
+            coords = np.stack(coords, axis=-1).astype(np.float32)
 
-        # actually scale flow (and flow coordinates)
-        coords = coords * scale
-        flow = flow * scale
+            # filter for valid ones (note: this reshapes into list of values/tuples)
+            coords = coords[valid[i]]
+            flow_i = flow[i][valid[i]]
 
-        # round flow coordinates back to integer and separate
-        coords = np.round(coords).astype(np.int32)
-        cx, cy = coords[:, 0], coords[:, 1]
+            # actually scale flow (and flow coordinates)
+            coords = coords * scale
+            flow_i = flow_i * scale
 
-        # filter new flow coordinates to ensure they are still in range
-        cv = (cx >= 0) & (cx < size[0]) & (cy >= 0) & (cy < size[1])
-        coords = coords[cv]
-        flow = flow[cv]
+            # round flow coordinates back to integer and separate
+            coords = np.round(coords).astype(np.int32)
+            cx, cy = coords[:, 0], coords[:, 1]
 
-        # map sparse flow back onto full image
-        new_flow = np.zeros((*size[::-1], 2), dtype=np.float32)
-        new_flow[cy, cx] = flow
+            # filter new flow coordinates to ensure they are still in range
+            cv = (cx >= 0) & (cx < size[0]) & (cy >= 0) & (cy < size[1])
+            coords = coords[cv]
+            flow_i = flow_i[cv]
 
-        # create new validity map
-        new_valid = np.zeros(size[::-1], dtype=bool)
-        new_valid[cy, cx] = True
+            # map sparse flow back onto full image
+            new_flow = np.zeros((*size[::-1], 2), dtype=np.float32)
+            new_flow[cy, cx] = flow_i
+
+            # create new validity map
+            new_valid = np.zeros(size[::-1], dtype=bool)
+            new_valid[cy, cx] = True
+
+            flow_out += [new_flow]
+            valid_out += [new_valid]
+
+        flow = np.stack(flow_out, axis=0)
+        valid = np.stack(valid_out, axis=0)
+
+        for m in meta:
+            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, new_flow, new_valid, meta
 
@@ -600,10 +669,10 @@ class Translate(Augmentation):
         }
 
     def process(self, img1, img2, flow, valid, meta):
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
-        assert img1.shape[1] >= self.min_size[0] and img1.shape[0] >= self.min_size[1]
+        assert img1.shape[:3] == img2.shape[:3] == flow.shape[:3] == valid.shape[:3]
+        assert img1.shape[2] >= self.min_size[0] and img1.shape[1] >= self.min_size[1]
 
-        h, w, _ = img1.shape
+        _, h, w, _ = img1.shape
 
         # get maximum translation
         dx = np.clip(w - self.min_size[0], 0, self.delta[0])
@@ -613,16 +682,19 @@ class Translate(Augmentation):
         tx, ty = np.random.randint((-dx, -dy), (dx + 1, dy + 1))
 
         # perform translation
-        img1 = img1[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
-        img2 = img2[max(0, -ty):min(h, h - ty), max(0, -tx):min(w, w - tx)]
-        flow = flow[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)] + np.array([tx, ty])
-        valid = valid[max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
+        img1 = img1[:, max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
+        img2 = img2[:, max(0, -ty):min(h, h - ty), max(0, -tx):min(w, w - tx)]
 
-        assert img1.shape[:2] == img2.shape[:2] == flow.shape[:2] == valid.shape[:2]
-        assert img1.shape[1] >= self.min_size[0] and img1.shape[0] >= self.min_size[1]
+        if flow is not None:
+            flow = flow[:, max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)] + np.array([tx, ty])
+            valid = valid[:, max(0, ty):min(h, h + ty), max(0, tx):min(w, w + tx)]
+
+        assert img1.shape[:3] == img2.shape[:3] == flow.shape[:3] == valid.shape[:3]
+        assert img1.shape[2] >= self.min_size[0] and img1.shape[1] >= self.min_size[1]
 
         # update metadata
-        meta['original_extents'] = ((0, img1.shape[0]), (0, img1.shape[1]))
+        for m in meta:
+            m['original_extents'] = ((0, img1.shape[1]), (0, img1.shape[2]))
 
         return img1, img2, flow, valid, meta
 

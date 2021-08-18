@@ -170,3 +170,9 @@ source: datasource-basic.yaml
 # datasource-basic for more details.
 #
 # Paths are relative to this file.
+
+sync: true
+# Whether to apply augmentations synchronously to all samples when dealing with
+# batches. I.e. whether to apply the same random transformations to all samples
+# in the same batch (sync=true) or to treat each sample individually
+# (sync=false).

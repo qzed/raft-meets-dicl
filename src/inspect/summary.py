@@ -9,7 +9,6 @@ from tqdm import tqdm
 import numpy as np
 
 import torch
-import torch.utils.data as td
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -318,8 +317,8 @@ class StrategyValidation(Validation):
 
         # load validation data
         input = ctx.input.apply(stage.validation.source).torch()
-        data = td.DataLoader(input, batch_size=stage.validation.batch_size, shuffle=False,
-                             drop_last=False, **ctx.loader_args)
+        data = input.loader(batch_size=stage.validation.batch_size, shuffle=False, drop_last=False,
+                            **ctx.loader_args)
 
         # set up progress bar
         desc = f"validation: stage {stage.index + 1}/{len(ctx.strategy.stages)}"
@@ -496,9 +495,9 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     target = target[i]
     estimate = estimate[i]
     valid = valid[i]
+    meta = meta[i]
 
     (h0, h1), (w0, w1) = meta['original_extents']
-    h0, h1, w0, w1 = h0[i], h1[i], w0[i], w1[i]
 
     # move data to CPU
     mask = valid.detach().cpu()

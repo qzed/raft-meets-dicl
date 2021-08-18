@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 
+from torch.utils.data import DataLoader
+
 
 class Padding:
     type = None
@@ -64,13 +66,13 @@ class ModuloPadding(Padding):
             mode = self.mode
             args = {}
 
-        h, w, _c = img1.shape
+        _batch, h, w, _c = img1.shape
 
         new_h = ((h + self.size[1] - 1) // self.size[1]) * self.size[1]
         new_w = ((w + self.size[0] - 1) // self.size[0]) * self.size[0]
 
-        pad = ((0, new_h - h), (0, new_w - w), (0, 0))
-        pad_v = ((0, new_h - h), (0, new_w - w))
+        pad = ((0, 0), (0, new_h - h), (0, new_w - w), (0, 0))
+        pad_v = ((0, 0), (0, new_h - h), (0, new_w - w))
 
         img1 = np.pad(img1, pad, mode=mode, **args)
         img2 = np.pad(img2, pad, mode=mode, **args)
@@ -165,20 +167,53 @@ class TorchAdapter:
     def __getitem__(self, index):
         img1, img2, flow, valid, meta = self.source[index]
 
-        img1 = torch.from_numpy(img1).float().permute(2, 0, 1)
-        img2 = torch.from_numpy(img2).float().permute(2, 0, 1)
+        img1 = torch.from_numpy(img1).float().permute(0, 3, 1, 2)
+        img2 = torch.from_numpy(img2).float().permute(0, 3, 1, 2)
 
         if self.flow:
             # make sure dataset actually provides flow data
             assert flow is not None and valid is not None
 
-            flow = torch.from_numpy(flow).float().permute(2, 0, 1)
+            flow = torch.from_numpy(flow).float().permute(0, 3, 1, 2)
             valid = torch.from_numpy(valid).bool()
 
             return img1, img2, flow, valid, meta
 
         else:
-            return img1, img2, meta
+            return img1, img2, None, None, meta
 
     def __len__(self):
         return len(self.source)
+
+    def loader(self, batch_size=1, pin_memory=True, num_workers=4, **loader_args):
+        return DataLoader(self, batch_size=batch_size, pin_memory=pin_memory,
+                          num_workers=num_workers, **loader_args, collate_fn=_collate)
+
+
+def _collate(samples):
+    img1_batch = []
+    img2_batch = []
+    flow_batch = []
+    valid_batch = []
+    meta_batch = []
+
+    for img1, img2, flow, valid, meta in samples:
+        img1_batch += [img1]
+        img2_batch += [img2]
+
+        if flow is not None:
+            flow_batch += [flow]
+            valid_batch += [valid]
+
+        meta_batch += [meta]
+
+    img1 = torch.cat(img1_batch, dim=0)
+    img2 = torch.cat(img2_batch, dim=0)
+
+    if flow_batch:
+        flow = torch.cat(flow_batch, dim=0)
+        valid = torch.cat(valid_batch, dim=0)
+    else:
+        flow, valid = None, None
+
+    return img1, img2, flow, valid, meta

@@ -87,7 +87,14 @@ class Dataset(Collection):
             original_extents=((0, img1.shape[0]), (0, img1.shape[1])),
         )
 
-        return img1, img2, flow, valid, meta
+        img1 = np.array([img1])
+        img2 = np.array([img2])
+
+        if flow is not None:
+            flow = np.array([flow])
+            valid = np.array([valid])
+
+        return img1, img2, flow, valid, [meta]
 
     def __len__(self):
         return len(self.files)
