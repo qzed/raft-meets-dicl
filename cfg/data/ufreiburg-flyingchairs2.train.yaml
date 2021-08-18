@@ -11,4 +11,4 @@ sources:
 
     parameters:
       type: train
-      direction: forwards
+      direction: backwards
