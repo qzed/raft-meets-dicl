@@ -231,7 +231,7 @@ class GenericLayout(Layout):
 
             files += [(path / img1, path / img2, path / flow, key)]
 
-        return files
+        return sorted(files, key=lambda x: x[3])
 
 
 class GenericBackwardsLayout(Layout):
@@ -311,7 +311,7 @@ class GenericBackwardsLayout(Layout):
 
             files += [(path / img1, path / img2, path / flow, key)]
 
-        return files
+        return sorted(files, key=lambda x: x[3])
 
 
 class MultiLayout(Layout):
