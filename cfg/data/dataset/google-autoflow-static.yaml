@@ -1,0 +1,10 @@
+name: Google AutoFlow (static/40k)
+id: google-autoflow-static
+path: '../../../../datasets/google-autoflow-static/data/'
+
+layout:
+  type: generic
+
+  images: 'table_{table:d}_batch_{batch:d}/im{idx:d}.png'
+  flows: 'table_{table:d}_batch_{batch:d}/forward.flo'
+  key: 'table_{table:03d}_{batch:03d}'
