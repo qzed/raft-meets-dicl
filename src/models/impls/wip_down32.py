@@ -308,17 +308,64 @@ class SepConvGru(nn.Module):
         return h
 
 
-class FlowHead(nn.Sequential):
+class FlowHead(nn.Module):
     """Head to compute delta-flow from GRU hidden-state"""
 
-    def __init__(self, input_dim=128, hidden_dim=256):
-        super().__init__(
+    def __init__(self, input_dim=128, hidden_dim=256, disp_range=(5, 5)):
+        super().__init__()
+
+        self.disp_range = np.asarray(disp_range)
+        disp_dim = np.prod(2 * self.disp_range + 1)
+
+        # network for displacement score/cost generation
+        self.score = nn.Sequential(
             nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1),
-            nn.LeakyReLU(inplace=True),
+            nn.BatchNorm2d(hidden_dim),
+            nn.ReLU(inplace=True),
             nn.Conv2d(hidden_dim, hidden_dim, kernel_size=3, padding=1),
-            nn.LeakyReLU(inplace=True),
-            nn.Conv2d(hidden_dim, 2, kernel_size=3, padding=1),
+            nn.BatchNorm2d(hidden_dim),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(hidden_dim, disp_dim, kernel_size=3, padding=1),
+            nn.BatchNorm2d(disp_dim),
+            nn.ReLU(inplace=True),
         )
+
+    def init_weights(self):
+        # initialize center layer(s) to identity
+        nn.init.eye_(self.score[3].weight[:, :, 1, 1])
+
+    def forward(self, x):
+        batch, c, h, w = x.shape
+
+        ru, rv = self.disp_range
+        du, dv = self.disp_range * 2 + 1
+
+        # compute displacement score
+        score = self.score(x)
+
+        # displacement offsets along u
+        disp_u = torch.arange(-ru, ru + 1, device=x.device, dtype=torch.float32)
+        disp_u = disp_u.view(du, 1)
+        disp_u = disp_u.expand(-1, dv)                  # expand for stacking
+
+        # displacement offsets along v
+        disp_v = torch.arange(-rv, rv + 1, device=x.device, dtype=torch.float32)
+        disp_v = disp_v.view(1, dv)
+        disp_v = disp_v.expand(du, -1)                  # expand for stacking
+
+        # combined displacement vector
+        disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv)
+        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for broadcasting
+
+        # compute displacement probability
+        score = score.view(batch, du * dv, h, w)        # combine disp. dimensions for softmax
+        prob = F.softmax(score, dim=1)                  # softmax along displacement dimensions
+        prob = prob.view(batch, 1, du, dv, h, w)        # reshape for broadcasting
+
+        # compute flow as weighted sum over displacement vectors
+        flow = (prob * disp).sum(dim=(2, 3))            # weighted sum over displacements (du/dv)
+
+        return flow                                     # shape (batch, 2, h, w)
 
 
 class RecurrentLevelUnit(nn.Module):
@@ -357,7 +404,7 @@ class WipModule(nn.Module):
         super().__init__()
 
         self.c_feat = 32
-        self.c_hidden = 96
+        self.c_hidden = 160
 
         self.fnet = FeatureEncoder(self.c_feat)
         self.rlu = RecurrentLevelUnit(disp_range, self.c_feat, self.c_hidden)
@@ -375,6 +422,11 @@ class WipModule(nn.Module):
             for m in self.modules():
                 if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
+
+        # initialize flow head weights
+        for m in self.modules():
+            if isinstance(m, FlowHead):
+                m.init_weights()
 
     def forward(self, img1, img2, iterations=2):
         out = []
