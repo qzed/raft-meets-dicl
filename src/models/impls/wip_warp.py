@@ -16,7 +16,7 @@ class ConvBlock(nn.Sequential):
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.InstanceNorm2d(c_out),
+            nn.BatchNorm2d(c_out),
             nn.LeakyReLU(inplace=True),
         )
 
@@ -27,7 +27,7 @@ class DeconvBlock(nn.Sequential):
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.InstanceNorm2d(c_out),
+            nn.BatchNorm2d(c_out),
             nn.LeakyReLU(inplace=True),
         )
 
@@ -39,11 +39,11 @@ class GaConv2xBlock(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.LeakyReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.InstanceNorm2d(c_out)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.bn2 = nn.BatchNorm2d(c_out)
+        self.relu2 = nn.LeakyReLU(inplace=True)
 
     def forward(self, x, res):
         x = self.conv1(x)
@@ -67,11 +67,11 @@ class GaDeconv2xBlock(nn.Module):
         super().__init__()
 
         self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.LeakyReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.InstanceNorm2d(c_out)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.bn2 = nn.BatchNorm2d(c_out)
+        self.relu2 = nn.LeakyReLU(inplace=True)
 
     def forward(self, x, res):
         x = self.conv1(x)
@@ -269,17 +269,16 @@ class DisplacementAwareProjection(nn.Module):
         return x
 
 
-class MotionEncoder(nn.Module):
+class MotionEncoder(nn.Sequential):
     def __init__(self, disp_range, ctx_channels, output_channels):
-        super().__init__()
-
         disp_range = np.asarray(disp_range)
         input_channels = np.prod(2 * disp_range + 1) + ctx_channels + 2
         hidden_channels = 128
 
-        self.enc = nn.Sequential(
+        super().__init__(
             nn.Conv2d(input_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.InstanceNorm2d(hidden_channels),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
             nn.LeakyReLU(inplace=True),
             nn.Conv2d(hidden_channels, output_channels, kernel_size=3, padding=1),
         )
@@ -293,7 +292,7 @@ class MotionEncoder(nn.Module):
         mvol = torch.cat((cvol, cmap, flow), dim=1)
 
         # run actual encoder network
-        return self.enc(mvol)
+        return super().forward(mvol)
 
 
 class SepConvGru(nn.Module):
@@ -330,23 +329,39 @@ class SepConvGru(nn.Module):
         return h
 
 
-class FlowRegression(nn.Module):
-    """Soft-argmin flow regression"""
+class FlowHead(nn.Module):
+    """Head to compute delta-flow from GRU hidden-state"""
 
-    def __init__(self):
+    def __init__(self, input_dim=128, hidden_dim=256, disp_range=(5, 5)):
         super().__init__()
 
-    def forward(self, cost):
-        batch, du, dv, h, w = cost.shape
-        ru, rv = (du - 1) // 2, (dv - 1) // 2           # displacement range
+        self.disp_range = np.asarray(disp_range)
+        disp_dim = np.prod(2 * self.disp_range + 1)
+
+        # network for displacement score/cost generation
+        self.score = nn.Sequential(
+            nn.Conv2d(input_dim, hidden_dim, kernel_size=1, padding=0),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_dim, disp_dim, kernel_size=1, padding=0),
+            nn.LeakyReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        batch, c, h, w = x.shape
+
+        ru, rv = self.disp_range
+        du, dv = self.disp_range * 2 + 1
+
+        # compute displacement score
+        score = self.score(x)
 
         # displacement offsets along u
-        disp_u = torch.arange(-ru, ru + 1, device=cost.device, dtype=torch.float32)
+        disp_u = torch.arange(-ru, ru + 1, device=x.device, dtype=torch.float32)
         disp_u = disp_u.view(du, 1)
         disp_u = disp_u.expand(-1, dv)                  # expand for stacking
 
         # displacement offsets along v
-        disp_v = torch.arange(-rv, rv + 1, device=cost.device, dtype=torch.float32)
+        disp_v = torch.arange(-rv, rv + 1, device=x.device, dtype=torch.float32)
         disp_v = disp_v.view(1, dv)
         disp_v = disp_v.expand(du, -1)                  # expand for stacking
 
@@ -355,8 +370,8 @@ class FlowRegression(nn.Module):
         disp = disp.view(1, 2, du, dv, 1, 1)            # create view for broadcasting
 
         # compute displacement probability
-        cost = cost.view(batch, du * dv, h, w)          # combine disp. dimensions for softmax
-        prob = F.softmax(cost, dim=1)                   # softmax along displacement dimensions
+        score = score.view(batch, du * dv, h, w)        # combine disp. dimensions for softmax
+        prob = F.softmax(score, dim=1)                  # softmax along displacement dimensions
         prob = prob.view(batch, 1, du, dv, h, w)        # reshape for broadcasting
 
         # compute flow as weighted sum over displacement vectors
@@ -365,156 +380,124 @@ class FlowRegression(nn.Module):
         return flow                                     # shape (batch, 2, h, w)
 
 
-class FlowHead(nn.Module):
-    """Head to compute delta-flow from GRU hidden-state"""
-
-    def __init__(self, input_dim=128, hidden_dim=256):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_dim, 2, kernel_size=3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        return self.conv2(self.relu(self.conv1(x)))
-
-
 class RecurrentLevelUnit(nn.Module):
-    def __init__(self, disp_range, feat_channels, ctx_channels, hidden_dim):
+    def __init__(self, disp_range, feat_channels, hidden_dim):
         super().__init__()
 
-        mf_channels = 64
+        mf_channels = 96
 
         self.cvnet = CorrelationVolume(disp_range, feat_channels)
         self.dap = DisplacementAwareProjection(disp_range)
-        self.menet = MotionEncoder(disp_range, ctx_channels, mf_channels - 2 - 2)
+        self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
-        self.flow = FlowRegression()
 
-    def forward(self, fmap1, fmap2, cmap, h, flow):
+    def forward(self, fmap1, fmap2, h, flow):
+        # warp features backwards
+        fmap2, _mask = common.warp.warp_backwards(fmap2, flow.detach())
+
         # build cost volume
         cvol = self.cvnet(fmap1, fmap2)                 # correlation/cost volume
         cvol = self.dap(cvol)                           # projected cost volume
 
         # compute motion features
-        x = self.menet(cvol, cmap, flow)
-        x = torch.cat((x, flow, self.flow(cvol)), dim=1)
+        x = self.menet(cvol, fmap1, flow)
+        x = torch.cat((x, flow), dim=1)
 
         # update hidden state and compute flow delta
         h = self.gru(h, x)
-        flow = flow + self.fhead(h)
+        d = self.fhead(h)
 
-        return h, flow
+        return h, flow + d
 
 
 class WipModule(nn.Module):
-    def __init__(self, disp_range=(5, 5)):
+    def __init__(self, disp_range=(6, 6), dap_init='identity'):
         super().__init__()
 
         self.c_feat = 32
-        self.c_ctx = 32
-        self.c_hidden = 64
+        self.c_hidden = 96
 
         self.fnet = FeatureEncoder(self.c_feat)
-        self.cnet = FeatureEncoder(self.c_ctx)
-        self.rlu = RecurrentLevelUnit(disp_range, self.c_feat, self.c_ctx, self.c_hidden)
+        self.rlu = RecurrentLevelUnit(disp_range, self.c_feat, self.c_hidden)
 
-        self.mask = nn.Sequential(
-            nn.Conv2d(self.c_hidden, 256, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
-        )
+        # initialize weights
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
 
-    def upsample_flow(self, flow, shape, mode='bilinear'):
-        _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = shape
+        # initialize DAP layers via identity matrices if specified
+        if dap_init == 'identity':
+            for m in self.modules():
+                if isinstance(m, DisplacementAwareProjection):
+                    nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
-        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
-        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
-        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
-
-        return flow
-
-    def upsample_flow_toplevel(self, flow, mask):
-        batch, c, h, w = flow.shape
-
-        # prepare mask
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
-
-        # prepare flow
-        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
-        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
-
-        # perform upsampling
-        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
-        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
-
-        return up_flow
-
-    def forward(self, img1, img2):
-        batch, _, h, w = img1.shape
+    def forward(self, img1, img2, iterations=2):
+        out = []
 
         # compute feature maps
         i1f2, i1f3, i1f4, i1f5, i1f6 = self.fnet(img1)
         i2f2, i2f3, i2f4, i2f5, i2f6 = self.fnet(img2)
 
-        # compute context features
-        ctx2, ctx3, ctx4, ctx5, ctx6 = self.fnet(img1)
+        # initialize flow
+        batch, _, h, w = i1f6.shape
+        flow = torch.zeros((batch, 2, h, w), device=img1.device)
 
-        # initialize flow and hidden state
-        flow6 = torch.zeros((batch, 2, h // 64, w // 64), device=img1.device)
-        hidden = torch.zeros((batch, self.c_hidden, h // 64, w // 64), device=img1.device)
+        # initialize hidden state
+        h = torch.zeros((batch, self.c_hidden, *i1f6.shape[2:]), device=img1.device)
 
-        # level 6 (h/64, w/64)
-        hidden, flow6 = self.rlu(i1f6, i2f6, ctx6, hidden, flow6)
+        # level 6
+        h, flow = self.rlu(i1f6, i2f6, h, flow)
+        out.append(flow)
 
-        # level 5 (h/32, w/32)
-        flow5 = self.upsample_flow(flow6, (batch, 2, h // 32, w // 32))
-        hidden = F.interpolate(hidden, (h // 32, w // 32), mode='bilinear', align_corners=True)
+        # level 5
+        flow = 2.0 * F.interpolate(flow, i1f5.shape[2:], mode='bilinear', align_corners=True)
 
-        i2f5, _mask = common.warp.warp_backwards(i2f5, flow5.detach())
+        c = self.c_hidden // 2
+        h1 = F.interpolate(h[:, :c, :, :], i1f5.shape[2:], mode='nearest')
+        h2 = F.interpolate(h[:, c:, :, :], i1f5.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        h = torch.cat((h1, h2), dim=1)
 
-        hidden, flow5 = self.rlu(i1f5, i2f5, ctx5, hidden, flow5)
+        h, flow = self.rlu(i1f5, i2f5, h, flow)
+        out.append(flow)
 
-        # level 4 (h/16, w/16)
-        flow4 = self.upsample_flow(flow5, (batch, 2, h // 16, w // 16))
-        hidden = F.interpolate(hidden, (h // 16, w // 16), mode='bilinear', align_corners=True)
+        # level 4
+        flow = 2.0 * F.interpolate(flow, i1f4.shape[2:], mode='bilinear', align_corners=True)
 
-        i2f4, _mask = common.warp.warp_backwards(i2f4, flow4.detach())
+        c = self.c_hidden // 2
+        h1 = F.interpolate(h[:, :c, :, :], i1f4.shape[2:], mode='nearest')
+        h2 = F.interpolate(h[:, c:, :, :], i1f4.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        h = torch.cat((h1, h2), dim=1)
 
-        hidden, flow4 = self.rlu(i1f4, i2f4, ctx4, hidden, flow4)
+        h, flow = self.rlu(i1f4, i2f4, h, flow)
+        out.append(flow)
 
-        # level 3 (h/8, w/8)
-        flow3 = self.upsample_flow(flow5, (batch, 2, h // 8, w // 8))
-        hidden = F.interpolate(hidden, (h // 8, w // 8), mode='bilinear', align_corners=True)
+        # level 3
+        flow = 2.0 * F.interpolate(flow, i1f3.shape[2:], mode='bilinear', align_corners=True)
 
-        i2f3_1, _mask = common.warp.warp_backwards(i2f3, flow3.detach())
+        c = self.c_hidden // 2
+        h1 = F.interpolate(h[:, :c, :, :], i1f3.shape[2:], mode='nearest')
+        h2 = F.interpolate(h[:, c:, :, :], i1f3.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        h = torch.cat((h1, h2), dim=1)
 
-        hidden, flow3 = self.rlu(i1f3, i2f3_1, ctx3, hidden, flow3)
-        flow3_1 = self.upsample_flow_toplevel(flow3, self.mask(hidden))
+        h, flow = self.rlu(i1f3, i2f3, h, flow)
+        out.append(flow)
 
-        return flow3_1, flow4, flow5, flow6
+        # # level 2
+        # flow = 2.0 * F.interpolate(flow, i1f2.shape[2:], mode='bilinear', align_corners=True)
+        #
+        # c = self.c_hidden // 2
+        # h1 = F.interpolate(h[:, :c, :, :], i1f2.shape[2:], mode='nearest')
+        # h2 = F.interpolate(h[:, c:, :, :], i1f2.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        # h = torch.cat((h1, h2), dim=1)
+        #
+        # h, flow = self.rlu(i1f2, i2f2, h, flow)
+        # out.append(flow)
 
-        # # level 3 iteration 2 (h/8, w/8)
-        # i2f3_1, _mask = common.warp.warp_backwards(i2f3, flow3.detach())
-
-        # hidden, flow3 = self.rlu(i1f3, i2f3_1, ctx3, hidden, flow3)
-        # flow3_2 = self.upsample_flow_toplevel(flow3, self.mask(hidden))
-
-        # return (flow3_2, flow3_1, flow4, flow5, flow6)
-
-        # # level 2 (h/4, w/4)
-        # flow2 = self.upsample_flow(flow5, (batch, 2, h // 4, w // 4))
-        # hidden = F.interpolate(hidden, (h // 4, w // 4), mode='bilinear', align_corners=True)
-
-        # i2f2, _mask = common.warp.warp_backwards(i2f2, flow2.detach())
-
-        # hidden, flow2 = self.rlu(i1f2, i2f2, ctx2, hidden, flow2)
-
-        # return (flow2, flow3, flow4, flow5, flow6)
+        return out
 
 
 class Wip(Model):
@@ -536,7 +519,7 @@ class Wip(Model):
         super().__init__(WipModule(disp_range), arguments)
 
     def get_config(self):
-        default_args = {}
+        default_args = {'iterations': 2}
 
         return {
             'type': self.type,
@@ -546,8 +529,11 @@ class Wip(Model):
             'arguments': default_args | self.arguments,
         }
 
-    def forward(self, img1, img2):
-        return WipResult(self.module(img1, img2), img1.shape)
+    def forward(self, img1, img2, iterations=12):
+        return WipResult(self.module(img1, img2, iterations), img1.shape)
+
+    def train(self, mode: bool = True):
+        super().train(mode)
 
 
 class WipResult(Result):
@@ -562,74 +548,15 @@ class WipResult(Result):
         if batch_index is None:
             return self.result
 
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
+        return reversed([x[batch_index].view(1, *x.shape[1:]) for x in self.result])
 
     def final(self):
-        flow = self.result[0]
+        flow = self.result[-1]
 
         _b, _c, fh, fw = flow.shape
         _b, _c, th, tw = self.shape
 
         flow = F.interpolate(flow.detach(), (th, tw), mode=self.mode, align_corners=True)
-        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
-        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
-
-        return flow
-
-
-class MultiscaleLoss(Loss):
-    type = 'wip/warp/multiscale'
-
-    @classmethod
-    def from_config(cls, cfg):
-        cls._typecheck(cfg)
-
-        return cls(cfg.get('arguments', {}))
-
-    def __init__(self, arguments={}):
-        super().__init__(arguments)
-
-    def get_config(self):
-        default_args = {'ord': 2, 'mode': 'bilinear'}
-
-        return {
-            'type': self.type,
-            'arguments': default_args | self.arguments,
-        }
-
-    def compute(self, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
-        loss = 0.0
-
-        for i, flow in enumerate(result):
-            flow = self.upsample(flow, target.shape, mode)
-
-            # filter valid flow by per-level range
-            mask = valid
-            if valid_range is not None:
-                mask = torch.clone(mask)
-                mask &= target[..., 0, :, :].abs() < valid_range[i][0]
-                mask &= target[..., 1, :, :].abs() < valid_range[i][1]
-
-            # compute flow distance according to specified norm
-            if ord == 'robust':    # robust norm as defined in original DICL implementation
-                dist = ((flow - target).abs().sum(dim=-3) + 1e-8)**0.4
-            else:                       # generic L{ord}-norm
-                dist = torch.linalg.vector_norm(flow - target, ord=float(ord), dim=-3)
-
-            # only calculate error for valid pixels
-            dist = dist[mask]
-
-            # update loss
-            loss = loss + weights[i] * dist.mean()
-
-        # normalize for our convenience
-        return loss / len(result)
-
-    def upsample(self, flow, shape, mode):
-        _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = shape
-
-        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
         flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
