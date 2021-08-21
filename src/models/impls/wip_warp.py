@@ -380,6 +380,26 @@ class FlowHead(nn.Module):
         return flow                                     # shape (batch, 2, h, w)
 
 
+class FlowHead2(nn.Sequential):
+    """Head to compute delta-flow from GRU hidden-state"""
+
+    def __init__(self, input_dim=128, hidden_dim=256, disp_range=(5, 5)):
+
+        self.disp_range = np.asarray(disp_range)
+        disp_dim = np.prod(2 * self.disp_range + 1)
+
+        # network for displacement score/cost generation
+        super().__init__(
+            nn.Conv2d(input_dim, hidden_dim, kernel_size=1, padding=0),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(hidden_dim, disp_dim, kernel_size=1, padding=0),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(disp_dim, 2 * disp_dim, kernel_size=1, padding=0),
+            nn.LeakyReLU(inplace=True),
+            nn.Conv2d(2 * disp_dim, 2, kernel_size=1, padding=0),
+        )
+
+
 class RecurrentLevelUnit(nn.Module):
     def __init__(self, disp_range, feat_channels, hidden_dim):
         super().__init__()
@@ -390,7 +410,7 @@ class RecurrentLevelUnit(nn.Module):
         self.dap = DisplacementAwareProjection(disp_range)
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
-        self.fhead = FlowHead(input_dim=hidden_dim)
+        self.fhead = FlowHead2(input_dim=hidden_dim)
 
     def forward(self, fmap1, fmap2, h, flow):
         # warp features backwards
