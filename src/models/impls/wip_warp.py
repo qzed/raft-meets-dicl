@@ -1,10 +1,13 @@
 import itertools
+from dataclasses import dataclass
+from typing import List
 
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.functional import Tensor
 
 from .. import common
 from .. import Loss, Model, Result
@@ -410,7 +413,7 @@ class RecurrentLevelUnit(nn.Module):
         self.dap = DisplacementAwareProjection(disp_range)
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
-        self.fhead = FlowHead2(input_dim=hidden_dim)
+        self.fhead = FlowHead(input_dim=hidden_dim)
 
     def forward(self, fmap1, fmap2, h, flow):
         # warp features backwards
@@ -517,7 +520,7 @@ class WipModule(nn.Module):
         # h, flow = self.rlu(i1f2, i2f2, h, flow)
         # out.append(flow)
 
-        return out
+        return WipOutput(list(reversed(out)), [i1f3, i1f4, i1f5, i1f6], [i2f3, i2f4, i2f5, i2f6])
 
 
 class Wip(Model):
@@ -556,6 +559,13 @@ class Wip(Model):
         super().train(mode)
 
 
+@dataclass
+class WipOutput:
+    flow: List[Tensor]
+    f1: List[Tensor]
+    f2: List[Tensor]
+
+
 class WipResult(Result):
     def __init__(self, output, target_shape):
         super().__init__()
@@ -566,12 +576,16 @@ class WipResult(Result):
 
     def output(self, batch_index=None):
         if batch_index is None:
-            return list(reversed(self.result))
+            return self.result
 
-        return list(reversed([x[batch_index].view(1, *x.shape[1:]) for x in self.result]))
+        flow = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.flow]
+        f1 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f1]
+        f2 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f2]
+
+        return WipOutput(flow, f1, f2)
 
     def final(self):
-        flow = self.result[-1]
+        flow = self.result.flow[0]
 
         _b, _c, fh, fw = flow.shape
         _b, _c, th, tw = self.shape
@@ -581,3 +595,172 @@ class WipResult(Result):
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
         return flow
+
+
+class MultiscaleLoss(Loss):
+    type = 'wip/warp/multiscale'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 2, 'mode': 'bilinear', 'alpha': 1.0}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
+        loss = 0.0
+
+        for i, flow in enumerate(result.flow):
+            flow = self.upsample(flow, target.shape, mode)
+
+            # filter valid flow by per-level range
+            mask = valid
+            if valid_range is not None:
+                mask = torch.clone(mask)
+                mask &= target[..., 0, :, :].abs() < valid_range[i][0]
+                mask &= target[..., 1, :, :].abs() < valid_range[i][1]
+
+            # compute flow distance according to specified norm
+            if ord == 'robust':    # robust norm as defined in original DICL implementation
+                dist = ((flow - target).abs().sum(dim=-3) + 1e-8)**0.4
+            else:                       # generic L{ord}-norm
+                dist = torch.linalg.vector_norm(flow - target, ord=float(ord), dim=-3)
+
+            # only calculate error for valid pixels
+            dist = dist[mask]
+
+            # update loss
+            loss = loss + weights[i] * dist.mean()
+
+        # normalize and return
+        return loss / len(result.flow)
+
+    def upsample(self, flow, shape, mode):
+        _b, _c, fh, fw = flow.shape
+        _b, _c, th, tw = shape
+
+        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
+        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
+        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
+
+        return flow
+
+
+class MultiscaleCorrHingeLoss(MultiscaleLoss):
+    type = 'wip/warp/multiscale+corr_hinge'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 2, 'mode': 'bilinear', 'margin': 1.0, 'alpha': 1.0}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, weights, ord=2, mode='bilinear', margin=1.0,
+                alpha=1.0, valid_range=None):
+
+        # flow loss
+        loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
+
+        # cost/correlation hinge loss
+        module = model.module.module if isinstance(model, nn.DataParallel) else model.module
+        mnet = module.rlu.cvnet.mnet
+
+        corr_loss = 0.0
+        for feats in (result.f1, result.f2):
+            for i, f in enumerate(feats):
+                batch, c, h, w = f.shape
+
+                # positive examples
+                feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                loss = torch.maximum(margin - corr, torch.zeros_like(corr))
+                corr_loss += loss.mean()
+
+                # negative examples via random permutation (hope for the best...)
+                perm = torch.randperm(h * w)
+
+                fp = f.view(batch, c, h * w)
+                fp = fp[:, :, perm]
+                fp = fp.view(batch, c, h, w)
+
+                feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                loss = torch.maximum(margin + corr, torch.zeros_like(corr))
+                corr_loss += loss.mean()
+
+        return loss + alpha * corr_loss
+
+
+class MultiscaleCorrMseLoss(MultiscaleLoss):
+    type = 'wip/warp/multiscale+corr_mse'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 2, 'mode': 'bilinear', 'alpha': 1.0}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, weights, ord=2, mode='bilinear',
+                alpha=1.0, valid_range=None):
+
+        # flow loss
+        loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
+
+        # cost/correlation hinge loss
+        module = model.module.module if isinstance(model, nn.DataParallel) else model.module
+        mnet = module.rlu.cvnet.mnet
+
+        corr_loss = 0.0
+        for feats in (result.f1, result.f2):
+            for i, f in enumerate(feats):
+                batch, c, h, w = f.shape
+
+                # positive examples
+                feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                corr_loss += (corr - 1.0).square().mean()
+
+                # negative examples via random permutation (hope for the best...)
+                perm = torch.randperm(h * w)
+
+                fp = f.view(batch, c, h * w)
+                fp = fp[:, :, perm]
+                fp = fp.view(batch, c, h, w)
+
+                feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                corr_loss += corr.square().mean()
+
+        return loss + alpha * corr_loss

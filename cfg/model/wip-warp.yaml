@@ -8,7 +8,7 @@ model:
     disp-range: [5, 5]
 
 loss:
-  type: dicl/multiscale
+  type: wip/warp/multiscale
 
   arguments:
     ord: 2
