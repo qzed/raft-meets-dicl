@@ -13,6 +13,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.strategy.checkpoint import Checkpoint, Iteration, State
+from src import models
 
 
 def to_checkpoint(model_id, state, metadata):
@@ -81,11 +82,59 @@ def convert_dicl(state, metadata):
     return to_checkpoint('dicl/baseline', replace_pfx(state, sub), metadata)
 
 
+def convert_init_warp1_via_dicl(chkpt, metadata):
+    chkpt = Checkpoint.from_dict(chkpt)
+
+    model = models.load(Path(__file__).parent / '../cfg/model/wip-warp.yaml')
+    model = model.model
+
+    state = model.state_dict()
+
+    # feature network
+    for k in {k[len('module.fnet.'):] for k in state.keys() if k.startswith('module.fnet.')}:
+        state[f"module.fnet.{k}"] = chkpt.state.model[f"module.feature.{k}"]
+
+    # matchin nets
+    for k in {k[len('module.rlu.cvnet.4.mnet.'):] for k in state.keys() if k.startswith('module.rlu.cvnet.4.mnet.')}:
+        state[f"module.rlu.cvnet.4.mnet.{k}"] = chkpt.state.model[f"module.lvl6.mnet.{k}"]
+
+    for k in {k[len('module.rlu.cvnet.3.mnet.'):] for k in state.keys() if k.startswith('module.rlu.cvnet.3.mnet.')}:
+        state[f"module.rlu.cvnet.3.mnet.{k}"] = chkpt.state.model[f"module.lvl5.mnet.{k}"]
+
+    for k in {k[len('module.rlu.cvnet.2.mnet.'):] for k in state.keys() if k.startswith('module.rlu.cvnet.2.mnet.')}:
+        state[f"module.rlu.cvnet.2.mnet.{k}"] = chkpt.state.model[f"module.lvl4.mnet.{k}"]
+
+    for k in {k[len('module.rlu.cvnet.1.mnet.'):] for k in state.keys() if k.startswith('module.rlu.cvnet.1.mnet.')}:
+        state[f"module.rlu.cvnet.1.mnet.{k}"] = chkpt.state.model[f"module.lvl3.mnet.{k}"]
+
+    for k in {k[len('module.rlu.cvnet.0.mnet.'):] for k in state.keys() if k.startswith('module.rlu.cvnet.0.mnet.')}:
+        state[f"module.rlu.cvnet.0.mnet.{k}"] = chkpt.state.model[f"module.lvl2.mnet.{k}"]
+
+    # DAP
+    for k in {k[len('module.rlu.dap.4.'):] for k in state.keys() if k.startswith('module.rlu.dap.4.')}:
+        state[f"module.rlu.dap.4.{k}"] = chkpt.state.model[f"module.lvl6.dap.{k}"]
+
+    for k in {k[len('module.rlu.dap.3.'):] for k in state.keys() if k.startswith('module.rlu.dap.3.')}:
+        state[f"module.rlu.dap.3.{k}"] = chkpt.state.model[f"module.lvl5.dap.{k}"]
+
+    for k in {k[len('module.rlu.dap.2.'):] for k in state.keys() if k.startswith('module.rlu.dap.2.')}:
+        state[f"module.rlu.dap.2.{k}"] = chkpt.state.model[f"module.lvl4.dap.{k}"]
+
+    for k in {k[len('module.rlu.dap.1.'):] for k in state.keys() if k.startswith('module.rlu.dap.1.')}:
+        state[f"module.rlu.dap.1.{k}"] = chkpt.state.model[f"module.lvl3.dap.{k}"]
+
+    for k in {k[len('module.rlu.dap.0.'):] for k in state.keys() if k.startswith('module.rlu.dap.0.')}:
+        state[f"module.rlu.dap.0.{k}"] = chkpt.state.model[f"module.lvl2.dap.{k}"]
+
+    return to_checkpoint('wip/warp/1', state, metadata)
+
+
 def main():
     # define available converters
     convert = {
         'raft': convert_raft,
         'dicl': convert_dicl,
+        'init-warp1-via-dicl': convert_init_warp1_via_dicl,
     }
 
     # handle command-line input
