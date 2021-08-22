@@ -342,7 +342,7 @@ class StrategyValidation(Validation):
             result = ctx.model(img1, img2, **stage.model_args)
 
             # compute loss
-            loss = ctx.loss(result.output(), flow, valid, **stage.loss_args)
+            loss = ctx.loss(ctx.model, result.output(), flow, valid, **stage.loss_args)
 
             # update metrics
             est = result.final()

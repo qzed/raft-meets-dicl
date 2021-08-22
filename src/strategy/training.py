@@ -195,7 +195,7 @@ class TrainingContext:
         result = self.model(img1, img2, **stage.model_args)
 
         # compute loss
-        loss = self.loss(result.output(), flow, valid, **stage.loss_args)
+        loss = self.loss(self.model, result.output(), flow, valid, **stage.loss_args)
 
         # backprop
         self.scaler.scale(loss).backward()

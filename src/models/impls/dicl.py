@@ -610,7 +610,7 @@ class MultiscaleLoss(Loss):
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
+    def compute(self, model, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
         loss = 0.0
 
         for i, flow in enumerate(result):

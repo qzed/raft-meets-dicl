@@ -508,7 +508,7 @@ class SequenceLoss(Loss):
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, result, target, valid, ord=1, gamma=0.8):
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8):
         n_predictions = len(result)
 
         loss = 0.0

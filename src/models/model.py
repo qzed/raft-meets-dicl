@@ -47,8 +47,8 @@ class Loss:
     def get_config(self):
         raise NotImplementedError
 
-    def compute(self, result, target, valid, **kwargs):
+    def compute(self, model, result, target, valid, **kwargs):
         raise NotImplementedError
 
-    def __call__(self, result, target, valid, **kwargs):
-        return self.compute(result, target, valid, **(self.arguments | kwargs))
+    def __call__(self, model, result, target, valid, **kwargs):
+        return self.compute(model, result, target, valid, **(self.arguments | kwargs))
