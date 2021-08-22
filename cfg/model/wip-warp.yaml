@@ -5,7 +5,7 @@ model:
   type: wip/warp/1
 
   parameters:
-    disp-range: [5, 5]
+    disp-range: [3, 3]
 
 loss:
   type: wip/warp/multiscale
@@ -19,6 +19,7 @@ loss:
       - 0.75
       - 0.50
       - 0.25
+      - 0.125
 
 input:
   clip: [0, 1]

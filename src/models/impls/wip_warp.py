@@ -409,19 +409,31 @@ class RecurrentLevelUnit(nn.Module):
 
         mf_channels = 96
 
-        self.cvnet = CorrelationVolume(disp_range, feat_channels)
-        self.dap = DisplacementAwareProjection(disp_range)
+        self.cvnet = nn.ModuleList([
+            CorrelationVolume(disp_range, feat_channels),
+            CorrelationVolume(disp_range, feat_channels),
+            CorrelationVolume(disp_range, feat_channels),
+            CorrelationVolume(disp_range, feat_channels),
+            CorrelationVolume(disp_range, feat_channels),
+        ])
+        self.dap = nn.ModuleList([
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+        ])
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
 
-    def forward(self, fmap1, fmap2, h, flow):
+    def forward(self, fmap1, fmap2, h, flow, i):
         # warp features backwards
         fmap2, _mask = common.warp.warp_backwards(fmap2, flow.detach())
 
         # build cost volume
-        cvol = self.cvnet(fmap1, fmap2)                 # correlation/cost volume
-        cvol = self.dap(cvol)                           # projected cost volume
+        cvol = self.cvnet[i](fmap1, fmap2)              # correlation/cost volume
+        cvol = self.dap[i](cvol)                        # projected cost volume
 
         # compute motion features
         x = self.menet(cvol, fmap1, flow)
@@ -473,7 +485,7 @@ class WipModule(nn.Module):
         h = torch.zeros((batch, self.c_hidden, *i1f6.shape[2:]), device=img1.device)
 
         # level 6
-        h, flow = self.rlu(i1f6, i2f6, h, flow)
+        h, flow = self.rlu(i1f6, i2f6, h, flow, 4)
         out.append(flow)
 
         # level 5
@@ -484,7 +496,7 @@ class WipModule(nn.Module):
         h2 = F.interpolate(h[:, c:, :, :], i1f5.shape[2:], mode='bilinear', align_corners=True) * 2.0
         h = torch.cat((h1, h2), dim=1)
 
-        h, flow = self.rlu(i1f5, i2f5, h, flow)
+        h, flow = self.rlu(i1f5, i2f5, h, flow, 3)
         out.append(flow)
 
         # level 4
@@ -495,7 +507,7 @@ class WipModule(nn.Module):
         h2 = F.interpolate(h[:, c:, :, :], i1f4.shape[2:], mode='bilinear', align_corners=True) * 2.0
         h = torch.cat((h1, h2), dim=1)
 
-        h, flow = self.rlu(i1f4, i2f4, h, flow)
+        h, flow = self.rlu(i1f4, i2f4, h, flow, 2)
         out.append(flow)
 
         # level 3
@@ -506,21 +518,21 @@ class WipModule(nn.Module):
         h2 = F.interpolate(h[:, c:, :, :], i1f3.shape[2:], mode='bilinear', align_corners=True) * 2.0
         h = torch.cat((h1, h2), dim=1)
 
-        h, flow = self.rlu(i1f3, i2f3, h, flow)
+        h, flow = self.rlu(i1f3, i2f3, h, flow, 1)
         out.append(flow)
 
-        # # level 2
-        # flow = 2.0 * F.interpolate(flow, i1f2.shape[2:], mode='bilinear', align_corners=True)
-        #
-        # c = self.c_hidden // 2
-        # h1 = F.interpolate(h[:, :c, :, :], i1f2.shape[2:], mode='nearest')
-        # h2 = F.interpolate(h[:, c:, :, :], i1f2.shape[2:], mode='bilinear', align_corners=True) * 2.0
-        # h = torch.cat((h1, h2), dim=1)
-        #
-        # h, flow = self.rlu(i1f2, i2f2, h, flow)
-        # out.append(flow)
+        # level 2
+        flow = 2.0 * F.interpolate(flow, i1f2.shape[2:], mode='bilinear', align_corners=True)
 
-        return WipOutput(list(reversed(out)), [i1f3, i1f4, i1f5, i1f6], [i2f3, i2f4, i2f5, i2f6])
+        c = self.c_hidden // 2
+        h1 = F.interpolate(h[:, :c, :, :], i1f2.shape[2:], mode='nearest')
+        h2 = F.interpolate(h[:, c:, :, :], i1f2.shape[2:], mode='bilinear', align_corners=True) * 2.0
+        h = torch.cat((h1, h2), dim=1)
+
+        h, flow = self.rlu(i1f2, i2f2, h, flow, 0)
+        out.append(flow)
+
+        return WipOutput(list(reversed(out)), [i1f2, i1f3, i1f4, i1f5, i1f6], [i1f2, i2f3, i2f4, i2f5, i2f6])
 
 
 class Wip(Model):
@@ -693,7 +705,7 @@ class MultiscaleCorrHingeLoss(MultiscaleLoss):
 
                 # positive examples
                 feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 loss = torch.maximum(margin - corr, torch.zeros_like(corr))
                 corr_loss += loss.mean()
 
@@ -705,7 +717,7 @@ class MultiscaleCorrHingeLoss(MultiscaleLoss):
                 fp = fp.view(batch, c, h, w)
 
                 feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 loss = torch.maximum(margin + corr, torch.zeros_like(corr))
                 corr_loss += loss.mean()
 
@@ -749,7 +761,7 @@ class MultiscaleCorrMseLoss(MultiscaleLoss):
 
                 # positive examples
                 feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 corr_loss += (corr - 1.0).square().mean()
 
                 # negative examples via random permutation (hope for the best...)
@@ -760,7 +772,7 @@ class MultiscaleCorrMseLoss(MultiscaleLoss):
                 fp = fp.view(batch, c, h, w)
 
                 feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 corr_loss += corr.square().mean()
 
         return flow_loss + alpha * corr_loss
