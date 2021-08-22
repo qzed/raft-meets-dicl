@@ -566,9 +566,9 @@ class WipResult(Result):
 
     def output(self, batch_index=None):
         if batch_index is None:
-            return self.result
+            return list(reversed(self.result))
 
-        return reversed([x[batch_index].view(1, *x.shape[1:]) for x in self.result])
+        return list(reversed([x[batch_index].view(1, *x.shape[1:]) for x in self.result]))
 
     def final(self):
         flow = self.result[-1]
