@@ -8,13 +8,13 @@ model:
     upnet: true
 
   arguments:
-    iterations: 5
+    iterations: 3
 
 loss:
   type: raft/cl/sequence
 
   arguments:
-    ord: 1
+    ord: 2
     gamma: 0.85
 
 input:

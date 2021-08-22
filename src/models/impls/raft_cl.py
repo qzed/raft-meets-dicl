@@ -470,8 +470,18 @@ class CorrelationModule(nn.Module):
         self.radius = radius
         self.toplevel = toplevel
 
-        self.mnet = MatchingNet(feature_dim)
-        self.dap = DisplacementAwareProjection((radius, radius))
+        self.mnet = nn.ModuleList([
+            MatchingNet(feature_dim),
+            MatchingNet(feature_dim),
+            MatchingNet(feature_dim),
+            MatchingNet(feature_dim),
+        ])
+        self.dap = nn.ModuleList([
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+        ])
 
     def forward(self, fmap1, fmap2, coords, dap=True):
         batch, _, h, w = coords.shape
@@ -531,8 +541,8 @@ class CorrelationModule(nn.Module):
             corr = torch.cat((f1, f2), dim=-3)
 
             # build cost volume for this level
-            cost = self.mnet(corr)                                  # (batch, 2r+1, 2r+1, h2, w2)
-            cost = self.dap(cost)                                   # (batch, 2r+1, 2r+1, h2, w2)
+            cost = self.mnet[i](corr)                                  # (batch, 2r+1, 2r+1, h2, w2)
+            cost = self.dap[i](cost)                                   # (batch, 2r+1, 2r+1, h2, w2)
 
             # explode/repeat from (batch, c_lvl, h2, w2) to (batch, c_lvl, h, w)
             cost = cost.view(batch, -1, h2, 1, w2, 1)
@@ -552,7 +562,7 @@ class RaftModule(nn.Module):
     def __init__(self, upnet=True, dap_init='identity'):
         super().__init__()
 
-        self.feature_dim = 24
+        self.feature_dim = 32
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
@@ -795,7 +805,7 @@ class SequenceCorrHingeLoss(SequenceLoss):
 
                 # positive examples
                 feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 loss = torch.maximum(margin - corr, torch.zeros_like(corr))
                 corr_loss += loss.mean()
 
@@ -807,7 +817,7 @@ class SequenceCorrHingeLoss(SequenceLoss):
                 fp = fp.view(batch, c, h, w)
 
                 feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 loss = torch.maximum(margin + corr, torch.zeros_like(corr))
                 corr_loss += loss.mean()
 
@@ -848,18 +858,19 @@ class SequenceCorrMseLoss(SequenceLoss):
 
                 # positive examples
                 feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 corr_loss += (corr - 1.0).square().mean()
 
                 # negative examples via random permutation (hope for the best...)
-                perm = torch.randperm(h * w)
+                p_spatial = torch.randperm(h * w)
+                p_batch = torch.randperm(result.ft.shape[0])
 
                 fp = f.view(batch, c, h * w)
-                fp = fp[:, :, perm]
+                fp = fp[p_batch, :, p_spatial]
                 fp = fp.view(batch, c, h, w)
 
                 feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
-                corr = mnet(feat)
+                corr = mnet[i](feat)
                 corr_loss += corr.square().mean()
 
         return flow_loss + alpha * corr_loss
