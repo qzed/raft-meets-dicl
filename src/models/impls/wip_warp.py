@@ -680,7 +680,7 @@ class MultiscaleCorrHingeLoss(MultiscaleLoss):
                 alpha=1.0, valid_range=None):
 
         # flow loss
-        loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
+        flow_loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
 
         # cost/correlation hinge loss
         module = model.module.module if isinstance(model, nn.DataParallel) else model.module
@@ -709,7 +709,7 @@ class MultiscaleCorrHingeLoss(MultiscaleLoss):
                 loss = torch.maximum(margin + corr, torch.zeros_like(corr))
                 corr_loss += loss.mean()
 
-        return loss + alpha * corr_loss
+        return flow_loss + alpha * corr_loss
 
 
 class MultiscaleCorrMseLoss(MultiscaleLoss):
@@ -736,7 +736,7 @@ class MultiscaleCorrMseLoss(MultiscaleLoss):
                 alpha=1.0, valid_range=None):
 
         # flow loss
-        loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
+        flow_loss = super().compute(model, result, target, valid, weights, ord, mode, valid_range)
 
         # cost/correlation hinge loss
         module = model.module.module if isinstance(model, nn.DataParallel) else model.module
@@ -763,4 +763,4 @@ class MultiscaleCorrMseLoss(MultiscaleLoss):
                 corr = mnet(feat)
                 corr_loss += corr.square().mean()
 
-        return loss + alpha * corr_loss
+        return flow_loss + alpha * corr_loss
