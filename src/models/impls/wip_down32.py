@@ -428,7 +428,7 @@ class WipModule(nn.Module):
             if isinstance(m, FlowHead):
                 m.init_weights()
 
-    def forward(self, img1, img2, iterations=2):
+    def forward(self, img1, img2):
         out = []
 
         # compute feature maps
@@ -487,7 +487,7 @@ class Wip(Model):
         super().__init__(WipModule(disp_range), arguments)
 
     def get_config(self):
-        default_args = {'iterations': 2}
+        default_args = {}
 
         return {
             'type': self.type,
@@ -497,8 +497,8 @@ class Wip(Model):
             'arguments': default_args | self.arguments,
         }
 
-    def forward(self, img1, img2, iterations=12):
-        return WipResult(self.module(img1, img2, iterations), img1.shape)
+    def forward(self, img1, img2):
+        return WipResult(self.module(img1, img2), img1.shape)
 
     def train(self, mode: bool = True):
         super().train(mode)
