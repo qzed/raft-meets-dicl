@@ -11,7 +11,7 @@ model:
     iterations: 5
 
 loss:
-  type: raft/sequence
+  type: raft/cl/sequence
 
   arguments:
     ord: 1

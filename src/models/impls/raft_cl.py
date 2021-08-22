@@ -1,8 +1,12 @@
+from dataclasses import dataclass
+from typing import List
+
 import numpy as np
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.functional import Tensor
 
 from .. import Loss, Model, Result
 
@@ -650,7 +654,7 @@ class RaftModule(nn.Module):
 
             out.append(flow_up)
 
-        return out
+        return RaftClOutput(out, fmap1, fmap2)
 
 
 class Raft(Model):
@@ -696,7 +700,166 @@ class RaftResult(Result):
         if batch_index is None:
             return self.result
 
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
+        flow = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.flow]
+        f1 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f1]
+        f2 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f2]
+
+        return RaftClOutput(flow, f1, f2)
 
     def final(self):
-        return self.result[-1]
+        return self.result.flow[-1]
+
+
+@dataclass
+class RaftClOutput:
+    flow: List[Tensor]
+    f1: List[Tensor]
+    f2: List[Tensor]
+
+
+class SequenceLoss(Loss):
+    type = 'raft/cl/sequence'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 1, 'gamma': 0.8}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8):
+        n_predictions = len(result.flow)
+
+        # flow loss
+        loss = 0.0
+        for i, flow in enumerate(result.flow):
+            # compute weight for sequence index
+            weight = gamma**(n_predictions - i - 1)
+
+            # compute flow distance according to specified norm (L1 in orig. impl.)
+            dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
+
+            # Only calculate error for valid pixels. N.b.: This is a difference
+            # to the original implementation, where invalid pixels are included
+            # in the mean as zero loss, skewing it (this should not make much
+            # of a difference wrt. optimization).
+            dist = dist[valid]
+
+            # update loss
+            loss = loss + weight * dist.mean()
+
+        return loss
+
+
+class SequenceCorrHingeLoss(SequenceLoss):
+    type = 'raft/cl/sequence+corr_hinge'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 1, 'gamma': 0.8, 'alpha': 1.0, 'margin': 1.0}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=1.0, margin=1.0):
+        flow_loss = super().compute(model, result, target, valid, ord, gamma)
+
+        # cost/correlation hinge loss
+        module = model.module.module if isinstance(model, nn.DataParallel) else model.module
+        mnet = module.cvol.mnet
+
+        corr_loss = 0.0
+        for feats in (result.f1, result.f2):
+            for i, f in enumerate(feats):
+                batch, c, h, w = f.shape
+
+                # positive examples
+                feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                loss = torch.maximum(margin - corr, torch.zeros_like(corr))
+                corr_loss += loss.mean()
+
+                # negative examples via random permutation (hope for the best...)
+                perm = torch.randperm(h * w)
+
+                fp = f.view(batch, c, h * w)
+                fp = fp[:, :, perm]
+                fp = fp.view(batch, c, h, w)
+
+                feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                loss = torch.maximum(margin + corr, torch.zeros_like(corr))
+                corr_loss += loss.mean()
+
+        return flow_loss + alpha * corr_loss
+
+
+class SequenceCorrMseLoss(SequenceLoss):
+    type = 'raft/cl/sequence+corr_mse'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {'ord': 1, 'gamma': 0.8, 'alpha': 1.0}
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=1.0):
+        flow_loss = super().compute(model, result, target, valid, ord, gamma)
+
+        # cost/correlation loss
+        module = model.module.module if isinstance(model, nn.DataParallel) else model.module
+        mnet = module.cvol.mnet
+
+        corr_loss = 0.0
+        for feats in (result.f1, result.f2):
+            for i, f in enumerate(feats):
+                batch, c, h, w = f.shape
+
+                # positive examples
+                feat = torch.cat((f, f), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                corr_loss += (corr - 1.0).square().mean()
+
+                # negative examples via random permutation (hope for the best...)
+                perm = torch.randperm(h * w)
+
+                fp = f.view(batch, c, h * w)
+                fp = fp[:, :, perm]
+                fp = fp.view(batch, c, h, w)
+
+                feat = torch.cat((f, fp), dim=-3).view(batch, 1, 1, 2 * c, h, w)
+                corr = mnet(feat)
+                corr_loss += corr.square().mean()
+
+        return flow_loss + alpha * corr_loss
