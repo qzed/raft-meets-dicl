@@ -128,6 +128,9 @@ class FeatureNet(nn.Module):
         self.deconv3b = GaDeconv2xBlock(96, 64)
         self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
+        self.deconv2b = GaDeconv2xBlock(64, 48)
+        self.outconv2 = ConvBlock(48, output_channels, kernel_size=3, padding=1)
+
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
 
@@ -164,7 +167,10 @@ class FeatureNet(nn.Module):
         x = self.deconv3b(x, res2)              # -> 64, H/8, W/8
         x3 = self.outconv3(x)                   # -> 32, H/8, W/8
 
-        return x3, x4, x5, x6
+        x = self.deconv2b(x, res1)              # -> 48, H/4, W/4
+        x2 = self.outconv2(x)                   # -> 32, H/4, W/4
+
+        return x2, x3, x4, x5, x6
 
 
 class MatchingNet(nn.Sequential):
@@ -294,13 +300,13 @@ class RecurrentFlowUnit(nn.Module):
 
 
 class WipModule(nn.Module):
-    def __init__(self, feature_channels=32, disp=[(3, 3)]*4):
+    def __init__(self, feature_channels=32, disp=[(3, 3)]*5):
         super().__init__()
 
         self.fnet = FeatureNet(feature_channels)
-        self.rfu = nn.ModuleList([RecurrentFlowUnit(feature_channels, disp[i]) for i in range(4)])
+        self.rfu = nn.ModuleList([RecurrentFlowUnit(feature_channels, disp[i]) for i in range(5)])
 
-    def forward(self, img1, img2, iterations=[1, 1, 1, 1, 1]):
+    def forward(self, img1, img2, iterations=[1]*5):
         batch, _, h, w = img1.shape
 
         # perform feature extraction
@@ -355,7 +361,7 @@ class Wip(Model):
 
         param_cfg = cfg['parameters']
         feat = param_cfg.get('feature-channels', 32)
-        disp = param_cfg.get('disp-range', [(3, 3)] * 4)
+        disp = param_cfg.get('disp-range', [(3, 3)] * 5)
 
         args = cfg.get('arguments', {})
 
@@ -368,7 +374,7 @@ class Wip(Model):
         self.disp = disp
 
     def get_config(self):
-        default_args = {'iterations': [1]*4}
+        default_args = {'iterations': [1]*5}
 
         return {
             'type': self.type,
@@ -379,7 +385,7 @@ class Wip(Model):
             'arguments': default_args | self.arguments,
         }
 
-    def forward(self, img1, img2, iterations=[1]*4):
+    def forward(self, img1, img2, iterations=[1]*5):
         _, _, h, w = img1.shape
         return WipResult(self.module(img1, img2, iterations), img1.shape[2:])
 
