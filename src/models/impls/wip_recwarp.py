@@ -261,36 +261,26 @@ class RecurrentFlowUnit(nn.Module):
         batch, c, h, w = feat2.shape
         du, dv = disp
 
+        # prepare base coordinates
         coords = coords.permute(0, 2, 3, 1)                     # (batch, h, w, 2)
-        coords = coords.view(batch, h, w, 1, 1, 2)
+        coords = coords.view(batch, 1, h, 1, w, 2)
 
         # add lookup kernel
-        coords = coords + self.lookup_kernel((du, dv), device=coords.device)
+        delta = self.lookup_kernel((du, dv), device=coords.device)
+        delta = delta.view(1, 2*dv + 1, 1, 2*du + 1, 1, 2)
+
+        coords = coords + delta                                 # (batch, 2dv+1, h, 2du+1, w, 2)
 
         # normalize coordinates for sampling
         coords[..., 0] = 2 * coords[..., 0] / (w - 1) - 1
         coords[..., 1] = 2 * coords[..., 1] / (h - 1) - 1
 
-        # prepare for sampling
-        coords = coords.reshape(batch, h * w, 2*dv + 1, 2*du + 1, 2)
-
         # sample second frame: backwards warping with context
-        # FIXME: possible to build a custom grid_sample that does not run into these memory issues?
-        f2o = []
-        for b in range(batch):
-            f2b = feat2[b]
+        coords = coords.reshape(batch, (2*dv + 1) * h, (2*du + 1) * w, 2)  # (batch, vh, uw, 2)
+        feat2 = F.grid_sample(feat2, coords, align_corners=True)        # (batch, c, vh, uw)
+        feat2 = feat2.view(batch, c, 2*dv + 1, h, 2*du + 1, w)          # (batch, c, v, h, u, w)
 
-            f2b = f2b.view(1, c, h, w)
-            f2b = f2b.expand(h*w, c, h, w)
-
-            f2b = F.grid_sample(f2b, coords[b], align_corners=True)
-
-            f2b = f2b.view(h, w, c, 2*dv + 1, 2*du + 1)
-            f2b = f2b.permute(3, 4, 2, 0, 1)                    # (2dv+1, 2du+1, c, h, w)
-
-            f2o.append(f2b)
-
-        return torch.stack(f2o, dim=0)                          # (batch, 2dv+1, 2du+1, c, h, w)
+        return feat2.permute(0, 2, 4, 1, 3, 5)                          # (batch, v, u, c, h, w)
 
     def feature_stack(self, feat1, feat2):
         batch, v, u, c, h, w = feat2.shape
