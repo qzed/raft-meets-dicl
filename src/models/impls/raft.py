@@ -168,7 +168,7 @@ class CorrBlock:
         # build lookup kernel
         dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
         dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        delta = torch.stack(torch.meshgrid(dx, dy), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+        delta = torch.stack(torch.meshgrid(dx, dy), dim=-1)     # change dims to (2r+1, 2r+1, 2)
 
         # lookup over pyramid levels
         out = []
