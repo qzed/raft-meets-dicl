@@ -62,6 +62,7 @@ def load_model(cfg) -> model.Model:
         m.raft_cl.Raft,
         m.raft_down32.Raft,
         m.wip_down32.Wip,
+        m.wip_recwarp.Wip,
         m.wip_warp.Wip,
     ]
     types = {cls.type: cls for cls in types}
