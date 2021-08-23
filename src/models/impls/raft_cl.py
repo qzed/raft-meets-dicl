@@ -502,7 +502,7 @@ class CorrelationModule(nn.Module):
                 coords = F.avg_pool2d(coords, kernel_size=2, stride=2)  # (batch, 2, h2, w2)
 
             # build interpolation map for grid-sampling
-            centroids = coords.permute(0, 2, 3, 1)              # (batch, 2, h2, w2)
+            centroids = coords.permute(0, 2, 3, 1)              # (batch, h2, w2, 2)
             centroids = coords.view(batch, h2, w2, 1, 1, 2)     # reshape for broadcasting
             centroids = centroids / 2**i + delta                # broadcasts to (..., 2r+1, 2r+1, 2)
 
