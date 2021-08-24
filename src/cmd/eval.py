@@ -61,7 +61,7 @@ class MeanCollector(Collector):
             if k not in self.results:
                 self.results[k] = list()
 
-            self.results[k].append(v.item())
+            self.results[k].append(v)
 
     def result(self):
         results = OrderedDict()
@@ -214,9 +214,10 @@ def evaluate(args):
 
             # compute metrics
             sample_metrs = metrics(model, est, target, valid, sample_loss)
+            sample_metrs = {k: v.item() for k, v in sample_metrs.items()}
 
             # collect for output
-            output.append({'id': meta.sample_id, 'metrics': sample_metrs})
+            output.append({'id': str(meta.sample_id), 'metrics': sample_metrs})
 
             # collect for summary
             collectors.collect(sample_metrs)
