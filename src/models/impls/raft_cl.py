@@ -491,6 +491,7 @@ class CorrelationModule(nn.Module):
         dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
         dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
         delta = torch.stack(torch.meshgrid(dx, dy), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+        delta = delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)        # reshape for broadcasting
 
         # compute correlation/cost for each feature level
         out = []
@@ -503,46 +504,30 @@ class CorrelationModule(nn.Module):
 
             # build interpolation map for grid-sampling
             centroids = coords.permute(0, 2, 3, 1)              # (batch, h2, w2, 2)
-            centroids = coords.view(batch, h2, w2, 1, 1, 2)     # reshape for broadcasting
-            centroids = centroids / 2**i + delta                # broadcasts to (..., 2r+1, 2r+1, 2)
+            centroids = coords.view(batch, 1, h2, 1, w2, 2)     # reshape for broadcasting
+            centroids = centroids / 2**i + delta                # broadcasts to (b, 2r+1, h2, 2r+1, w2, 2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
             centroids[..., 0] = 2 * centroids[..., 0] / (w2 - 1) - 1
             centroids[..., 1] = 2 * centroids[..., 1] / (h2 - 1) - 1
 
             # reshape coordinates for sampling to (n, h_out, w_out, x/y=2)
-            centroids = centroids.view(batch, h2 * w2, 2*r + 1, 2*r + 1, 2)
+            centroids = centroids.view(batch, (2*r + 1) * h2, (2*r + 1) * w2, 2)
 
             # sample from second frame features
-            f2o = []
-            for b in range(batch):
-                # Split on samples so we can use expand for grid sampling. This
-                # saves a bunch of memory as we'd otherwise have to use reshape
-                # after extend.
-
-                f2b = f2[b]
-
-                f2b = f2b.view(1, c, h2, w2)                        # (1, c, h2, w2)
-                f2b = f2b.expand(h2 * w2, c, h2, w2)                # (h2*w2, c, h2, w2)
-
-                f2b = F.grid_sample(f2b, centroids[b], align_corners=True)  # (h2*w2, c, 2r+1, 2r+1)
-
-                f2b = f2b.view(h2, w2, c, 2*r + 1, 2*r + 1)         # (h2, w2, c, 2r+1, 2r+1)
-                f2b = f2b.permute(3, 4, 2, 0, 1)                    # (2r+1, 2r+1, c, h2, w2)
-
-                f2o.append(f2b)
-
-            f2 = torch.stack(f2o, dim=0)
+            f2 = F.grid_sample(f2, centroids, align_corners=True)   # (batch, c, dh2, dw2)
+            f2 = f2.view(batch, c, 2*r + 1, h2, 2*r + 1, w2)    # (batch, c, 2r+1, h2, 2r+1, w2)
+            f2 = f2.permute(0, 2, 4, 1, 3, 5)                   # (batch, 2r+1, 2r+1, c, h2, w2)
 
             # build correlation volume
             f1 = f1.view(batch, 1, 1, c, h2, w2)
-            f1 = f1.expand(-1, 2*r + 1, 2*r + 1, c, h2, w2)         # (batch, 2r+1, 2r+1, c, h2, w2)
+            f1 = f1.expand(-1, 2*r + 1, 2*r + 1, c, h2, w2)     # (batch, 2r+1, 2r+1, c, h2, w2)
 
-            corr = torch.cat((f1, f2), dim=-3)
+            corr = torch.cat((f1, f2), dim=-3)                  # (batch, 2r+1, 2r+1, 2c, h2, w2)
 
             # build cost volume for this level
-            cost = self.mnet[i](corr)                                  # (batch, 2r+1, 2r+1, h2, w2)
-            cost = self.dap[i](cost)                                   # (batch, 2r+1, 2r+1, h2, w2)
+            cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h2, w2)
+            cost = self.dap[i](cost)                            # (batch, 2r+1, 2r+1, h2, w2)
 
             # explode/repeat from (batch, c_lvl, h2, w2) to (batch, c_lvl, h, w)
             cost = cost.view(batch, -1, h2, 1, w2, 1)
