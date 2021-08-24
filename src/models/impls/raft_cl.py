@@ -504,7 +504,7 @@ class CorrelationModule(nn.Module):
 
             # build interpolation map for grid-sampling
             centroids = coords.permute(0, 2, 3, 1)              # (batch, h2, w2, 2)
-            centroids = coords.view(batch, 1, h2, 1, w2, 2)     # reshape for broadcasting
+            centroids = centroids.view(batch, 1, h2, 1, w2, 2)  # reshape for broadcasting
             centroids = centroids / 2**i + delta                # broadcasts to (b, 2r+1, h2, 2r+1, w2, 2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
@@ -512,7 +512,7 @@ class CorrelationModule(nn.Module):
             centroids[..., 1] = 2 * centroids[..., 1] / (h2 - 1) - 1
 
             # reshape coordinates for sampling to (n, h_out, w_out, x/y=2)
-            centroids = centroids.view(batch, (2*r + 1) * h2, (2*r + 1) * w2, 2)
+            centroids = centroids.reshape(batch, (2*r + 1) * h2, (2*r + 1) * w2, 2)
 
             # sample from second frame features
             f2 = F.grid_sample(f2, centroids, align_corners=True)   # (batch, c, dh2, dw2)
