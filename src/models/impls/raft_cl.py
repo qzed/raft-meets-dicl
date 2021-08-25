@@ -256,15 +256,15 @@ class BasicEncoder(nn.Module):
         # dropout
         self.dropout = nn.Dropout2d(p=dropout)
 
-#        # initialize weights
-#        for m in self.modules():
-#            if isinstance(m, nn.Conv2d):
-#                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-#            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-#                if m.weight is not None:
-#                    nn.init.constant_(m.weight, 1)
-#                if m.bias is not None:
-#                    nn.init.constant_(m.bias, 0)
+        # # initialize weights
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        #     elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+        #         if m.weight is not None:
+        #             nn.init.constant_(m.weight, 1)
+        #         if m.bias is not None:
+        #             nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         # input may be tuple/list for flow network (img1, img2), combine this into single batch
