@@ -337,6 +337,17 @@ class WipModule(nn.Module):
         self.fnet = FeatureNet(feature_channels)
         self.rfu = nn.ModuleList([RecurrentFlowUnit(feature_channels, disp[i]) for i in range(5)])
 
+        # initialize weights
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                # Note: fan_out does not work at all and performs worse than
+                # default initialization, fan_in performs about the same as
+                # default initialization.
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
+
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
