@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -194,6 +196,31 @@ class MatchingNet(nn.Sequential):
         return x
 
 
+class DisplacementAwareProjection(nn.Module):
+    """Displacement aware projection layer"""
+
+    def __init__(self, range):
+        super().__init__()
+
+        range = np.asarray(range)
+        assert range.shape == (2,)     # displacement range for u and v
+
+        # compute number of channels aka. displacement possibilities
+        n_channels = np.prod(2 * range + 1)
+
+        # output channels are weighted sums over input channels (i.e. displacement possibilities)
+        self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
+
+    def forward(self, x):
+        batch, du, dv, h, w = x.shape
+
+        x = x.view(batch, du * dv, h, w)    # combine displacement ranges to channels
+        x = self.conv1(x)                   # apply 1x1 convolution to combine channels
+        x = x.view(batch, du, dv, h, w)     # separate displacement ranges again
+
+        return x
+
+
 class FlowRegression(nn.Module):
     def __init__(self):
         super().__init__()
@@ -234,9 +261,10 @@ class RecurrentFlowUnit(nn.Module):
         self.disp = range
 
         self.mnet = MatchingNet(feature_channels)
+        self.dap = DisplacementAwareProjection(range)
         self.flow = FlowRegression()
 
-    def forward(self, feat1, feat2, coords):
+    def forward(self, feat1, feat2, coords, dap=True):
         # collect second frame features: warp backwards with displacement context
         feat2 = self.warp_with_context(feat2, coords, self.disp)    # (batch, 2dv+1, 2du+1, c, h, w)
 
@@ -245,6 +273,9 @@ class RecurrentFlowUnit(nn.Module):
 
         # compute matching costs/correlation from features
         cost = self.mnet(feat)                                  # (batch, 2dv+1, 2du+1, h, w)
+
+        if dap:
+            cost = self.dap(cost)                               # (batch, 2dv+1, 2du+1, h, w)
 
         # flow delta regression
         delta = self.flow(cost)                                 # (batch, 2, h, w)
@@ -300,13 +331,19 @@ class RecurrentFlowUnit(nn.Module):
 
 
 class WipModule(nn.Module):
-    def __init__(self, feature_channels=32, disp=[(3, 3)]*5):
+    def __init__(self, feature_channels=32, disp=[(3, 3)]*5, dap_init='identity'):
         super().__init__()
 
         self.fnet = FeatureNet(feature_channels)
         self.rfu = nn.ModuleList([RecurrentFlowUnit(feature_channels, disp[i]) for i in range(5)])
 
-    def forward(self, img1, img2, iterations=[1]*5):
+        # initialize DAP layers via identity matrices if specified
+        if dap_init == 'identity':
+            for m in self.modules():
+                if isinstance(m, DisplacementAwareProjection):
+                    nn.init.eye_(m.conv1.weight[:, :, 0, 0])
+
+    def forward(self, img1, img2, iterations=[1]*5, dap=True):
         batch, _, h, w = img1.shape
 
         # perform feature extraction
@@ -333,7 +370,7 @@ class WipModule(nn.Module):
             coords0 = self.coordinate_grid((batch, *f1.shape[2:]), device=img1.device)
 
             for j in range(iterations[i]):
-                coords = self.rfu[i](f1, f2, coords)
+                coords = self.rfu[i](f1, f2, coords, dap=dap)
 
                 out.append(coords - coords0)
 
@@ -362,32 +399,35 @@ class Wip(Model):
         param_cfg = cfg['parameters']
         feat = param_cfg.get('feature-channels', 32)
         disp = param_cfg.get('disp-range', [(3, 3)] * 5)
+        dap_init = param_cfg.get('dap-init', 'identity')
 
         args = cfg.get('arguments', {})
 
-        return cls(feat, disp, args)
+        return cls(feat, disp, dap_init, args)
 
-    def __init__(self, feature_channels, disp, arguments={}):
-        super().__init__(WipModule(feature_channels, disp), arguments)
+    def __init__(self, feature_channels, disp, dap_init='identity', arguments={}):
+        super().__init__(WipModule(feature_channels, disp, dap_init), arguments)
 
         self.feature_channels = feature_channels
         self.disp = disp
+        self.dap_init = dap_init
 
     def get_config(self):
-        default_args = {'iterations': [1]*5}
+        default_args = {'iterations': [1]*5, 'dap': True}
 
         return {
             'type': self.type,
             'parameters': {
                 'feature-channels': self.feature_channels,
                 'range': self.disp,
+                'dap-init': self.dap_init,
             },
             'arguments': default_args | self.arguments,
         }
 
-    def forward(self, img1, img2, iterations=[1]*5):
+    def forward(self, img1, img2, iterations=[1]*5, dap=True):
         _, _, h, w = img1.shape
-        return WipResult(self.module(img1, img2, iterations), img1.shape[2:])
+        return WipResult(self.module(img1, img2, iterations, dap), img1.shape[2:])
 
 
 class WipResult(Result):
