@@ -256,16 +256,6 @@ class BasicEncoder(nn.Module):
         # dropout
         self.dropout = nn.Dropout2d(p=dropout)
 
-        # # initialize weights
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-        #         if m.weight is not None:
-        #             nn.init.constant_(m.weight, 1)
-        #         if m.bias is not None:
-        #             nn.init.constant_(m.bias, 0)
-
     def forward(self, x):
         # input may be tuple/list for flow network (img1, img2), combine this into single batch
         is_list = isinstance(x, tuple) or isinstance(x, list)
@@ -561,12 +551,15 @@ class RaftModule(nn.Module):
         self.cvol = CorrelationModule(self.feature_dim, self.corr_radius)
 
         # initialize weights
-        # for m in self.modules():
-        #     if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, nn.BatchNorm2d):
-        #         nn.init.constant_(m.weight, 1.0)
-        #         nn.init.constant_(m.bias, 0.0)
+        for m in self.modules():
+            if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+                # Note: fan_out mode proves unstable and leads to being stuck
+                # in a local minumum (learning to forget input and produce
+                # zeros flow rather than proper flow values).
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
 
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
