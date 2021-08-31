@@ -11,6 +11,11 @@ import torch.nn.functional as F
 from .. import Loss, Model, Result
 
 
+import pickle
+
+EVDATA = []
+
+
 def _make_norm2d(ty, num_channels, num_groups):
     if ty == 'group':
         return nn.GroupNorm(num_groups=num_groups, num_channels=num_channels)
@@ -400,6 +405,12 @@ class RaftModule(nn.Module):
         if flow_init is not None:
             coords1 += flow_init
 
+        EVDATA.append({})
+        EVDATA[-1]['img1'] = img1.detach().cpu().numpy()
+        EVDATA[-1]['img2'] = img2.detach().cpu().numpy()
+        EVDATA[-1]['corr'] = [c.detach().cpu().numpy() for c in corr_vol.corr_pyramid]
+        EVDATA[-1]['delta'] = []
+
         # iteratively predict flow
         out = []
         for _ in range(iterations):
@@ -413,6 +424,8 @@ class RaftModule(nn.Module):
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
                 h, mask, d = self.update_block(h, x, corr, flow)
 
+            EVDATA[-1]['delta'].append(d.detach().cpu().numpy())
+
             # update flow estimate
             coords1 = coords1 + d
 
@@ -423,6 +436,9 @@ class RaftModule(nn.Module):
                 flow_up = F.interpolate(coords1 - coords0, img1.shape[2:], mode='bilinear', align_corners=True)
 
             out.append(flow_up)
+
+        with open('./notebooks/data/raft-data.pickle', 'wb') as fd:
+            pickle.dump(EVDATA, fd)
 
         return out
 
