@@ -18,3 +18,4 @@ chkpt/
 # checkpoints and binary data
 *.pth
 *.npy
+*.pickle
