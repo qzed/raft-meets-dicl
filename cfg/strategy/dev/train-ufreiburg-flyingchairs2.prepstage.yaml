@@ -1,0 +1,56 @@
+mode: continuous
+
+stages:
+  - name: "FlyingChairs2 (basic augmentations only with forwards-backwards batching)"
+    id: train/chairs2-0
+
+    data:
+      source: ../../data/ufreiburg-flyingchairs2.train.aug-basic.fwbw.yaml
+      epochs: 1
+      batch-size: 1   # Note: this will create a batch size of 2 due to forward-backward matching
+
+    validation:
+      source: ../../data/ufreiburg-flyingchairs2.test.yaml
+      batch-size: 1
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: 1.0e-4
+        weight_decay: 0.0
+        betas: [0.9, 0.999]
+        eps: 1.0e-8
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
+
+  - name: "FlyingChairs2 (fully augmented)"
+    id: train/chairs2-1
+
+    data:
+      source: ../../data/ufreiburg-flyingchairs2.train.aug-full.yaml
+      epochs: 25
+      batch-size: 2
+
+    validation:
+      source: ../../data/ufreiburg-flyingchairs2.test.yaml
+      batch-size: 1
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: 1.0e-4
+        weight_decay: 0.0
+        betas: [0.9, 0.999]
+        eps: 1.0e-8
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
