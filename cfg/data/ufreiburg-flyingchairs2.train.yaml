@@ -1,3 +1,5 @@
+type: concat
+
 sources:
   - type: dataset
     spec: dataset/ufreiburg-flyingchairs2.yaml
