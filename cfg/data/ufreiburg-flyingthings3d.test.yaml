@@ -1,0 +1,5 @@
+type: concat
+
+sources:
+  - ufreiburg-flyingthings3d-clean.test.yaml
+  - ufreiburg-flyingthings3d-final.test.yaml

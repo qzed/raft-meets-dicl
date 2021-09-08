@@ -1,0 +1,5 @@
+type: concat
+
+sources:
+  - ufreiburg-flyingthings3d-clean.train.yaml
+  - ufreiburg-flyingthings3d-final.train.yaml
