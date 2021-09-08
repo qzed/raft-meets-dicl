@@ -15,9 +15,9 @@ from . import cmd
 # - training with warm start from previous checkpoint (only model weights)
 #   {prog} train --data data.yaml --model model.yaml --checkpoint checkpoint.pth
 #
-# - continue previous run from checkpoint (only epoch granularity, includes optimizer state etc.)
-#   {prog} train --config config.yaml --continue checkpoint.pth
-#   {prog} train --data data.yaml --model model.yaml --continue checkpoint.pth
+# - resume previous run from checkpoint (only epoch granularity, includes optimizer state etc.)
+#   {prog} train --config config.yaml --resume checkpoint.pth
+#   {prog} train --data data.yaml --model model.yaml --resume checkpoint.pth
 #
 # - reproduce previous training run
 #   {prog} train --config config.yaml --reproduce
