@@ -1,0 +1,28 @@
+mode: continuous
+
+stages:
+  - name: "FlyingThings3d"
+    id: train/things3d-0
+
+    data:
+      source: ../../data/ufreiburg-flyingthings3d.train.aug-full.yaml
+      epochs: 100
+      batch-size: 2
+
+    validation:
+      source: ../../data/ufreiburg-flyingthings3d.test.yaml
+      batch-size: 1
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: 0.0001125
+        weight_decay: 0.00001
+        eps: 1.0e-9
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
