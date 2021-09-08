@@ -543,7 +543,6 @@ class Scale(Augmentation):
 
     def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:3] == img2.shape[:3]
-        assert np.all(valid)        # full flows only!
 
         # draw random but valid scale factors
         size, scale = self._get_new_size(img1.shape[1:3])
@@ -565,6 +564,7 @@ class Scale(Augmentation):
             flow = np.stack(flow_out, axis=0)
 
             # this is for full/non-sparse flows only...
+            # FIXME: This will invalidate pre-filtering of flow magnitudes when loading.
             valid = np.ones(img1.shape[:3], dtype=bool)
 
         for m in meta:

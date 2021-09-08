@@ -41,4 +41,7 @@ augmentations:
   - type: noise-normal
     stddev: 0.002
 
+  - type: restrict-flow-magnitude
+    maximum: 1000
+
 source: ufreiburg-flyingthings3d.train.yaml
