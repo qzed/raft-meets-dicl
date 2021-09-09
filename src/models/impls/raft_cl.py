@@ -19,7 +19,7 @@ class ConvBlock(nn.Sequential):
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            # nn.BatchNorm2d(c_out),
+            nn.BatchNorm2d(c_out),
             nn.ReLU(inplace=True),
         )
 
@@ -30,7 +30,7 @@ class DeconvBlock(nn.Sequential):
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            # nn.BatchNorm2d(c_out),
+            nn.BatchNorm2d(c_out),
             nn.ReLU(inplace=True),
         )
 
@@ -45,7 +45,7 @@ class GaConv2xBlock(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        # self.bn2 = nn.BatchNorm2d(c_out)
+        self.bn2 = nn.BatchNorm2d(c_out)
         self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x, res):
@@ -57,7 +57,7 @@ class GaConv2xBlock(nn.Module):
         x = torch.cat((x, res), dim=1)
 
         x = self.conv2(x)
-        # x = self.bn2(x)
+        x = self.bn2(x)
         x = self.relu2(x)
 
         return x
@@ -73,7 +73,7 @@ class GaDeconv2xBlock(nn.Module):
         self.relu1 = nn.ReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        # self.bn2 = nn.BatchNorm2d(c_out)
+        self.bn2 = nn.BatchNorm2d(c_out)
         self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x, res):
@@ -85,7 +85,7 @@ class GaDeconv2xBlock(nn.Module):
         x = torch.cat((x, res), dim=1)
 
         x = self.conv2(x)
-        # x = self.bn2(x)
+        x = self.bn2(x)
         x = self.relu2(x)
 
         return x
