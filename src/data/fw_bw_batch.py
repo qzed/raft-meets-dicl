@@ -44,7 +44,6 @@ class ForwardsBackwardsBatch(Collection):
 
         # Make sure that the pairs actually match
         for mf, mb in zip(meta_fw, meta_bw):
-            assert mf.sample_id.format == mb.sample_id.format
             assert mf.sample_id.img1 == mb.sample_id.img2
             assert mf.sample_id.img2 == mb.sample_id.img1
 
