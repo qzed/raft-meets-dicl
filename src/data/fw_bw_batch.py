@@ -52,6 +52,7 @@ class ForwardsBackwardsBatch(Collection):
         img1 = np.concatenate((img1_fw, img1_bw), axis=0)
         img2 = np.concatenate((img2_fw, img2_bw), axis=0)
 
+        flow, valid = None, None
         if flow_fw is not None:
             flow = np.concatenate((flow_fw, flow_bw), axis=0)
             valid = np.concatenate((valid_fw, valid_bw), axis=0)
