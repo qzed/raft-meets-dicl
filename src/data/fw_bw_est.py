@@ -239,7 +239,7 @@ def estimate_backwards_flow(img1, img2, flow, valid, th_weight=0.25, s_motion=1.
     if fill_method == 'minimum':
         flow_bw, valid_bw = fill_min(flow_bw, valid_bw, **fill_args)
     elif fill_method == 'average':
-        pass        # TODO
+        flow_bw, valid_bw = fill_avg(flow_bw, valid_bw, **fill_args)
     elif fill_method == 'oriented':
         pass        # TODO
     elif fill_method != 'none':
@@ -296,5 +296,52 @@ def fill_min(flow, valid, kernel_size=(5, 5), n_iter=None):
     else:
         while not np.all(valid):
             flow, valid = _fill_min(flow, valid, kernel_size)
+
+    return flow, valid
+
+
+def _fill_avg(flow, valid, kernel_size=(5, 5), threshold=5):
+    # Pad input with zeros / invalid.
+    p_y, p_x = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
+    flow_pad = np.pad(flow, ((p_y, p_y), (p_x, p_x), (0, 0)), mode='constant', constant_values=0)
+    valid_pad = np.pad(valid, ((p_y, p_y), (p_x, p_x)), mode='constant', constant_values=False)
+
+    # Create masked kernel views.
+    u, v = flow_pad[..., 0], flow_pad[..., 1]
+    count = np.ones(u.shape)
+
+    u_kern = np.lib.stride_tricks.sliding_window_view(u, kernel_size)
+    v_kern = np.lib.stride_tricks.sliding_window_view(v, kernel_size)
+    count = np.lib.stride_tricks.sliding_window_view(count, kernel_size)
+    mask = ~np.lib.stride_tricks.sliding_window_view(valid_pad, kernel_size)
+
+    u_kern = np.ma.masked_array(u_kern, mask)
+    v_kern = np.ma.masked_array(v_kern, mask)
+    count = np.ma.masked_array(count, mask)
+
+    # Compute average over kernel.
+    u_avg = np.average(u_kern, axis=(-2, -1))
+    v_avg = np.average(v_kern, axis=(-2, -1))
+    count = np.sum(count, axis=(-2, -1))
+
+    # Set average only on invalid pixels where we have enough data.
+    mask = ~valid & (count >= threshold)
+
+    flow = np.copy(flow)
+    flow[mask, 0] = u_avg[mask]
+    flow[mask, 1] = v_avg[mask]
+
+    assert np.all(u_avg.mask == v_avg.mask)
+
+    return flow, ~u_avg.mask & (count >= threshold)
+
+
+def fill_avg(flow, valid, kernel_size=(5, 5), threshold=5, n_iter=None):
+    if n_iter is not None:
+        for _ in range(n_iter):
+            flow, valid = _fill_avg(flow, valid, kernel_size, threshold)
+    else:
+        while not np.all(valid):
+            flow, valid = _fill_avg(flow, valid, kernel_size, threshold)
 
     return flow, valid
