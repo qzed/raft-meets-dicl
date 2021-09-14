@@ -47,6 +47,15 @@ class ForwardsBackwardsBatch(Collection):
             assert mf.sample_id.img1 == mb.sample_id.img2
             assert mf.sample_id.img2 == mb.sample_id.img1
 
+        # Update metadata. We assume that the sample ID already distinguishes
+        # between fowrards and backwards samples, so do not modify the
+        # sample_id format here.
+        for m in meta_fw:
+            m.direction = 'forwards'
+
+        for m in meta_bw:
+            m.direction = 'backwards'
+
         # Concat to batch. Note: Batches get shuffled internally when
         # collating.
         img1 = np.concatenate((img1_fw, img1_bw), axis=0)
