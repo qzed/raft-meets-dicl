@@ -342,10 +342,13 @@ class Stage:
         gradient = GradientSpec.from_config(cfg.get('gradient', {}))
         scheduler = MultiSchedulerSpec.from_config(cfg.get('lr-scheduler', {}))
 
-        return cls(name, id, data, valid, optimizer, model_args, loss_args, gradient, scheduler)
+        loader_args = cfg.get('loader', {})
+
+        return cls(name, id, data, valid, optimizer, model_args, loss_args, gradient, scheduler,
+                   loader_args)
 
     def __init__(self, name, id, data, validation, optimizer, model_args={}, loss_args={},
-                 gradient=None, scheduler=MultiSchedulerSpec()):
+                 gradient=None, scheduler=MultiSchedulerSpec(), loader_args={}):
         self.name = name
         self.id = id
         self.data = data
@@ -355,6 +358,7 @@ class Stage:
         self.loss_args = loss_args
         self.gradient = gradient
         self.scheduler = scheduler
+        self.loader_args = loader_args
         self.index = 0
 
     def get_config(self):
@@ -368,6 +372,7 @@ class Stage:
             'loss': {'arguments': self.loss_args},
             'gradient': self.gradient.get_config() if self.gradient is not None else None,
             'lr-scheduler': self.scheduler.get_config(),
+            'loader': self.loader_args,
         }
 
 

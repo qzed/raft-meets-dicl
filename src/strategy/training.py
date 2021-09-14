@@ -122,9 +122,11 @@ class TrainingContext:
         # load data
         log.info(f"loading dataset: {stage.data.source.description()}")
 
+        loader_args = self.loader_args | stage.loader_args
+
         input = self.input.apply(stage.data.source).torch()
         self.data = input.loader(batch_size=stage.data.batch_size, shuffle=stage.data.shuffle,
-                                 drop_last=stage.data.drop_last, **self.loader_args)
+                                 drop_last=stage.data.drop_last, **loader_args)
 
         log.info(f"dataset loaded: have {len(self.data)} batches over {len(input)} samples")
 

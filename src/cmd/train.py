@@ -166,7 +166,7 @@ def _train(args):
         torch.backends.cudnn.benchmark = True
 
     # training loop
-    loader_args = {'num_workers': 4, 'pin_memory': True}
+    loader_args = {'num_workers': 4, 'pin_memory': True}    # defaults, can be overwritten in stage
 
     log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
