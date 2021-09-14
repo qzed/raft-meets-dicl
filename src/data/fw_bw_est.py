@@ -15,17 +15,27 @@ class ForwardsBackwardsEstimate(Collection):
 
         source = config.load(path, cfg['source'])
 
-        return cls(source)
+        fill_cfg = cfg.get('fill', {})
+        fill_mthd = fill_cfg.get('method', 'none')
+        fill_args = fill_cfg.get('args', {})
 
-    def __init__(self, source):
+        return cls(source, fill_mthd, fill_args)
+
+    def __init__(self, source, fill_method, fill_args):
         super().__init__()
 
         self.source = source
+        self.fill_method = fill_method
+        self.fill_args = fill_args
 
     def get_config(self):
         return {
             'type': self.type,
             'source': self.source.get_config(),
+            'fill': {
+                'method': self.fill_method,
+                'args': self.fill_args,
+            },
         }
 
     def __getitem__(self, index):
@@ -66,7 +76,8 @@ class ForwardsBackwardsEstimate(Collection):
         return img1, img2, flow, valid, meta_fw + meta_bw
 
     def _est_bwd(self, img1, img2, flow, valid):
-        return estimate_backwards_flow(img1, img2, flow, valid)     # TODO: options
+        return estimate_backwards_flow(img1, img2, flow, valid, fill_method=self.fill_method,
+                                       fill_args=self.fill_args)        # TODO: add more options
 
     def __len__(self):
         return len(self.source)
@@ -226,7 +237,7 @@ def estimate_backwards_flow(img1, img2, flow, valid, th_weight=0.25, s_motion=1.
 
     # Fill disocclusions.
     if fill_method == 'minimum':
-        pass        # TODO
+        flow_bw, valid_bw = fill_min(flow_bw, valid_bw, **fill_args)
     elif fill_method == 'average':
         pass        # TODO
     elif fill_method == 'oriented':
@@ -235,3 +246,55 @@ def estimate_backwards_flow(img1, img2, flow, valid, th_weight=0.25, s_motion=1.
         raise ValueError(f"invalid fill method '{fill_method}'")
 
     return flow_bw, valid_bw
+
+
+def _fill_min(flow, valid, kernel_size=(5, 5)):
+    # Pad input with zeros / invalid.
+    p_y, p_x = (kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2
+    flow_pad = np.pad(flow, ((p_y, p_y), (p_x, p_x), (0, 0)), mode='constant', constant_values=0)
+    valid_pad = np.pad(valid, ((p_y, p_y), (p_x, p_x)), mode='constant', constant_values=False)
+
+    # Compute squared flow magnitude (no need for root).
+    u, v = flow_pad[..., 0], flow_pad[..., 1]
+    mag = np.square(u) + np.square(v)
+
+    # Create masked kernel views.
+    u_kern = np.lib.stride_tricks.sliding_window_view(u, kernel_size)
+    v_kern = np.lib.stride_tricks.sliding_window_view(v, kernel_size)
+    mag_kern = np.lib.stride_tricks.sliding_window_view(mag, kernel_size)
+    mask = ~np.lib.stride_tricks.sliding_window_view(valid_pad, kernel_size)
+
+    u_kern = np.ma.masked_array(u_kern, mask)
+    v_kern = np.ma.masked_array(v_kern, mask)
+    mag_kern = np.ma.masked_array(mag_kern, mask)
+
+    # Compute argmin over kernel.
+    mag_kern = mag_kern.reshape((*mag_kern.shape[:-2], -1))
+    idx = np.argmin(mag_kern, axis=-1)
+
+    # Create new u/v arrays by selecting minimum.
+    u_kern = u_kern.reshape((*u_kern.shape[:-2], -1))
+    u_min = np.take_along_axis(u_kern, idx[:, :, None], axis=-1).reshape(u_kern.shape[:-1])
+
+    v_kern = v_kern.reshape((*v_kern.shape[:-2], -1))
+    v_min = np.take_along_axis(v_kern, idx[:, :, None], axis=-1).reshape(v_kern.shape[:-1])
+
+    # Set minimum only on invalid pixels.
+    flow = np.copy(flow)
+    flow[~valid, 0] = u_min[~valid]
+    flow[~valid, 1] = v_min[~valid]
+
+    assert np.all(u_min.mask == v_min.mask)
+
+    return flow, ~u_min.mask
+
+
+def fill_min(flow, valid, kernel_size=(5, 5), n_iter=None):
+    if n_iter is not None:
+        for _ in range(n_iter):
+            flow, valid = _fill_min(flow, valid, kernel_size)
+    else:
+        while not np.all(valid):
+            flow, valid = _fill_min(flow, valid, kernel_size)
+
+    return flow, valid
