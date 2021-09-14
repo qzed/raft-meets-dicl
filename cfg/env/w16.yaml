@@ -1,0 +1,3 @@
+loader:
+  num_workers: 16
+  pin_memory: false

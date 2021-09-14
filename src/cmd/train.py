@@ -15,10 +15,30 @@ from .. import inspect
 from ..strategy.training import TrainingContext
 
 
+class Environment:
+    @classmethod
+    def load(cls, cfg):
+        if isinstance(cfg, (Path, str)):
+            cfg = utils.config.load(cfg)
+
+        loader_args = cfg.get('loader', {})
+
+        return cls(loader_args)
+
+    def __init__(self, loader_args):
+        self.loader_args = loader_args
+
+    def get_config(self):
+        return {
+            'loader': self.loader_args,
+        }
+
+
 def _train(args):
     timestamp = datetime.datetime.now()
 
     cfg_seeds = None
+    cfg_env = None
     cfg_model = None
     cfg_strat = None
     cfg_inspc = None
@@ -44,6 +64,7 @@ def _train(args):
         cfg_model = config.get('model')
         cfg_strat = config.get('strategy')
         cfg_inspc = config.get('inspect')
+        cfg_env = config.get('environment')
 
     # load seed config
     if args.seeds:
@@ -58,6 +79,15 @@ def _train(args):
         seeds = utils.seeds.from_config(cfg_seeds).apply()
     else:
         seeds = utils.seeds.random_seeds().apply()
+
+    # load environment config
+    if args.env:
+        cfg_env = args.env
+
+    if cfg_env is None:
+        cfg_env = Path(__file__).parent.parent.parent / 'cfg' / 'env' / 'default.yaml'
+
+    env = Environment.load(cfg_env)
 
     # load model
     if args.model is not None:
@@ -113,6 +143,7 @@ def _train(args):
         'model': model.get_config(),
         'strategy': strat.get_config(),
         'inspect': inspc.get_config(),
+        'environment': env.get_config(),
     })
 
     # set up device
@@ -166,10 +197,8 @@ def _train(args):
         torch.backends.cudnn.benchmark = True
 
     # training loop
-    loader_args = {'num_workers': 4, 'pin_memory': True}    # defaults, can be overwritten in stage
-
     log = utils.logging.Logger()
-    tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, loader_args)
+    tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, env.loader_args)
 
     if args.detect_anomaly:
         with torch.autograd.detect_anomaly():
