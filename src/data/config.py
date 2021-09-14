@@ -6,6 +6,7 @@ from . import augment
 from . import concat
 from . import dataset
 from . import fw_bw_batch
+from . import fw_bw_est
 from . import repeat
 
 
@@ -15,6 +16,7 @@ def _load(path, cfg):
         augment.Augment,
         concat.Concat,
         fw_bw_batch.ForwardsBackwardsBatch,
+        fw_bw_est.ForwardsBackwardsEstimate,
         repeat.Repeat,
     ]
     types = {ty.type: ty for ty in types}
