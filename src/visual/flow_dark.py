@@ -16,6 +16,10 @@ def flow_to_rgba(uv, mask=None, mrm=None, gamma=1.0, transform=None, mask_color=
 
     u, v = uv[:, :, 0], uv[:, :, 1]
 
+    if mask is not None:
+        u[~mask] = 0.0
+        v[~mask] = 0.0
+
     # Handle bogus flow fields: This is an indication of network collapse, emit
     # a warning but set to zero so that we don't fail with index errors later
     # on.

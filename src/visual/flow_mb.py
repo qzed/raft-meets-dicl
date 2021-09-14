@@ -71,6 +71,10 @@ def flow_to_rgba(uv, mask=None, mrm=None, gamma=1.0, eps=1e-5, mask_color=(0, 0,
     if COLORWHEEL is None:
         COLORWHEEL = generate_color_wheel()
 
+    if mask is not None:
+        u[~mask] = 0.0
+        v[~mask] = 0.0
+
     # Handle bogus flow fields: This is an indication of network collapse, emit
     # a warning but set to zero so that we don't fail with index errors later
     # on.
