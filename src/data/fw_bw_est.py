@@ -15,16 +15,19 @@ class ForwardsBackwardsEstimate(Collection):
 
         source = config.load(path, cfg['source'])
 
+        parameters = cfg.get('parameters', {})
+
         fill_cfg = cfg.get('fill', {})
         fill_mthd = fill_cfg.get('method', 'none')
-        fill_args = fill_cfg.get('args', {})
+        fill_args = fill_cfg.get('parameters', {})
 
-        return cls(source, fill_mthd, fill_args)
+        return cls(source, parameters, fill_mthd, fill_args)
 
-    def __init__(self, source, fill_method, fill_args):
+    def __init__(self, source, parameters, fill_method, fill_args):
         super().__init__()
 
         self.source = source
+        self.parameters = parameters
         self.fill_method = fill_method
         self.fill_args = fill_args
 
@@ -34,8 +37,9 @@ class ForwardsBackwardsEstimate(Collection):
             'source': self.source.get_config(),
             'fill': {
                 'method': self.fill_method,
-                'args': self.fill_args,
+                'parameters': self.fill_args,
             },
+            'parameters:': self.parameters,
         }
 
     def __getitem__(self, index):
@@ -77,7 +81,7 @@ class ForwardsBackwardsEstimate(Collection):
 
     def _est_bwd(self, img1, img2, flow, valid):
         return estimate_backwards_flow(img1, img2, flow, valid, fill_method=self.fill_method,
-                                       fill_args=self.fill_args)        # TODO: add more options
+                                       fill_args=self.fill_args, **self.parameters)
 
     def __len__(self):
         return len(self.source)
