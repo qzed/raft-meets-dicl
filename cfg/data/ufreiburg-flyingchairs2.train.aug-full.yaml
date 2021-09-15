@@ -1,14 +1,17 @@
 type: augment
 
 augmentations:
-  # TODO: more augmentations?
+  - type: translate
+    min-size: &img_size [496, 368]
+    delta: [10, 10]
 
   - type: scale
-    min-size: &img_size [496, 368]
+    min-size: *img_size
     min-scale: 0.9
     max-scale: 2.0
     max-stretch: 0.2
     prob-stretch: 0.8
+    mode: linear
 
   - type: crop
     size: *img_size
@@ -24,9 +27,21 @@ augmentations:
     hue: 0.1592   # 0.5 / pi
 
   - type: occlusion-forward
-    probability: 0.5
+    probability: 0.25
     num: [1, 3]
     min-size: [1, 1]
     max-size: [100, 50]
+
+  - type: occlusion-backward
+    probability: 0.25
+    num: [1, 3]
+    min-size: [1, 1]
+    max-size: [100, 50]
+
+  - type: noise-normal
+    stddev: 0.002
+
+  - type: restrict-flow-magnitude
+    maximum: 400
 
 source: ufreiburg-flyingchairs2.train.yaml
