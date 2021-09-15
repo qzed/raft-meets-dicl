@@ -503,11 +503,7 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     mask = valid.detach().cpu()
 
     ft = target.detach().cpu().permute(1, 2, 0).numpy()
-    ft = visual.flow_to_rgba(ft, mask=mask)
-
     fe = estimate.detach().cpu().permute(1, 2, 0).numpy()
-    fe = visual.flow_to_rgba(fe)
-
     i1 = (img1.detach().cpu().permute(1, 2, 0).numpy() + 1) / 2
     i2 = (img2.detach().cpu().permute(1, 2, 0).numpy() + 1) / 2
 
@@ -517,6 +513,15 @@ def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step
     ft = ft[h0:h1, w0:w1]
     fe = fe[h0:h1, w0:w1]
     mask = mask[h0:h1, w0:w1]
+
+    # compute maximum motion accross both estiamte and target
+    ft_max = np.max(np.linalg.norm(ft, axis=-1))
+    fe_max = np.max(np.linalg.norm(fe, axis=-1))
+    mrm = max(ft_max, fe_max)
+
+    # convert image to RGBA
+    ft = visual.flow_to_rgba(ft, mrm=mrm, mask=mask)
+    fe = visual.flow_to_rgba(fe, mrm=mrm)
 
     # write images
     writer.add_image(f"{pfx}img1", i1, step, dataformats='HWC')
