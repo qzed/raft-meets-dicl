@@ -576,8 +576,8 @@ class Scale(Augmentation):
 class ScaleSparse(Scale):
     type = 'scale-sparse'
 
-    def __init__(self, min_size, min_scale, max_scale, mode):
-        super().__init__(min_size, min_scale, max_scale, mode)
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
+        super().__init__(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
 
     def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:3] == img2.shape[:3] == flow.shape[:3] == valid.shape[:3]
