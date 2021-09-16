@@ -635,7 +635,7 @@ class ScaleSparse(Scale):
         for m in meta:
             m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
 
-        return img1, img2, new_flow, new_valid, meta
+        return img1, img2, flow, valid, meta
 
 
 class Translate(Augmentation):
