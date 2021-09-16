@@ -1,0 +1,31 @@
+type: augment
+
+augmentations:
+  - type: crop
+    size: [768, 384]
+
+  - type: flip
+    probability: [0.5, 0.5]
+
+source:
+  type: forwards-backwards-batch
+
+  forwards:
+    type: dataset
+    spec: dataset/ufreiburg-flyingthings3d.yaml
+
+    parameters:
+      type: train
+      pass: clean
+      direction: forwards
+      camera: left
+
+  backwards:
+    type: dataset
+    spec: dataset/ufreiburg-flyingthings3d.yaml
+
+    parameters:
+      type: train
+      pass: clean
+      direction: backwards
+      camera: left

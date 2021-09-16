@@ -1,0 +1,38 @@
+mode: continuous
+
+stages:
+  - name: "FlyingThings3d"
+    id: train/things3d-0
+
+    data:
+      source: ../../data/ufreiburg-flyingthings3d-clean.train.aug-basic.fwbw.yaml
+      epochs: 1
+      batch-size: 1
+
+    validation:
+      source: ../../data/ufreiburg-flyingthings3d-clean.test.yaml
+      batch-size: 1
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: &learning_rate 0.000125
+        weight_decay: 0.0001
+        eps: 1.0e-9
+
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate
+            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
