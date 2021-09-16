@@ -19,6 +19,7 @@ class Metric:
         from . import grad_norm
         from . import loss
         from . import lr
+        from . import param_norm
 
         types = [
             aae.AverageAngularError,
@@ -28,6 +29,7 @@ class Metric:
             grad_norm.GradientNorm,
             loss.Loss,
             lr.LearningRate,
+            param_norm.ParameterNorm,
         ]
         types = {cls.type: cls for cls in types}
 
