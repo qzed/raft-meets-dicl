@@ -173,13 +173,13 @@ class TorchAdapter:
         # validate image data
         if self.validate:
             if not np.all(np.isfinite(img1)):
-                warnings.warn("non-finite values in img1 detected", RuntimeWarning)
+                warnings.warn("non-finite values in img1 detected", RuntimeWarning, stacklevel=2)
 
                 for m in meta:
                     m.valid = False
 
             if not np.all(np.isfinite(img1)):
-                warnings.warn("non-finite values in img2 detected", RuntimeWarning)
+                warnings.warn("non-finite values in img2 detected", RuntimeWarning, stacklevel=2)
 
                 for m in meta:
                     m.valid = False
@@ -195,13 +195,13 @@ class TorchAdapter:
             # validate flow data
             if self.validate:
                 if not np.all(np.any(valid, axis=(1, 2))):
-                    warnings.warn("a sample contains no valid flow pixels", RuntimeWarning)
+                    warnings.warn("a sample contains no valid flow pixels", RuntimeWarning, stacklevel=2)
 
                     for m in meta:
                         m.valid = False
 
                 if not np.all(np.isfinite(flow[valid[:, :, :], :])):
-                    warnings.warn("non-finite values in flow detected", RuntimeWarning)
+                    warnings.warn("non-finite values in flow detected", RuntimeWarning, stacklevel=2)
 
                     for m in meta:
                         m.valid = False
