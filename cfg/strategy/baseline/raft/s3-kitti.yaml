@@ -2,8 +2,8 @@ name: "RAFT: Stage 3: KITTI"
 id: raft/s3-kitti
 
 data:
-  epochs: 155       # ~ 300000 samples
-  batch-size: 2
+  epochs: 155       # ~ 50k steps or 300k samples
+  batch-size: 6
 
   source:
     type: augment
@@ -71,5 +71,3 @@ gradient:
   clip:
     type: norm
     value: 1.0
-
-  accumulate: 3

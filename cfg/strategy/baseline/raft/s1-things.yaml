@@ -2,8 +2,8 @@ name: "RAFT: Stage 1: Uni Freiburg FlyingThings"
 id: raft/s1-things
 
 data:
-  epochs: 4           # ~ 600000 samples
-  batch-size: 2
+  epochs: 15        # ~ 600k samples or 100k steps
+  batch-size: 6
 
   source:
     type: augment
@@ -77,5 +77,3 @@ gradient:
   clip:
     type: norm
     value: 1.0
-
-  accumulate: 3
