@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import torch
 
@@ -160,13 +162,29 @@ class Input:
 
 
 class TorchAdapter:
-    def __init__(self, source, flow=True):
+    def __init__(self, source, flow=True, validate=True):
         self.source = source
         self.flow = flow
+        self.validate = validate
 
     def __getitem__(self, index):
         img1, img2, flow, valid, meta = self.source[index]
 
+        # validate image data
+        if self.validate:
+            if not np.all(np.isfinite(img1)):
+                warnings.warn("non-finite values in img1 detected", RuntimeWarning)
+
+                for m in meta:
+                    m.valid = False
+
+            if not np.all(np.isfinite(img1)):
+                warnings.warn("non-finite values in img2 detected", RuntimeWarning)
+
+                for m in meta:
+                    m.valid = False
+
+        # convert images
         img1 = torch.from_numpy(img1).float().permute(0, 3, 1, 2)
         img2 = torch.from_numpy(img2).float().permute(0, 3, 1, 2)
 
@@ -174,6 +192,21 @@ class TorchAdapter:
             # make sure dataset actually provides flow data
             assert flow is not None and valid is not None
 
+            # validate flow data
+            if self.validate:
+                if not np.all(np.any(valid, axis=(1, 2))):
+                    warnings.warn("a sample contains no valid flow pixels", RuntimeWarning)
+
+                    for m in meta:
+                        m.valid = False
+
+                if not np.all(np.isfinite(flow[valid[:, :, :], :])):
+                    warnings.warn("non-finite values in flow detected", RuntimeWarning)
+
+                    for m in meta:
+                        m.valid = False
+
+            # convert flow data
             flow = torch.from_numpy(flow).float().permute(0, 3, 1, 2)
             valid = torch.from_numpy(valid).bool()
 

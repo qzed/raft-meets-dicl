@@ -28,6 +28,7 @@ class SampleId:
 
 @dataclass
 class Metadata:
+    valid: bool
     dataset_id: str
     sample_id: SampleId
     original_extents: Tuple[Tuple[int, int], Tuple[int, int]]
@@ -110,6 +111,7 @@ class Dataset(Collection):
             dataset_id=self.id,
             sample_id=key,
             original_extents=((0, img1.shape[0]), (0, img1.shape[1])),
+            valid=True,
         )
 
         img1 = np.array([img1])

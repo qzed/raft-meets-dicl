@@ -193,6 +193,10 @@ class TrainingContext:
         flow = flow.to(self.device, non_blocking=True)
         valid = valid.to(self.device, non_blocking=True)
 
+        # check for degeneracies in samples and warn/skip (e.g. all pixels invalid)
+        if not all(m.valid for m in meta):
+            return
+
         # run model
         result = self.model(img1, img2, **stage.model_args)
 
