@@ -59,7 +59,7 @@ class Logger:
         logging.info(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
 
     def warn(self, msg, *args, **kwargs):
-        logging.warn(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
+        logging.warning(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
         logging.error(f"{self.pfx}: {msg}" if self.pfx else msg, *args, **kwargs)
