@@ -201,9 +201,9 @@ def _train(args):
     tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, env.loader_args)
 
     if args.detect_anomaly:
-        with torch.autograd.detect_anomaly():
-            tctx.run(args.start_stage, args.start_epoch, chkpt)
-    else:
+        log.warn('anomaly detection enabled')
+
+    with torch.autograd.set_detect_anomaly(args.detect_anomaly):
         tctx.run(args.start_stage, args.start_epoch, chkpt)
 
 
