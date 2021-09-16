@@ -24,7 +24,7 @@ class GradientNorm(Metric):
         cls._typecheck(cfg)
 
         key = cfg.get('key', 'GradientNorm/')
-        ord = cfg.get('ord', 2)
+        ord = float(cfg.get('ord', 2))
         parameters = cfg.get('parameters', 'total')
 
         return cls(key, ord, parameters)
