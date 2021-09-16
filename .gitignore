@@ -19,3 +19,6 @@ chkpt/
 *.pth
 *.npy
 *.pickle
+
+# (generated) image data
+*.png
