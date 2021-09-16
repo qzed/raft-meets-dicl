@@ -5,9 +5,10 @@ import torch
 from .common import Metric
 
 
+@torch.no_grad()
 def grad_norm(module: torch.nn.Module, ord: float) -> Dict[str, float]:
     def _norm(p):
-        return p.grad.detach().data.norm(p=ord).item()
+        return p.grad.data.norm(p=ord).item()
 
     norms = {name: _norm(p) for name, p in module.named_parameters() if p is not None}
     norms['total'] = torch.tensor(list(norms.values())).norm(p=ord).item()
