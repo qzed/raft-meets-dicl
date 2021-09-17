@@ -195,6 +195,7 @@ class TrainingContext:
 
         # check for degeneracies in samples and warn/skip (e.g. all pixels invalid)
         if not all(m.valid for m in meta):
+            log.new(f"step {self.step}", sep=', ').warn("skipping batch due to invalid data")
             return
 
         # run model
