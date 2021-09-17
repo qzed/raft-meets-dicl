@@ -218,6 +218,10 @@ class TorchAdapter:
             # triggering anomaly detection or messing other things up.
             flow = np.nan_to_num(flow, nan=0.0, posinf=self.flow_inf, neginf=-self.flow_inf)
 
+            # Since we've already set infiite to self.flow_inf, also clip the
+            # flow values.
+            flow = np.clip(flow, -self.flow_inf, self.flow_inf)
+
             # convert flow data
             flow = torch.from_numpy(flow).float().permute(0, 3, 1, 2)
             valid = torch.from_numpy(valid).bool()
