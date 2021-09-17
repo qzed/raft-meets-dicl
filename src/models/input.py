@@ -166,6 +166,11 @@ class TorchAdapter:
         self.source = source
         self.flow = flow
         self.validate = validate
+
+        # This valus is deliberatly non-configurable. The maximum flow
+        # magnitude can still be restricted properly by augmentation. This is
+        # more like a technical limit rather than an optimization choice. This
+        # value should be way above any sane/actually possible flow value.
         self.flow_inf = 1e10
 
     def __getitem__(self, index):
