@@ -166,6 +166,7 @@ class TorchAdapter:
         self.source = source
         self.flow = flow
         self.validate = validate
+        self.flow_inf = 1e10
 
     def __getitem__(self, index):
         img1, img2, flow, valid, meta = self.source[index]
@@ -205,6 +206,12 @@ class TorchAdapter:
 
                     for m in meta:
                         m.valid = False
+
+            # Any non-fininte values should have been marked as invalid
+            # (validated above). Set them to actual values here so we can
+            # compute things like error magnitude before masking without that
+            # triggering anomaly detection or messing other things up.
+            flow = np.nan_to_num(flow, nan=0.0, posinf=self.flow_inf, neginf=-self.flow_inf)
 
             # convert flow data
             flow = torch.from_numpy(flow).float().permute(0, 3, 1, 2)
