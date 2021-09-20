@@ -10,7 +10,7 @@ def grad_norm(module: torch.nn.Module, ord: float) -> Dict[str, float]:
     def _norm(p):
         return p.grad.data.norm(p=ord).item()
 
-    norms = {name: _norm(p) for name, p in module.named_parameters() if p is not None}
+    norms = {name: _norm(p) for name, p in module.named_parameters() if p.grad is not None}
     norms['total'] = torch.tensor(list(norms.values())).norm(p=ord).item()
 
     return norms
