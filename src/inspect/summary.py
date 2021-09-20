@@ -281,6 +281,11 @@ class StrategyValidation(Validation):
         metrics = self._evaluate(log, ctx, writer, stage, epoch)
         kvmetrics = {}
 
+        # format prefix
+        stage_id = stage.id.replace('/', '.')
+        fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step)
+        pfx = self.tb_metrics_pfx.format_map(fmtargs)
+
         # build log line and write metrics to tensorboard
         entries = []
         for m in metrics:
@@ -290,7 +295,7 @@ class StrategyValidation(Validation):
 
             # write to tensorboard
             for k, v in res:
-                writer.add_scalar(self.tb_metrics_pfx + k, v, ctx.step)
+                writer.add_scalar(pfx + k, v, ctx.step)
 
             # append to log line
             if m.do_log:
@@ -350,6 +355,7 @@ class StrategyValidation(Validation):
             for m in metrics:
                 m.add(ctx.model, ctx.optimizer, est, flow, valid, loss.detach())
 
+            stage_id = stage.id.replace('/', '.')
             for j in images:        # note: we expect this to be a small set
                 j_min = i * stage.validation.batch_size
                 j_max = (i + 1) * stage.validation.batch_size
@@ -357,7 +363,9 @@ class StrategyValidation(Validation):
                 if not (j_min <= j < j_max):
                     continue
 
-                p = self.images.prefix + f"i{j}."
+                fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step, img_idx=j)
+
+                p = self.images.prefix.format_map(fmtargs)
                 write_images(writer, p, j - j_min, img1, img2, flow, est, valid, meta, ctx.step)
 
         ctx.model.train()
