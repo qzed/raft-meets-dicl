@@ -2,8 +2,8 @@ name: "DICL: Stage 1: Uni Freiburg FlyingChairs (full augmentations, context)"
 id: dicl/s1-chairs
 
 data:
-  epochs: 10
-  batch-size: 3     # original: 8 per GPU
+  epochs: 55        # > 70k steps (120 epochs in origina config)
+  batch-size: 16    # original: 8 per GPU
 
   source:
     type: augment

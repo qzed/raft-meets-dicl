@@ -2,8 +2,8 @@ name: "DICL: Stage 0: Uni Freiburg FlyingChairs (simple augmentations only, no c
 id: dicl/s0-chairs
 
 data:
-  epochs: 5         # > 50k steps pre-training with simple augmentations
-  batch-size: 3     # original: 8 per GPU
+  epochs: 40        # > 50k steps pre-training with simple augmentations (120 epochs in original config?)
+  batch-size: 16    # original: 64 (8 per GPU)
 
   source:
     type: augment

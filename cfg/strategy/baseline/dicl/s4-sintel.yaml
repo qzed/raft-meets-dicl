@@ -2,8 +2,8 @@ name: "DICL: Stage 4: MPI Sintel"
 id: dicl/s4-sintel
 
 data:
-  epochs: 60        # > 60k steps
-  batch-size: 1     # original: 64
+  epochs: 175       # > 60k steps
+  batch-size: 6     # original: 64
 
   source:
     type: augment

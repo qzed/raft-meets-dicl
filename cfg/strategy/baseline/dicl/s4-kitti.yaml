@@ -2,8 +2,8 @@ name: "DICL: Stage 4: KITTI"
 id: dicl/s4-kitti
 
 data:
-  epochs: 150       # > 60k steps
-  batch-size: 1     # original: 2 per GPU
+  epochs: 925       # > 60k steps
+  batch-size: 6     # original: 2 per GPU
 
   source:
     type: augment

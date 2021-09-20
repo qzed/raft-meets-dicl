@@ -2,8 +2,8 @@ name: "DICL: Stage 3: Uni Freiburg FlyingThings"
 id: dicl/s3-chairs
 
 data:
-  epochs: 3         # > 220k steps
-  batch-size: 1     # original: 2 per GPU
+  epochs: 65        # > 220k steps (50 epochs in original config?)
+  batch-size: 6     # original: 2 per GPU
 
   source:
     type: augment
