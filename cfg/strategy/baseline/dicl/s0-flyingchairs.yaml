@@ -22,7 +22,7 @@ data:
 
 validation:
   source: ../../../data/ufreiburg-flyingchairs.test.yaml
-  batch-size: 1
+  batch-size: 8
   images: [0]
 
 model:

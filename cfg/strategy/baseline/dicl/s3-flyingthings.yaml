@@ -42,7 +42,7 @@ data:
 
 validation:
   source: ../../../data/ufreiburg-flyingthings3d-clean.test.yaml
-  batch-size: 1
+  batch-size: 4
   images: [0]
 
 model:

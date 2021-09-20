@@ -51,7 +51,7 @@ validation:
       - ../../../data/mpi-sintel-clean.train-full.yaml
       - ../../../data/mpi-sintel-final.train-full.yaml
 
-  batch-size: 1
+  batch-size: 4
   images: [0]
 
 model:
