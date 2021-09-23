@@ -149,8 +149,16 @@ class TrainingContext:
         # load full checkpoint state
         log.info(f"restoring data from checkpoint")
         if checkpoint is not None:
-            checkpoint.apply(self.model, self.optimizer, self.scaler, self.lr_sched_inst,
-                             self.lr_sched_epoch)
+            # At each new stage, the optimizer, scaler, LR-scheduler, etc. are
+            # re-created and initialized according to the stage/strategy. Any
+            # state saved in the checkpoint belongs to the previous stage and
+            # must therefore not be used for this (new) stage. Only model
+            # parameters are valid, so only load those.
+            if start_epoch == 0:
+                checkpoint.apply(self.model)
+            else:
+                checkpoint.apply(self.model, self.optimizer, self.scaler, self.lr_sched_inst,
+                                 self.lr_sched_epoch)
 
         # run training
         log.info(f"running {stage.data.epochs} epochs")
