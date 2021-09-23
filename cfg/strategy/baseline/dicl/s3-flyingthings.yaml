@@ -1,5 +1,5 @@
 name: "DICL: Stage 3: Uni Freiburg FlyingThings"
-id: dicl/s3-chairs
+id: dicl/s3-things
 
 data:
   epochs: 65        # > 220k steps (50 epochs in original config?)
