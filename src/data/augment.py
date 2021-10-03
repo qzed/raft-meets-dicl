@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import scipy.ndimage as ndimage
 
 import torch
 import torchvision.transforms as T
@@ -723,6 +724,98 @@ class Translate(Augmentation):
         return img1, img2, flow, valid, meta
 
 
+class Rotate(Augmentation):
+    """Based on RandomRotate in https://github.com/jytime/DICL-Flow/blob/main/flow_transforms.py"""
+
+    type = 'rotate'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        range = cfg['range']
+        if isinstance(range, (int, float)):
+            range = (-range, range)
+
+        deviation = cfg.get('deviation', 0)
+        order = cfg.get('order', 2)
+        reshape = cfg.get('reshape', False)
+        th_valid = cfg.get('th-valid', 0.99)
+
+        return cls(range, deviation, order, reshape, th_valid)
+
+    def __init__(self, range, deviation, order, reshape, th_valid):
+        self.range = range
+        self.deviation = deviation
+        self.order = order
+        self.reshape = reshape
+        self.th_valid = th_valid
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'range': self.range,
+            'deviation': self.deviation,
+            'order': self.order,
+            'reshape': self.reshape,
+            'th-valid': self.th_valid,
+        }
+
+    def process(self, img1, img2, flow, valid, meta):
+        assert img1.shape == img2.shape
+
+        angle = np.random.uniform(self.range[0], self.range[1])
+        diff = np.random.uniform(-self.deviation, self.deviation)
+        angle1 = angle - diff / 2
+        angle2 = angle + diff / 2
+
+        print(angle)
+
+        rot_args = dict(order=self.order, reshape=self.reshape, mode='constant', cval=0.0)
+
+        # rotate images
+        img1_out, img2_out = [], []
+        for i in range(img1.shape[0]):
+            img1_out += [ndimage.interpolation.rotate(img1[i], angle=angle1, **rot_args)]
+            img2_out += [ndimage.interpolation.rotate(img2[i], angle=angle2, **rot_args)]
+
+        img1 = np.stack(img1_out, axis=0)
+        img2 = np.stack(img2_out, axis=0)
+
+        # rotate flow, validity masks
+        if flow is not None:
+            _, h, w, _ = flow.shape
+            a = np.deg2rad(angle1)
+
+            # compute delta caused by different rotation angles
+            def delta_flow(i, j, k):
+                return -k * (j - w/2) * (diff * np.pi/180) + (1 - k) * (i - h/2) * (diff * np.pi/180)
+
+            delta = np.fromfunction(delta_flow, flow.shape[1:])
+
+            # rotate flow, validity masks (out of bounds pixels are set to zero)
+            flow_out, valid_out = [], []
+            for i in range(flow.shape[0]):
+                f, v = flow[i], valid[i]
+
+                f = ndimage.interpolation.rotate(f + delta, angle=angle1, **rot_args)
+
+                f_ = np.copy(f)
+                f[:, :, 0] = +np.cos(a) * f_[:, :, 0] + np.sin(a) * f_[:, :, 1]
+                f[:, :, 1] = -np.sin(a) * f_[:, :, 0] + np.cos(a) * f_[:, :, 1]
+
+                flow_out += [f]
+
+                # rotate validity mask, mark as invalid if below threshold
+                v = ndimage.interpolation.rotate(v.astype(np.float32), angle=angle1, **rot_args)
+                valid_out += [v >= self.th_valid]
+
+            flow = np.stack(flow_out, axis=0)
+            valid = np.stack(valid_out, axis=0)
+
+        return img1, img2, flow, valid, meta
+
+
 def _build_augmentation(cfg):
     types = [
         ColorJitter,
@@ -732,6 +825,7 @@ def _build_augmentation(cfg):
         OcclusionForward,
         OcclusionBackward,
         RestrictFlowMagnitude,
+        Rotate,
         Scale,
         ScaleSparse,
         Translate,
