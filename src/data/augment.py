@@ -451,11 +451,9 @@ class RestrictFlowMagnitude(Augmentation):
         return img1, img2, flow, valid & (mag < self.maximum), meta
 
 
-class Scale(Augmentation):
-    type = 'scale'
-
+class _Scale(Augmentation):
     @classmethod
-    def from_config(cls, cfg):
+    def _from_config(cls, cfg, **args):
         cls._typecheck(cfg)
 
         min_size = list(cfg.get('min-size', [0, 0]))
@@ -483,7 +481,7 @@ class Scale(Augmentation):
 
         mode = cfg.get('mode', 'linear')
 
-        return cls(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
+        return cls(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode, **args)
 
     def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
         super().__init__()
@@ -541,6 +539,26 @@ class Scale(Augmentation):
 
         return new_size, scale
 
+
+class Scale(_Scale):
+    type = 'scale'
+
+    @classmethod
+    def from_config(cls, cfg):
+        th_valid = cfg.get('th-valid', 0.99)
+
+        return cls._from_config(cfg, th_valid=th_valid)
+
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode, th_valid):
+        super().__init__(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
+
+        self.th_valid = th_valid
+
+    def get_config(self):
+        return super().get_config() | {
+            'th-valid': self.th_valid,
+        }
+
     def process(self, img1, img2, flow, valid, meta):
         assert img1.shape[:3] == img2.shape[:3]
 
@@ -558,14 +576,16 @@ class Scale(Augmentation):
 
         if flow is not None:
             flow_out = []
+            valid_out = []
             for i in range(flow.shape[0]):
                 flow_out += [cv2.resize(flow[i], size, interpolation=self.modenum) * scale]
 
-            flow = np.stack(flow_out, axis=0)
+                # attempt to scale validity mask, mark as invalid if below threshold
+                v = cv2.resize(valid[i].astype(np.float32), size, interpolation=self.modenum)
+                valid_out += [v >= self.th_valid]
 
-            # this is for full/non-sparse flows only...
-            # FIXME: This will invalidate pre-filtering of flow magnitudes when loading.
-            valid = np.ones(img1.shape[:3], dtype=bool)
+            flow = np.stack(flow_out, axis=0)
+            valid = np.stack(valid_out, axis=0)
 
         for m in meta:
             m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
@@ -573,8 +593,12 @@ class Scale(Augmentation):
         return img1, img2, flow, valid, meta
 
 
-class ScaleSparse(Scale):
+class ScaleSparse(_Scale):
     type = 'scale-sparse'
+
+    @classmethod
+    def from_config(cls, cfg):
+        return cls._from_config(cfg)
 
     def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
         super().__init__(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
