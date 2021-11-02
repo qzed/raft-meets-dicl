@@ -129,12 +129,29 @@ def convert_init_warp1_via_dicl(chkpt, metadata):
     return to_checkpoint('wip/warp/1', state, metadata)
 
 
+def convert_init_raftcl_via_dicl(chkpt, metadata):
+    chkpt = Checkpoint.from_dict(chkpt)
+
+    model = models.load(Path(__file__).parent / '../cfg/model/raft-cl.yaml')
+    model = model.model
+
+    state = model.state_dict()
+
+    # feature network
+    for k in {k[len('module.fnet.'):] for k in state.keys() if k.startswith('module.fnet.')}:
+        state[f"module.fnet.{k}"] = chkpt.state.model[f"module.feature.{k}"]
+
+    metadata |= {'comment': 'feature encoder pre-trained via DICL'}
+    return to_checkpoint('raft/cl', state, metadata)
+
+
 def main():
     # define available converters
     convert = {
         'raft': convert_raft,
         'dicl': convert_dicl,
         'init-warp1-via-dicl': convert_init_warp1_via_dicl,
+        'init-raftcl-via-dicl': convert_init_raftcl_via_dicl,
     }
 
     # handle command-line input
