@@ -624,7 +624,7 @@ class RaftModule(nn.Module):
         for _ in range(iterations):
             coords1 = coords1.detach()
 
-            # indes correlation volume
+            # index correlation volume
             corr = self.cvol(fmap1, fmap2, coords1)
 
             # estimate delta for flow update
