@@ -94,7 +94,7 @@ class GaDeconv2xBlock(nn.Module):
 class FeatureNet(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
-    def __init__(self, output_channels):
+    def __init__(self):
         super().__init__()
 
         self.conv0 = nn.Sequential(
@@ -125,16 +125,9 @@ class FeatureNet(nn.Module):
         self.conv6b = GaConv2xBlock(160, 192)
 
         self.deconv6b = GaDeconv2xBlock(192, 160)
-        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
-
         self.deconv5b = GaDeconv2xBlock(160, 128)
-        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
-
         self.deconv4b = GaDeconv2xBlock(128, 96)
-        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
-
         self.deconv3b = GaDeconv2xBlock(96, 64)
-        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -160,19 +153,103 @@ class FeatureNet(nn.Module):
         x = res5 = self.conv5b(x, res5)         # -> 160, H/64, W/64
         x = res6 = self.conv6b(x, res6)         # -> 192, H/128, W/128
 
-        x = self.deconv6b(x, res5)              # -> 160, H/64, W/64
-        x6 = self.outconv6(x)                   # -> 32, H/64, W/64
-
-        x = self.deconv5b(x, res4)              # -> 128, H/32, W/32
-        x5 = self.outconv5(x)                   # -> 32, H/32, W/32
-
-        x = self.deconv4b(x, res3)              # -> 96, H/16, W/16
-        x4 = self.outconv4(x)                   # -> 32, H/16, W/16
-
-        x = self.deconv3b(x, res2)              # -> 64, H/8, W/8
-        x3 = self.outconv3(x)                   # -> 32, H/8, W/8
+        x6 = self.deconv6b(x, res5)             # -> 160, H/64, W/64
+        x5 = self.deconv5b(x6, res4)            # -> 128, H/32, W/32
+        x4 = self.deconv4b(x5, res3)            # -> 96, H/16, W/16
+        x3 = self.deconv3b(x4, res2)            # -> 64, H/8, W/8
 
         return x3, x4, x5, x6
+
+
+class FeatureNetDown(nn.Module):
+    """Head for second-frame feature pyramid, produces outputs of (B, 32, H/2^l, W/2^l)"""
+
+    def __init__(self, output_channels):
+        super().__init__()
+
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
+
+    def forward(self, x):
+        x6 = self.outconv6(x[3])                # -> 32, H/64, W/64
+        x5 = self.outconv5(x[2])                # -> 32, H/32, W/32
+        x4 = self.outconv4(x[1])                # -> 32, H/16, W/16
+        x3 = self.outconv3(x[0])                # -> 32, H/8, W/8
+
+        return x3, x4, x5, x6
+
+
+class FeatureNetUp(nn.Module):
+    """Head for first-frame feature stack, produces outputs of (B, 32, H, W)"""
+
+    def __init__(self, output_channels):
+        super().__init__()
+
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
+
+        self.mask5 = nn.Sequential(
+            nn.Conv2d(128, 128, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(128, 9, 1, padding=0)
+        )
+
+        self.mask4 = nn.Sequential(
+            nn.Conv2d(96, 96, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(96, 9, 1, padding=0)
+        )
+
+        self.mask3 = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 9, 1, padding=0)
+        )
+
+    def genmask(self, net, x):
+        batch, _, h, w = x.shape
+
+        m = net(x)
+        m = torch.softmax(m, dim=1)
+        m = m.view(batch, 1, 9, h//2, 2, w//2, 2)
+
+        return m
+
+    def upsample(self, mask, u):
+        batch, c, h, w = u.shape
+
+        u = u.view(batch, c, 1, h, 1, w, 1)
+        u = torch.sum(mask * u, dim=2)          # (batch, c, h, 2, w, 2)
+        u = u.view(batch, c, h*2, w*2)          # (batch, c, h*2, w*2)
+
+        return u
+
+    def forward(self, x):
+        x3, x4, x5, x6 = x[0], x[1], x[2], x[3]
+
+        u6 = self.outconv6(x6)                  # -> 32, H/64, W/64
+        u5 = self.outconv5(x5)                  # -> 32, H/32, W/32
+        u4 = self.outconv4(x4)                  # -> 32, H/16, W/16
+        u3 = self.outconv3(x3)                  # -> 32, H/8, W/8
+
+        m5 = self.genmask(self.mask5, x5)
+        m4 = self.genmask(self.mask4, x4)
+        m3 = self.genmask(self.mask3, x3)
+
+        u6 = self.upsample(m5, u6)              # -> 32, H/32, W/32
+        u6 = self.upsample(m4, u6)              # -> 32, H/16, W/16
+        u6 = self.upsample(m3, u6)              # -> 32, H/8, W/8
+
+        u5 = self.upsample(m4, u5)              # -> 32, H/16, W/16
+        u5 = self.upsample(m3, u5)              # -> 32, H/8, W/8
+
+        u4 = self.upsample(m3, u4)              # -> 32, H/8, W/8
+
+        return u3, u4, u5, u6
 
 
 # -- Context network from RAFT ---------------------------------------------------------------------
@@ -483,46 +560,39 @@ class CorrelationModule(nn.Module):
         delta = torch.stack(torch.meshgrid(dx, dy), axis=-1)    # change dims to (2r+1, 2r+1, 2)
         delta = delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)        # reshape for broadcasting
 
+        coords = coords.permute(0, 2, 3, 1)                     # (batch, h, w, 2)
+        coords = coords.view(batch, 1, h, 1, w, 2)              # reshape for broadcasting
+
         # compute correlation/cost for each feature level
         out = []
         for i, (f1, f2) in enumerate(zip(fmap1, fmap2)):
             _, c, h2, w2 = f1.shape
 
-            # reduce coordinates
-            if i > 0:
-                coords = F.avg_pool2d(coords, kernel_size=2, stride=2)  # (batch, 2, h2, w2)
-
             # build interpolation map for grid-sampling
-            centroids = coords.permute(0, 2, 3, 1)              # (batch, h2, w2, 2)
-            centroids = centroids.view(batch, 1, h2, 1, w2, 2)  # reshape for broadcasting
-            centroids = centroids / 2**i + delta                # broadcasts to (b, 2r+1, h2, 2r+1, w2, 2)
+            centroids = coords / 2**i + delta               # broadcasts to (b, 2r+1, h, 2r+1, w, 2)
 
             # F.grid_sample() takes coordinates in range [-1, 1], convert them
             centroids[..., 0] = 2 * centroids[..., 0] / (w2 - 1) - 1
             centroids[..., 1] = 2 * centroids[..., 1] / (h2 - 1) - 1
 
             # reshape coordinates for sampling to (n, h_out, w_out, x/y=2)
-            centroids = centroids.reshape(batch, (2*r + 1) * h2, (2*r + 1) * w2, 2)
+            centroids = centroids.reshape(batch, (2*r + 1) * h, (2*r + 1) * w, 2)
 
             # sample from second frame features
-            f2 = F.grid_sample(f2, centroids, align_corners=True)   # (batch, c, dh2, dw2)
-            f2 = f2.view(batch, c, 2*r + 1, h2, 2*r + 1, w2)    # (batch, c, 2r+1, h2, 2r+1, w2)
-            f2 = f2.permute(0, 2, 4, 1, 3, 5)                   # (batch, 2r+1, 2r+1, c, h2, w2)
+            f2 = F.grid_sample(f2, centroids, align_corners=True)   # (batch, c, dh, dw)
+            f2 = f2.view(batch, c, 2*r + 1, h, 2*r + 1, w)      # (batch, c, 2r+1, h, 2r+1, w)
+            f2 = f2.permute(0, 2, 4, 1, 3, 5)                   # (batch, 2r+1, 2r+1, c, h, w)
 
             # build correlation volume
-            f1 = f1.view(batch, 1, 1, c, h2, w2)
-            f1 = f1.expand(-1, 2*r + 1, 2*r + 1, c, h2, w2)     # (batch, 2r+1, 2r+1, c, h2, w2)
+            f1 = f1.view(batch, 1, 1, c, h, w)
+            f1 = f1.expand(-1, 2*r + 1, 2*r + 1, c, h, w)       # (batch, 2r+1, 2r+1, c, h, w)
 
-            corr = torch.cat((f1, f2), dim=-3)                  # (batch, 2r+1, 2r+1, 2c, h2, w2)
+            corr = torch.cat((f1, f2), dim=-3)                  # (batch, 2r+1, 2r+1, 2c, h, w)
 
             # build cost volume for this level
-            cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h2, w2)
-            cost = self.dap[i](cost)                            # (batch, 2r+1, 2r+1, h2, w2)
-
-            # explode/repeat from (batch, c_lvl, h2, w2) to (batch, c_lvl, h, w)
-            cost = cost.view(batch, -1, h2, 1, w2, 1)
-            cost = cost.expand(-1, -1, -1, h // h2, -1, w // w2)
-            cost = cost.reshape(batch, -1, h, w)
+            cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h, w)
+            cost = self.dap[i](cost)                            # (batch, 2r+1, 2r+1, h, w)
+            cost = cost.reshape(batch, -1, h, w)                # (batch, (2r+1)^2, h, w)
 
             out.append(cost)
 
@@ -545,7 +615,10 @@ class RaftModule(nn.Module):
         self.corr_radius = 3
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
-        self.fnet = FeatureNet(self.feature_dim)
+        self.fnet = FeatureNet()
+        self.fnet_u = FeatureNetUp(self.feature_dim)
+        self.fnet_d = FeatureNetDown(self.feature_dim)
+
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0.0)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
         self.cvol = CorrelationModule(self.feature_dim, self.corr_radius)
@@ -607,8 +680,8 @@ class RaftModule(nn.Module):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
-        fmap1 = self.fnet(img1)
-        fmap2 = self.fnet(img2)
+        fmap1 = self.fnet_u(self.fnet(img1))
+        fmap2 = self.fnet_d(self.fnet(img2))
 
         # run context network
         h, x = torch.split(self.cnet(img1), (hdim, cdim), dim=1)
