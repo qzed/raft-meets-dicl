@@ -36,8 +36,8 @@ class FlAll(Metric):
         epe = epe[valid]
         tgt = tgt[valid]
 
-        # find outliers/bad pixels, i.e. all pixels with epe > 3px or epe > 5% of target
-        fl_all = torch.logical_or(epe > 3, epe > 0.05 * tgt)
+        # find outliers/bad pixels, i.e. all pixels with epe > 3px and epe > 5% of target
+        fl_all = torch.logical_and(epe > 3, epe > 0.05 * tgt)
 
         # compute metrics based on end-point error means
         return {self.key: fl_all.float().mean()}
