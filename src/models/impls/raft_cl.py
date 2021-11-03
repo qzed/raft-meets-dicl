@@ -718,14 +718,14 @@ class SequenceLoss(Loss):
         super().__init__(arguments)
 
     def get_config(self):
-        default_args = {'ord': 1, 'gamma': 0.8}
+        default_args = {'ord': 1, 'gamma': 0.8, 'scale': 1.0}
 
         return {
             'type': self.type,
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, model, result, target, valid, ord=1, gamma=0.8):
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, scale=1.0):
         n_predictions = len(result.flow)
 
         # flow loss
@@ -746,7 +746,7 @@ class SequenceLoss(Loss):
             # update loss
             loss = loss + weight * dist.mean()
 
-        return loss
+        return loss * scale
 
 
 class SequenceCorrHingeLoss(SequenceLoss):
