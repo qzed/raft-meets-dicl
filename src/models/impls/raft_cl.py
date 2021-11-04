@@ -557,7 +557,7 @@ class CorrelationModule(nn.Module):
         # build lookup kernel
         dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
         dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        delta = torch.stack(torch.meshgrid(dx, dy), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
         delta = delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)        # reshape for broadcasting
 
         coords = coords.permute(0, 2, 3, 1)                     # (batch, h, w, 2)
@@ -652,7 +652,7 @@ class RaftModule(nn.Module):
         cy = torch.arange(h // 8, device=img.device)
         cx = torch.arange(w // 8, device=img.device)
 
-        coords = torch.meshgrid(cy, cx)[::-1]               # build transposed grid (h/8, w/8) x 2
+        coords = torch.meshgrid(cy, cx, indexing='ij')[::-1]  # build transposed grid (h/8, w/8) x 2
         coords = torch.stack(coords, dim=0).float()         # combine coordinates (2, h/8, w/8)
         coords = coords.expand(batch, -1, -1, -1)           # expand to batch (batch, 2, h/8, w/8)
 
