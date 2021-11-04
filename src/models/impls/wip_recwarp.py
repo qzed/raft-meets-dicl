@@ -289,7 +289,7 @@ class RecurrentFlowUnit(nn.Module):
         cx = torch.linspace(-du, du, 2 * du + 1, dtype=torch.float, device=device)
         cy = torch.linspace(-dv, dv, 2 * dv + 1, dtype=torch.float, device=device)
 
-        delta = torch.meshgrid(cy, cx)[::-1]
+        delta = torch.meshgrid(cy, cx, indexing='ij')[::-1]
         delta = torch.stack(delta, dim=-1)
 
         return delta                                            # (2dv+1, 2du+1, 2)
@@ -393,7 +393,7 @@ class WipModule(nn.Module):
         cy = torch.arange(h, dtype=torch.float, device=device)
         cx = torch.arange(w, dtype=torch.float, device=device)
 
-        coords = torch.meshgrid(cy, cx)[::-1]               # build transposed grid (h, w) x 2
+        coords = torch.meshgrid(cy, cx, indexing='ij')[::-1]    # build transposed grid (h, w) x 2
         coords = torch.stack(coords, dim=0)                 # combine coordinates (2, h, w)
         coords = coords.expand(batch, -1, -1, -1)           # expand to batch (batch, 2, h, w)
 
