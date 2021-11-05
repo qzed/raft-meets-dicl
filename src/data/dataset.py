@@ -478,6 +478,36 @@ class Filter:
         raise NotImplementedError
 
 
+class CombineFilter(Filter):
+    type = 'combine'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+
+        filters = cfg['filters']
+        filters = [_build_filter(path, f) for f in filters]
+
+        return cls(filters)
+
+    def __init__(self, filters):
+        super().__init__()
+
+        self.filters = filters
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'filters': [f.get_config() for f in self.filters]
+        }
+
+    def filter(self, files):
+        for f in self.filters:
+            files = f.filter(files)
+
+        return files
+
+
 class FileFilter(Filter):
     type = 'file'
 
@@ -632,6 +662,7 @@ def _build_filter(path, cfg):
         return None
 
     filters = {
+        CombineFilter,
         FileFilter,
     }
     filters = {cls.type: cls for cls in filters}
