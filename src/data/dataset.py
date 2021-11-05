@@ -508,6 +508,48 @@ class CombineFilter(Filter):
         return files
 
 
+class ExcludeFilter(Filter):
+    type = 'exclude'
+
+    @classmethod
+    def from_config(cls, path, cfg):
+        cls._typecheck(cfg)
+
+        exclude = cfg['exclude']
+        return cls(exclude)
+
+    def __init__(self, exclude):
+        super().__init__()
+
+        self.exclude = exclude
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'exclude': self.exclude
+        }
+
+    def _match_rule(self, rule, args):
+        print(args, rule)
+        for k, v in rule.items():
+            if k not in args:
+                return False
+
+            if args[k] != v:
+                return False
+
+        return True
+
+    def _match_exclude(self, file):
+        _, _, _, key = file
+        sample_args = key.img1.kwargs
+
+        return any([self._match_rule(rule, sample_args) for rule in self.exclude])
+
+    def filter(self, files):
+        return [file for file in files if not self._match_exclude(file)]
+
+
 class FileFilter(Filter):
     type = 'file'
 
@@ -663,6 +705,7 @@ def _build_filter(path, cfg):
 
     filters = {
         CombineFilter,
+        ExcludeFilter,
         FileFilter,
     }
     filters = {cls.type: cls for cls in filters}
