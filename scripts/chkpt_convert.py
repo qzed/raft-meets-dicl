@@ -165,8 +165,19 @@ def main():
     parser.add_argument('-i', '--input', required=True, help='input checkpoint file')
     parser.add_argument('-o', '--output', required=True, help='output checkpoint file')
     parser.add_argument('-f', '--format', required=True, choices=convert.keys(), help='input format')
+    parser.add_argument('-s', '--seeds', help='seed config for initializing RNGs')
 
     args = parser.parse_args()
+
+    # apply seeds
+    if args.seeds:
+        cfg_seeds = utils.config.load(args.seeds)
+
+        logging.info("seeding: using seeds from config")
+        utils.seeds.from_config(cfg_seeds).apply()
+
+    else:
+        utils.seeds.random_seeds().apply()
 
     # create metadata dict
     metadata = {
