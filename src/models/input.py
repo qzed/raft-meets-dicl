@@ -1,4 +1,4 @@
-import warnings
+from .. import utils
 
 import numpy as np
 import torch
@@ -166,6 +166,7 @@ class TorchAdapter:
         self.source = source
         self.flow = flow
         self.validate = validate
+        self.log = utils.logging.Logger('data:torch-adapter')
 
         # This valus is deliberatly non-configurable. The maximum flow
         # magnitude can still be restricted properly by augmentation. This is
@@ -178,14 +179,21 @@ class TorchAdapter:
 
         # validate image data
         if self.validate:
-            if not np.all(np.isfinite(img1)):
-                warnings.warn("non-finite values in img1 detected", RuntimeWarning)
+            img1_finite = np.all(np.isfinite(img1), axis=(1, 2, 3))
+            img2_finite = np.all(np.isfinite(img2), axis=(1, 2, 3))
+
+            if not np.all(img1_finite):
+                for i in range(img1_finite.shape[0]):
+                    if not img1_finite[i]:
+                        self.log.warn(f"non-finite values in img1 detected: {meta[i].sample_id}")
 
                 for m in meta:
                     m.valid = False
 
-            if not np.all(np.isfinite(img1)):
-                warnings.warn("non-finite values in img2 detected", RuntimeWarning)
+            if not np.all(img2_finite):
+                for i in range(img2_finite.shape[0]):
+                    if not img2_finite[i]:
+                        self.log.warn(f"non-finite values in img2 detected: {meta[i].sample_id}")
 
                 for m in meta:
                     m.valid = False
@@ -200,14 +208,21 @@ class TorchAdapter:
 
             # validate flow data
             if self.validate:
-                if not np.all(np.any(valid, axis=(1, 2))):
-                    warnings.warn("a sample contains no valid flow pixels", RuntimeWarning)
+                has_valid = np.any(valid, axis=(1, 2))
+                is_finite = [np.all(np.isfinite(flow[b, valid[b, :, :], :])) for b in range(flow.shape[0])]
+
+                if not np.all(has_valid):
+                    for i in range(has_valid.shape[0]):
+                        if not has_valid[i]:
+                            self.log.warn(f"sample contains no valid flow pixels: {meta[i].sample_id}")
 
                     for m in meta:
                         m.valid = False
 
-                if not np.all(np.isfinite(flow[valid[:, :, :], :])):
-                    warnings.warn("non-finite values in flow detected", RuntimeWarning)
+                if not np.all(is_finite):
+                    for i in range(len(is_finite)):
+                        if not is_finite[i]:
+                            self.log.warn(f"non-finite values in flow detected: {meta[i].sample_id}")
 
                     for m in meta:
                         m.valid = False
