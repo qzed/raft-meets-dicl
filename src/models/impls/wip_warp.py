@@ -426,6 +426,7 @@ class RecurrentLevelUnit(nn.Module):
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
+        # self.fhead = FlowHead2(input_dim=hidden_dim, disp_range=disp_range)
 
     def forward(self, fmap1, fmap2, h, flow, i):
         # warp features backwards
