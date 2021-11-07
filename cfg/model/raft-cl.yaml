@@ -5,6 +5,8 @@ model:
   type: raft/cl
 
   parameters:
+    corr-radius: 4
+    dap-init: 'identity'
     upnet: true
 
   arguments:

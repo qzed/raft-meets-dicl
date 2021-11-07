@@ -604,16 +604,15 @@ class CorrelationModule(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network with cost learning"""
 
-    def __init__(self, upnet=True, dap_init='identity'):
+    def __init__(self, upnet=True, dap_init='identity', corr_radius=3):
         super().__init__()
 
         self.feature_dim = 32
         self.hidden_dim = hdim = 128
         self.context_dim = cdim = 128
 
-        self.corr_levels = 4
-        self.corr_radius = 3
-        corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
+        corr_levels = 4
+        corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
         self.fnet = FeatureNet()
         self.fnet_u = FeatureNetUp(self.feature_dim)
@@ -621,7 +620,7 @@ class RaftModule(nn.Module):
 
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0.0)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
-        self.cvol = CorrelationModule(self.feature_dim, self.corr_radius)
+        self.cvol = CorrelationModule(self.feature_dim, corr_radius)
 
         # initialize weights
         for m in self.modules():
@@ -727,14 +726,19 @@ class Raft(Model):
 
         param_cfg = cfg['parameters']
         upnet = bool(param_cfg.get('upnet', True))
+        dap_init = param_cfg.get('dap-init', 'identity')
+        corr_radius = param_cfg.get('corr-radius', 3)
+
         args = cfg.get('arguments', {})
 
-        return cls(upnet, args)
+        return cls(upnet, dap_init, corr_radius, args)
 
-    def __init__(self, upnet=True, arguments={}):
+    def __init__(self, upnet=True, dap_init='identity', corr_radius=3, arguments={}):
         self.upnet = upnet
+        self.dap_init = dap_init
+        self.corr_radius = corr_radius
 
-        super().__init__(RaftModule(upnet), arguments)
+        super().__init__(RaftModule(upnet, dap_init, corr_radius), arguments)
 
     def get_config(self):
         default_args = {'iterations': 12}
@@ -742,6 +746,8 @@ class Raft(Model):
         return {
             'type': self.type,
             'parameters': {
+                'corr-radius': self.corr_radius,
+                'dap-init': self.dap_init,
                 'upnet': self.upnet
             },
             'arguments': default_args | self.arguments,
