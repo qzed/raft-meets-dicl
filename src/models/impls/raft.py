@@ -326,7 +326,7 @@ class BasicUpdateBlock(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -335,7 +335,7 @@ class RaftModule(nn.Module):
         self.context_dim = cdim = 128
 
         self.corr_levels = 4
-        self.corr_radius = 4
+        self.corr_radius = corr_radius
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
         self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
@@ -438,16 +438,19 @@ class Raft(Model):
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
         upnet = bool(param_cfg.get('upnet', True))
+        corr_radius = param_cfg.get('corr-radius', 4)
+
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, args)
+        return cls(dropout, mixed_precision, upnet, corr_radius, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, arguments={}):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4, arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
+        self.corr_radius = corr_radius
 
-        super().__init__(RaftModule(dropout, mixed_precision, upnet), arguments)
+        super().__init__(RaftModule(dropout, mixed_precision, upnet, corr_radius), arguments)
 
     def get_config(self):
         default_args = {'iterations': 12}
@@ -457,6 +460,7 @@ class Raft(Model):
             'parameters': {
                 'dropout': self.dropout,
                 'mixed-precision': self.mixed_precision,
+                'corr-radius': self.corr_radius,
                 'upnet': self.upnet
             },
             'arguments': default_args | self.arguments,
