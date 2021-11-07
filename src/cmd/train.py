@@ -55,6 +55,9 @@ def _train(args):
 
     logging.info(f"starting: time is {timestamp}, writing to '{path_out}'")
 
+    # log comment/description
+    logging.info(f"description: {args.comment if args.comment else '<not available>'}")
+
     # load full config, if specified
     if args.config is not None:
         logging.info(f"loading configuration: file='{args.config}'")
@@ -137,8 +140,9 @@ def _train(args):
     utils.config.store(path_config, {
         'timestamp': timestamp.isoformat(),
         'commit': utils.vcs.get_git_head_hash(),
+        'comment': args.comment if args.comment else '',
         'cwd': str(Path.cwd()),
-        'args': vars(args),
+        'args': {k: v for k, v in vars(args).items() if k != 'comment'},
         'seeds': seeds.get_config(),
         'model': model.get_config(),
         'strategy': strat.get_config(),
