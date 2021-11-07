@@ -4,6 +4,7 @@
 # the checkpoint format of this implementation.
 
 import argparse
+import logging
 import sys
 
 from datetime import datetime
@@ -14,6 +15,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.strategy.checkpoint import Checkpoint, Iteration, State
 from src import models
+from src import utils
 
 
 def to_checkpoint(model_id, state, metadata):
@@ -146,6 +148,8 @@ def convert_init_raftcl_via_dicl(chkpt, metadata):
 
 
 def main():
+    utils.logging.setup()
+
     # define available converters
     convert = {
         'raft': convert_raft,
@@ -171,12 +175,15 @@ def main():
     }
 
     # load checkpoint
+    logging.info(f"loading checkpoint, file: '{args.input}'")
     chkpt = torch.load(args.input, map_location='cpu')
 
     # convert
+    logging.info(f"converting...")
     chkpt = convert[args.format](chkpt, metadata)
 
     # save checkpoint
+    logging.info(f"saving checkpoint, file: '{args.output}'")
     chkpt.save(args.output)
 
 
