@@ -38,9 +38,6 @@ augmentations:
     saturation: 0.4
     hue: 0.1274
 
-  - type: noise-normal
-    stddev: 0.002
-
   - type: restrict-flow-magnitude
     maximum: 1000
 

@@ -38,9 +38,6 @@ augmentations:
     min-size: [1, 1]
     max-size: [100, 50]
 
-  - type: noise-normal
-    stddev: 0.002
-
   - type: restrict-flow-magnitude
     maximum: 400
 
