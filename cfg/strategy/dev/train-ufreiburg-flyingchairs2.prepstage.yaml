@@ -37,6 +37,10 @@ stages:
         type: norm
         value: 1.0
 
+    loss:
+      arguments:
+        scale: 1000
+
   - name: "FlyingChairs2 (fully augmented)"
     id: train/chairs2-1
 
