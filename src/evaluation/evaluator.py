@@ -29,7 +29,7 @@ def evaluate(model, data, device, use_tqdm=True):
             # switch to batch size of one
             sample_valid = valid[b] if valid is not None else None
             sample_flow = flow[b] if flow is not None else None
-            sample_output = result.output(b)[0]
+            sample_output = result.output(b)
             sample_meta = meta[b]
 
             yield img1[b], img2[b], sample_flow, sample_valid, final[b], sample_output, sample_meta

@@ -204,7 +204,6 @@ def evaluate(args):
         # eval returns per-sample data, add fake batch
         target = target.view(1, *target.shape) if target is not None else None
         valid = valid.view(1, *valid.shape) if valid is not None else None
-        out = out.view(1, *out.shape)
         est = est.view(1, *est.shape) if est is not None else None
 
         if target is not None:
