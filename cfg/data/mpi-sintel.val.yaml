@@ -1,0 +1,4 @@
+type: concat
+sources:
+  - mpi-sintel-clean.val.yaml
+  - mpi-sintel-final.val.yaml

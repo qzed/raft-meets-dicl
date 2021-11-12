@@ -1,0 +1,4 @@
+type: concat
+sources:
+  - mpi-sintel-clean.train.yaml
+  - mpi-sintel-final.train.yaml
