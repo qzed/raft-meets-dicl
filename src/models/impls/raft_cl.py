@@ -591,9 +591,10 @@ class CorrelationModule(nn.Module):
 
             # build cost volume for this level
             cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h, w)
-            cost = self.dap[i](cost)                            # (batch, 2r+1, 2r+1, h, w)
-            cost = cost.reshape(batch, -1, h, w)                # (batch, (2r+1)^2, h, w)
+            if dap:
+                cost = self.dap[i](cost)                        # (batch, 2r+1, 2r+1, h, w)
 
+            cost = cost.reshape(batch, -1, h, w)                # (batch, (2r+1)^2, h, w)
             out.append(cost)
 
         return torch.cat(out, dim=-3)
