@@ -518,15 +518,6 @@ class Dicl(Model):
     def from_config(cls, cfg):
         cls._typecheck(cfg)
 
-        def parse_level_list(cfg):
-            pattern = parse.compile("level-{:d}")
-            levels = {}
-
-            for k, v in cfg.items():
-                levels[pattern.parse(k).fixed[0]] = v
-
-            return levels
-
         param_cfg = cfg['parameters']
         disp_ranges = param_cfg['displacement-range']
         dap_init = param_cfg.get('dap-init', 'identity')
