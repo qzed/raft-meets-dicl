@@ -277,64 +277,79 @@ class StrategyValidation(Validation):
 
     @torch.no_grad()
     def run(self, log, ctx, writer, chkpt, stage, epoch):
+        if not stage.validation:
+            log.warn('no validation data specified, skipping this validation step')
+            return
+
+        # enter validation loop
+        ctx.model.eval()
+
         # evaluate model
-        metrics = self._evaluate(log, ctx, writer, stage, epoch)
-        kvmetrics = {}
+        chkpmetrics = {}
 
-        # format prefix
-        stage_id = stage.id.replace('/', '.')
-        fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step)
-        pfx = self.tb_metrics_pfx.format_map(fmtargs)
+        for i, val in enumerate(stage.validation):
+            metrics = self._evaluate_one(ctx, writer, stage, val, epoch)
+            kvmetrics = {}
 
-        # build log line and write metrics to tensorboard
-        entries = []
-        for m in metrics:
-            # perform reduction
-            res = m.result()
-            kvmetrics |= {k: v for k, v in res}
+            # format prefix
+            stage_id = stage.id.replace('/', '.')
+            fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step,
+                           id_val=val.name)
+            pfx = self.tb_metrics_pfx.format_map(fmtargs)
 
-            # write to tensorboard
-            for k, v in res:
-                writer.add_scalar(pfx + k, v, ctx.step)
+            entries = []
 
-            # append to log line
-            if m.do_log:
+            # build log line and write metrics to tensorboard
+            for m in metrics:
+                # perform reduction
+                res = m.result()
+                kvmetrics |= {k: v for k, v in res}
+
+                # write to tensorboard
                 for k, v in res:
-                    entries += [f"{k}: {v:.4f}"]
+                    writer.add_scalar(pfx + k, v, ctx.step)
 
-        if entries:
-            log.new(f"step {ctx.step}", sep=', ').info(f"validation: {', '.join(entries)}")
+                # append to log line
+                if m.do_log:
+                    for k, v in res:
+                        entries += [f"{k}: {v:.4f}"]
+
+            if entries:
+                log.new(f"step {ctx.step}", sep=', ').info(f"validation ({val.name}): {', '.join(entries)}")
+
+            # first evaluation run stores main metrics
+            if i == 0:
+                chkpmetrics |= kvmetrics
+
+            # specific runs are accessible with prefix
+            chkpmetrics |= {f"{val.name}:{k}": v for k, v in kvmetrics.items()}
+
+        ctx.model.train()
 
         # create checkpoint
         if self.checkpoint:
-            chkpt.create(log, ctx, stage, epoch, ctx.step, kvmetrics)
+            chkpt.create(log, ctx, stage, epoch, ctx.step, chkpmetrics)
 
-    def _evaluate(self, log, ctx: strategy.TrainingContext, writer, stage: strategy.Stage, epoch):
-        if stage.validation is None:
-            log.warn('no validation data specified, skipping this validation step')
-            return []
+    def _evaluate_one(self, ctx: strategy.TrainingContext, writer, stage: strategy.Stage, val, epoch):
 
         # get image selection
-        images = set(stage.validation.images) if self.images.enabled else {}
+        images = set(val.images) if self.images.enabled else {}
 
         # build metric accumulators
         metrics = [m.build() for m in self.metrics]
 
         # load validation data
-        input = ctx.input.apply(stage.validation.source).torch()
-        data = input.loader(batch_size=stage.validation.batch_size, shuffle=False, drop_last=False,
+        input = ctx.input.apply(val.source).torch()
+        data = input.loader(batch_size=val.batch_size, shuffle=False, drop_last=False,
                             **ctx.loader_args)
 
         # set up progress bar
-        desc = f"validation: stage {stage.index + 1}/{len(ctx.strategy.stages)}"
+        desc = f"validation ({val.name}): stage {stage.index + 1}/{len(ctx.strategy.stages)}"
         if epoch is not None:
             desc += f", epoch {epoch + 1}/{stage.data.epochs}"
         desc += f", step {ctx.step}"
         samples = tqdm(data, unit='batch', leave=False)
         samples.set_description(desc)
-
-        # validation loop
-        ctx.model.eval()
 
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):
             # move data to device
@@ -357,18 +372,17 @@ class StrategyValidation(Validation):
 
             stage_id = stage.id.replace('/', '.')
             for j in images:        # note: we expect this to be a small set
-                j_min = i * stage.validation.batch_size
-                j_max = (i + 1) * stage.validation.batch_size
+                j_min = i * val.batch_size
+                j_max = (i + 1) * val.batch_size
 
                 if not (j_min <= j < j_max):
                     continue
 
-                fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step, img_idx=j)
+                fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch,
+                               n_step=ctx.step, img_idx=j, id_val=val.name)
 
                 p = self.images.prefix.format_map(fmtargs)
                 write_images(writer, p, j - j_min, img1, img2, flow, est, valid, meta, ctx.step)
-
-        ctx.model.train()
 
         return metrics
 

@@ -48,21 +48,25 @@ class ValidationSpec:
         if cfg is None:
             return None
 
+        name = cfg.get('name', 'default')
+
         source = cfg['source']
         source = data.load(path, source)
 
         batch_size = int(cfg.get('batch-size', 1))
         images = set(cfg.get('images', {}))
 
-        return cls(source, batch_size, images)
+        return cls(name, source, batch_size, images)
 
-    def __init__(self, source, batch_size, images):
+    def __init__(self, name, source, batch_size, images):
+        self.name = name
         self.source = source
         self.batch_size = batch_size
         self.images = images
 
     def get_config(self):
         return {
+            'name': self.name,
             'source': self.source.get_config(),
             'batch_size': self.batch_size,
             'images': list(self.images),
@@ -333,8 +337,12 @@ class Stage:
         id = cfg['id']
 
         data = DataSpec.from_config(path, cfg['data'])
-        valid = ValidationSpec.from_config(path, cfg.get('validation'))
         optimizer = OptimizerSpec.from_config(cfg['optimizer'])
+
+        valid = cfg.get('validation', [])
+        if isinstance(valid, dict):
+            valid = [valid]
+        valid = [ValidationSpec.from_config(path, v) for v in valid]
 
         model_args = cfg.get('model', {}).get('arguments', {})
         loss_args = cfg.get('loss', {}).get('arguments', {})
@@ -366,7 +374,7 @@ class Stage:
             'name': self.name,
             'id': self.id,
             'data': self.data.get_config(),
-            'validation': self.validation.get_config() if self.validation is not None else None,
+            'validation': [v.get_config() for v in self.validation],
             'optimizer': self.optimizer.get_config(),
             'model': {'arguments': self.model_args},
             'loss': {'arguments': self.loss_args},

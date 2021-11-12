@@ -25,21 +25,26 @@ data:
   # The batch size to use for training (default: 1).
 
 validation:
-  # Specifies the validation data to use.
+  # Specifies the validation data to use. Can contain multiple datasets. The
+  # first validation set is used for the metrics used in checkpoint naming.
 
-  source: datasource-basic.yaml
-  # The datasource for validation, either as path to a datasource specification
-  # file or as inline specification. See e.g. datasource-basic.yaml for more
-  # details.
+  - name: default
+    # The name with which this validation set will be referenced, defaults to
+    # 'default'.
 
-  batch-size: 2
-  # The batch size to use for validation (default: 1).
+    source: datasource-basic.yaml
+    # The datasource for validation, either as path to a datasource specification
+    # file or as inline specification. See e.g. datasource-basic.yaml for more
+    # details.
 
-  images: [0, 10]
-  # Set of images to store in tensorboard when validating. This controls which
-  # images will be displaced, whether they will be displayed and when
-  # validation runs depends on the validation/inspection config. See e.g.
-  # inspect.yaml.
+    batch-size: 2
+    # The batch size to use for validation (default: 1).
+
+    images: [0, 10]
+    # Set of images to store in tensorboard when validating. This controls which
+    # images will be displaced, whether they will be displayed and when
+    # validation runs depends on the validation/inspection config. See e.g.
+    # inspect.yaml.
 
 optimizer:
   # The optimizer to use for training.
