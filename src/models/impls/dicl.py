@@ -7,7 +7,6 @@
 import itertools
 
 import numpy as np
-import parse
 
 import torch
 import torch.nn as nn
