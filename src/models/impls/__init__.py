@@ -1,4 +1,5 @@
 from . import dicl
+from . import dicl_64to8
 from . import raft
 from . import raft_cl
 from . import raft_sl

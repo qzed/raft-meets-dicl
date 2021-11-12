@@ -1,0 +1,42 @@
+name: DICL baseline with level (H/4, W/4) removed
+id: dicl/64to8
+
+model:
+  type: dicl/64to8
+
+  parameters:
+    displacement-range:
+      level-6: [3, 3]
+      level-5: [3, 3]
+      level-4: [3, 3]
+      level-3: [3, 3]
+
+    dap-init: identity
+
+  arguments:
+    raw: true
+    dap: true
+    ctx: true
+
+    context_scale:
+      level-6: 0.03125
+      level-5: 0.0625
+      level-4: 0.125
+      level-3: 0.25
+
+loss:
+  type: dicl/multiscale
+
+  arguments:
+    weights: [1.0, 0.8, 0.75, 0.6, 0.5, 0.4, 0.5, 0.4]
+    ord: 2
+    mode: bilinear
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [128, 128]
