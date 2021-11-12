@@ -26,7 +26,7 @@ validation:
     frequency: epoch
     checkpoint: true
 
-    tb-metrics-prefix: Validation:S{n_stage}:{id_stage}/
+    tb-metrics-prefix: Validation:S{n_stage}:{id_stage}:{id_val}/
 
     metrics:
       - reduce: mean
@@ -42,4 +42,4 @@ validation:
           type: loss
 
     images:
-      prefix: 'Validation:S{n_stage}:{id_stage}/i{img_idx}/'
+      prefix: 'Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/'
