@@ -536,7 +536,11 @@ class WipModule(nn.Module):
         h, flow = self.rlu(i1f2, i2f2, h, flow, 0)
         out.append(flow)
 
-        return WipOutput(list(reversed(out)), [i1f2, i1f3, i1f4, i1f5, i1f6], [i1f2, i2f3, i2f4, i2f5, i2f6])
+        return {
+            'flow': list(reversed(out)),
+            'f1': [i1f2, i1f3, i1f4, i1f5, i1f6],
+            'f2': [i1f2, i2f3, i2f4, i2f5, i2f6],
+        }
 
 
 class Wip(Model):
@@ -575,13 +579,6 @@ class Wip(Model):
         super().train(mode)
 
 
-@dataclass
-class WipOutput:
-    flow: List[Tensor]
-    f1: List[Tensor]
-    f2: List[Tensor]
-
-
 class WipResult(Result):
     def __init__(self, output, target_shape):
         super().__init__()
@@ -594,14 +591,10 @@ class WipResult(Result):
         if batch_index is None:
             return self.result
 
-        flow = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.flow]
-        f1 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f1]
-        f2 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f2]
-
-        return WipOutput(flow, f1, f2)
+        return {k: v[batch_index].view(1, *v.shape[1:]) for k, v in self.result.items()}
 
     def final(self):
-        flow = self.result.flow[0]
+        flow = self.result['flow'][0]
 
         _b, _c, fh, fw = flow.shape
         _b, _c, th, tw = self.shape
@@ -636,7 +629,7 @@ class MultiscaleLoss(Loss):
     def compute(self, model, result, target, valid, weights, ord=2, mode='bilinear', valid_range=None):
         loss = 0.0
 
-        for i, flow in enumerate(result.flow):
+        for i, flow in enumerate(result['flow']):
             flow = self.upsample(flow, target.shape, mode)
 
             # filter valid flow by per-level range
@@ -659,7 +652,7 @@ class MultiscaleLoss(Loss):
             loss = loss + weights[i] * dist.mean()
 
         # normalize and return
-        return loss / len(result.flow)
+        return loss / len(result['flow'])
 
     def upsample(self, flow, shape, mode):
         _b, _c, fh, fw = flow.shape
@@ -703,7 +696,7 @@ class MultiscaleCorrHingeLoss(MultiscaleLoss):
         mnet = module.rlu.cvnet.mnet
 
         corr_loss = 0.0
-        for feats in (result.f1, result.f2):
+        for feats in (result['f1'], result['f2']):
             for i, f in enumerate(feats):
                 batch, c, h, w = f.shape
 
@@ -759,7 +752,7 @@ class MultiscaleCorrMseLoss(MultiscaleLoss):
         mnet = module.rlu.cvnet.mnet
 
         corr_loss = 0.0
-        for feats in (result.f1, result.f2):
+        for feats in (result['f1'], result['f2']):
             for i, f in enumerate(feats):
                 batch, c, h, w = f.shape
 

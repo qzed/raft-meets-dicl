@@ -715,7 +715,7 @@ class RaftModule(nn.Module):
 
             out.append(flow_up)
 
-        return RaftClOutput(out, fmap1, fmap2)
+        return {'flow': out, 'f1': fmap1, 'f2': fmap2}
 
 
 class Raft(Model):
@@ -768,21 +768,10 @@ class RaftResult(Result):
         if batch_index is None:
             return self.result
 
-        flow = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.flow]
-        f1 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f1]
-        f2 = [x[batch_index].view(1, *x.shape[1:]) for x in self.result.f2]
-
-        return RaftClOutput(flow, f1, f2)
+        return {k: v[batch_index].view(1, *v.shape[1:]) for k, v in self.result.items()}
 
     def final(self):
-        return self.result.flow[-1]
-
-
-@dataclass
-class RaftClOutput:
-    flow: List[Tensor]
-    f1: List[Tensor]
-    f2: List[Tensor]
+        return self.result['flow'][-1]
 
 
 class SequenceLoss(Loss):
@@ -806,11 +795,11 @@ class SequenceLoss(Loss):
         }
 
     def compute(self, model, result, target, valid, ord=1, gamma=0.8, scale=1.0):
-        n_predictions = len(result.flow)
+        n_predictions = len(result['flow'])
 
         # flow loss
         loss = 0.0
-        for i, flow in enumerate(result.flow):
+        for i, flow in enumerate(result['flow']):
             # compute weight for sequence index
             weight = gamma**(n_predictions - i - 1)
 
@@ -857,7 +846,7 @@ class SequenceCorrHingeLoss(SequenceLoss):
         mnet = module.cvol.mnet
 
         corr_loss = 0.0
-        for feats in (result.f1, result.f2):
+        for feats in (result['f1'], result['f2']):
             for i, f in enumerate(feats):
                 batch, c, h, w = f.shape
 
@@ -910,7 +899,7 @@ class SequenceCorrMseLoss(SequenceLoss):
         mnet = module.cvol.mnet
 
         corr_loss = 0.0
-        for feats in (result.f1, result.f2):
+        for feats in (result['f1'], result['f2']):
             for i, f in enumerate(feats):
                 batch, c, h, w = f.shape
 
