@@ -10,9 +10,15 @@ stages:
       batch-size: 2
 
     validation:
-      source: ../../data/ufreiburg-flyingthings3d.test.yaml
-      batch-size: 1
-      images: [0, 24, 49, 74, 99]
+      - name: sintel-clean
+        source: ../../data/mpi-sintel-clean.train-full.yaml
+        batch-size: 1
+        images: [0, 24, 49, 74, 99]
+
+      - name: sintel-final
+        source: ../../data/mpi-sintel-final.train-full.yaml
+        batch-size: 1
+        images: [0, 24, 49, 74, 99]
 
     optimizer:
       type: adam-w
