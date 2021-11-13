@@ -27,4 +27,4 @@ input:
   padding:
     type: modulo
     mode: zeros
-    size: [8, 8]
+    size: [16, 16]
