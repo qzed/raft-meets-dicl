@@ -4,8 +4,6 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from tqdm import tqdm
-
 import numpy as np
 
 import torch
@@ -14,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from .. import metrics
 from .. import strategy
+from .. import utils
 from .. import visual
 
 
@@ -348,7 +347,7 @@ class StrategyValidation(Validation):
         if epoch is not None:
             desc += f", epoch {epoch + 1}/{stage.data.epochs}"
         desc += f", step {ctx.step}"
-        samples = tqdm(data, unit='batch', leave=False)
+        samples = utils.logging.progress(data, unit='batch', leave=False)
         samples.set_description(desc)
 
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):

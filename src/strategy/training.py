@@ -1,7 +1,5 @@
 from typing import Dict, List, Optional
 
-from tqdm import tqdm
-
 import torch
 import torch.nn as nn
 import torch.utils.data as td
@@ -176,7 +174,7 @@ class TrainingContext:
         # set up progress bar
         desc = f"stage {stage.index + 1}/{len(self.strategy.stages)}, "
         desc += f"epoch {epoch + 1}/{stage.data.epochs}"
-        samples = tqdm(self.data, unit='batch', leave=False)
+        samples = utils.logging.progress(self.data, unit='batch', leave=False)
         samples.set_description(desc)
 
         # actual trainng loop

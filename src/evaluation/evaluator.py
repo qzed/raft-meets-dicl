@@ -1,9 +1,9 @@
-from tqdm import tqdm
+from .. import utils
 
 
-def evaluate(model, data, device, use_tqdm=True):
-    if use_tqdm:
-        samples = tqdm(data, unit='batch', leave=False)
+def evaluate(model, data, device, show_progress=True):
+    if show_progress:
+        samples = utils.logging.progress(data, unit='batch', leave=False)
 
     model.to(device)
     model.eval()
