@@ -18,8 +18,8 @@ stages:
       type: adam-w
 
       parameters:
-        lr: &learning_rate1 0.0004
-        weight_decay: 0.0001
+        lr: &learning_rate1 4.0e-4
+        weight_decay: 1.0e-4
         eps: 1.0e-8
 
     lr-scheduler:
@@ -58,8 +58,8 @@ stages:
       type: adam-w
 
       parameters:
-        lr: &learning_rate2 0.0004
-        weight_decay: 0.0001
+        lr: &learning_rate1 4.0e-4
+        weight_decay: 1.0e-4
         eps: 1.0e-8
 
     lr-scheduler:
