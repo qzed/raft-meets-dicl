@@ -1,0 +1,921 @@
+{
+    "timestamp": "2021-11-13T23:47:58.487908",
+    "commit": "6e878d9eea75e161c4148e90155cf942800c2c3a",
+    "cwd": "/media/t0/uni/mt/code",
+    "args": {
+        "command": "gencfg",
+        "output": "cfg/strategy/dev/combined/dicl-64to8.flyingchairs2.json",
+        "config": null,
+        "data": "cfg/strategy/dev/train-ufreiburg-flyingchairs2.prepstage.yaml",
+        "model": "cfg/model/dicl-64to8.yaml",
+        "seeds": "cfg/seeds/dev.yaml",
+        "inspect": null,
+        "env": null
+    },
+    "seeds": {
+        "python": -2490582583985330632,
+        "numpy": 3330162416,
+        "torch": -8116055267317430429,
+        "cuda": -1021252639206788731
+    },
+    "model": {
+        "name": "DICL baseline with level (H/4, W/4) removed",
+        "id": "dicl/64to8",
+        "model": {
+            "type": "dicl/64to8",
+            "parameters": {
+                "feature-channels": 32,
+                "displacement-range": {
+                    "level-6": [
+                        3,
+                        3
+                    ],
+                    "level-5": [
+                        3,
+                        3
+                    ],
+                    "level-4": [
+                        3,
+                        3
+                    ],
+                    "level-3": [
+                        3,
+                        3
+                    ]
+                },
+                "dap-init": "identity"
+            },
+            "arguments": {
+                "raw": true,
+                "dap": true,
+                "context_scale": {
+                    "level-6": 0.03125,
+                    "level-5": 0.0625,
+                    "level-4": 0.125,
+                    "level-3": 0.25
+                },
+                "ctx": true
+            }
+        },
+        "loss": {
+            "type": "dicl/multiscale",
+            "arguments": {
+                "ord": 2,
+                "mode": "bilinear",
+                "weights": [
+                    1.0,
+                    0.8,
+                    0.75,
+                    0.6,
+                    0.5,
+                    0.4,
+                    0.5,
+                    0.4
+                ]
+            }
+        },
+        "input": {
+            "clip": [
+                0.0,
+                1.0
+            ],
+            "range": [
+                -1,
+                1
+            ],
+            "padding": {
+                "type": "modulo",
+                "mode": "zeros",
+                "size": [
+                    128,
+                    128
+                ]
+            }
+        }
+    },
+    "strategy": {
+        "mode": "continuous",
+        "stages": [
+            {
+                "name": "FlyingChairs2 (basic augmentations only with forwards-backwards batching)",
+                "id": "train/chairs2-0",
+                "data": {
+                    "source": {
+                        "type": "augment",
+                        "augmentations": [
+                            {
+                                "type": "crop",
+                                "size": [
+                                    496,
+                                    368
+                                ]
+                            },
+                            {
+                                "type": "flip",
+                                "probability": [
+                                    0.5,
+                                    0.1
+                                ]
+                            }
+                        ],
+                        "source": {
+                            "type": "forwards-backwards-batch",
+                            "forwards": {
+                                "type": "dataset",
+                                "spec": {
+                                    "id": "ufreiburg-flyingchairs2",
+                                    "name": "Uni Freiburg FlyingChairs2",
+                                    "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                    "layout": {
+                                        "type": "multi",
+                                        "parameter": "direction",
+                                        "instances": {
+                                            "forwards": {
+                                                "type": "generic",
+                                                "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                "key": "{type}/{seq:07d}"
+                                            },
+                                            "backwards": {
+                                                "type": "generic-backwards",
+                                                "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                "key": "{type}/{seq:07d}"
+                                            }
+                                        }
+                                    },
+                                    "split": null,
+                                    "parameters": {
+                                        "type": {
+                                            "values": [
+                                                "train",
+                                                "test"
+                                            ],
+                                            "sub": {
+                                                "test": {
+                                                    "type": "val"
+                                                },
+                                                "train": {
+                                                    "type": "train"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "loader": {
+                                        "image": "generic-image",
+                                        "flow": {
+                                            "type": "generic-flow",
+                                            "uvmax": [
+                                                1000.0,
+                                                1000.0
+                                            ]
+                                        }
+                                    }
+                                },
+                                "parameters": {
+                                    "type": "train",
+                                    "direction": "forwards"
+                                },
+                                "filter": null
+                            },
+                            "backwards": {
+                                "type": "dataset",
+                                "spec": {
+                                    "id": "ufreiburg-flyingchairs2",
+                                    "name": "Uni Freiburg FlyingChairs2",
+                                    "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                    "layout": {
+                                        "type": "multi",
+                                        "parameter": "direction",
+                                        "instances": {
+                                            "forwards": {
+                                                "type": "generic",
+                                                "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                "key": "{type}/{seq:07d}"
+                                            },
+                                            "backwards": {
+                                                "type": "generic-backwards",
+                                                "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                "key": "{type}/{seq:07d}"
+                                            }
+                                        }
+                                    },
+                                    "split": null,
+                                    "parameters": {
+                                        "type": {
+                                            "values": [
+                                                "train",
+                                                "test"
+                                            ],
+                                            "sub": {
+                                                "test": {
+                                                    "type": "val"
+                                                },
+                                                "train": {
+                                                    "type": "train"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "loader": {
+                                        "image": "generic-image",
+                                        "flow": {
+                                            "type": "generic-flow",
+                                            "uvmax": [
+                                                1000.0,
+                                                1000.0
+                                            ]
+                                        }
+                                    }
+                                },
+                                "parameters": {
+                                    "type": "train",
+                                    "direction": "backwards"
+                                },
+                                "filter": null
+                            }
+                        },
+                        "sync": true
+                    },
+                    "epochs": 1,
+                    "batch-size": 3,
+                    "drop-last": true,
+                    "shuffle": true
+                },
+                "validation": [
+                    {
+                        "name": "default",
+                        "source": {
+                            "type": "concat",
+                            "sources": [
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "test",
+                                        "direction": "forwards"
+                                    },
+                                    "filter": null
+                                },
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "test",
+                                        "direction": "backwards"
+                                    },
+                                    "filter": null
+                                }
+                            ]
+                        },
+                        "batch_size": 4,
+                        "images": [
+                            0,
+                            99,
+                            74,
+                            49,
+                            24
+                        ]
+                    }
+                ],
+                "optimizer": {
+                    "type": "adam-w",
+                    "parameters": {
+                        "lr": 0.0004,
+                        "weight_decay": 0.0001,
+                        "eps": 1e-08
+                    }
+                },
+                "model": {
+                    "arguments": {}
+                },
+                "loss": {
+                    "arguments": {}
+                },
+                "gradient": {
+                    "accumulate": 1,
+                    "clip": {
+                        "type": "norm",
+                        "value": 1.0,
+                        "ord": 2.0
+                    },
+                    "scaler": {
+                        "enabled": false,
+                        "init-scale": 65536.0,
+                        "growth-factor": 2.0,
+                        "backoff-factor": 0.5,
+                        "growth-interval": 2000
+                    }
+                },
+                "lr-scheduler": {
+                    "instance": [
+                        {
+                            "type": "one-cycle",
+                            "parameters": {
+                                "max_lr": 0.0004,
+                                "total_steps": "({n_epochs} * {n_batches}) // {n_accum} + 100",
+                                "pct_start": 0.05,
+                                "cycle_momentum": false,
+                                "anneal_strategy": "linear"
+                            }
+                        }
+                    ],
+                    "epoch": []
+                },
+                "loader": {}
+            },
+            {
+                "name": "FlyingChairs2 (fully augmented)",
+                "id": "train/chairs2-1",
+                "data": {
+                    "source": {
+                        "type": "augment",
+                        "augmentations": [
+                            {
+                                "type": "translate",
+                                "min-size": [
+                                    496,
+                                    368
+                                ],
+                                "delta": [
+                                    10,
+                                    10
+                                ]
+                            },
+                            {
+                                "type": "scale",
+                                "min-size": [
+                                    496,
+                                    368
+                                ],
+                                "min-scale": 0.9,
+                                "max-scale": 2.0,
+                                "max-stretch": 0.2,
+                                "prob-stretch": 0.8,
+                                "mode": "linear",
+                                "th-valid": 0.99
+                            },
+                            {
+                                "type": "crop",
+                                "size": [
+                                    496,
+                                    368
+                                ]
+                            },
+                            {
+                                "type": "flip",
+                                "probability": [
+                                    0.5,
+                                    0.1
+                                ]
+                            },
+                            {
+                                "type": "color-jitter",
+                                "prob-asymmetric": 0.2,
+                                "brightness": 0.4,
+                                "contrast": 0.4,
+                                "saturation": 0.4,
+                                "hue": 0.1592
+                            },
+                            {
+                                "type": "occlusion-forward",
+                                "probability": 0.5,
+                                "num": [
+                                    1,
+                                    3
+                                ],
+                                "min-size": [
+                                    1,
+                                    1
+                                ],
+                                "max-size": [
+                                    100,
+                                    50
+                                ]
+                            },
+                            {
+                                "type": "restrict-flow-magnitude",
+                                "maximum": 400.0
+                            }
+                        ],
+                        "source": {
+                            "type": "concat",
+                            "sources": [
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "train",
+                                        "direction": "forwards"
+                                    },
+                                    "filter": null
+                                },
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "train",
+                                        "direction": "backwards"
+                                    },
+                                    "filter": null
+                                }
+                            ]
+                        },
+                        "sync": true
+                    },
+                    "epochs": 14,
+                    "batch-size": 6,
+                    "drop-last": true,
+                    "shuffle": true
+                },
+                "validation": [
+                    {
+                        "name": "default",
+                        "source": {
+                            "type": "concat",
+                            "sources": [
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "test",
+                                        "direction": "forwards"
+                                    },
+                                    "filter": null
+                                },
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingchairs2",
+                                        "name": "Uni Freiburg FlyingChairs2",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingchairs2/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_01.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "{type}/{seq:07d}-img_{idx:d}.png",
+                                                    "flows": "{type}/{seq:07d}-flow_10.flo",
+                                                    "key": "{type}/{seq:07d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "val"
+                                                    },
+                                                    "train": {
+                                                        "type": "train"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "test",
+                                        "direction": "backwards"
+                                    },
+                                    "filter": null
+                                }
+                            ]
+                        },
+                        "batch_size": 4,
+                        "images": [
+                            0,
+                            99,
+                            74,
+                            49,
+                            24
+                        ]
+                    }
+                ],
+                "optimizer": {
+                    "type": "adam-w",
+                    "parameters": {
+                        "lr": 0.0004,
+                        "weight_decay": 0.0001,
+                        "eps": 1e-08
+                    }
+                },
+                "model": {
+                    "arguments": {}
+                },
+                "loss": {
+                    "arguments": {}
+                },
+                "gradient": {
+                    "accumulate": 1,
+                    "clip": {
+                        "type": "norm",
+                        "value": 1.0,
+                        "ord": 2.0
+                    },
+                    "scaler": {
+                        "enabled": false,
+                        "init-scale": 65536.0,
+                        "growth-factor": 2.0,
+                        "backoff-factor": 0.5,
+                        "growth-interval": 2000
+                    }
+                },
+                "lr-scheduler": {
+                    "instance": [
+                        {
+                            "type": "one-cycle",
+                            "parameters": {
+                                "max_lr": 0.0004,
+                                "total_steps": "({n_epochs} * {n_batches}) // {n_accum} + 100",
+                                "pct_start": 0.05,
+                                "cycle_momentum": false,
+                                "anneal_strategy": "linear"
+                            }
+                        }
+                    ],
+                    "epoch": []
+                },
+                "loader": {}
+            }
+        ]
+    },
+    "inspect": {
+        "metrics": [
+            {
+                "frequency": 1,
+                "prefix": "Train:S{n_stage}:{id_stage}/",
+                "metrics": [
+                    {
+                        "type": "epe",
+                        "key": "EndPointError/",
+                        "distances": [
+                            1,
+                            3,
+                            5
+                        ]
+                    },
+                    {
+                        "type": "fl-all",
+                        "key": "Fl-all"
+                    },
+                    {
+                        "type": "loss",
+                        "key": "Loss"
+                    },
+                    {
+                        "type": "learning-rate",
+                        "key": "LearningRate"
+                    },
+                    {
+                        "type": "grad-norm",
+                        "key": "GradientNorm/",
+                        "parameters": [
+                            "total"
+                        ]
+                    },
+                    {
+                        "type": "flow-magnitude",
+                        "key": "FlowMagnitude",
+                        "ord": 2
+                    }
+                ]
+            }
+        ],
+        "images": {
+            "frequency": 100,
+            "prefix": "Train:S{n_stage}:{id_stage}/"
+        },
+        "checkpoints": {
+            "path": "checkpoints",
+            "name": "{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth",
+            "compare": [
+                "{m_EndPointError_mean}"
+            ],
+            "keep": {
+                "latest": 2,
+                "best": 2
+            }
+        },
+        "validation": [
+            {
+                "type": "strategy",
+                "frequency": "epoch",
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            }
+        ],
+        "tensorboard": {
+            "path": "tb.{id_model}"
+        }
+    },
+    "environment": {
+        "loader": {
+            "num_workers": 4,
+            "pin_memory": true
+        }
+    }
+}
