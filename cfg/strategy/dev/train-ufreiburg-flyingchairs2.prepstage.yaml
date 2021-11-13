@@ -58,7 +58,7 @@ stages:
       type: adam-w
 
       parameters:
-        lr: &learning_rate1 4.0e-4
+        lr: &learning_rate2 4.0e-4
         weight_decay: 1.0e-4
         eps: 1.0e-8
 
