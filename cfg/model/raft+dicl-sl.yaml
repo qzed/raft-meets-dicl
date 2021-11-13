@@ -10,7 +10,7 @@ model:
     dap-init: identity
 
   arguments:
-    iterations: 12
+    iterations: 4
     dap: true
 
 loss:

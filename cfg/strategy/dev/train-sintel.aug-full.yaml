@@ -6,18 +6,18 @@ stages:
 
     data:
       source: ../../data/mpi-sintel.train.aug-full.yaml
-      epochs: 100
-      batch-size: 1
+      epochs: 250     # ~100k steps
+      batch-size: 4
 
     validation:
       - name: sintel-clean
         source: ../../data/mpi-sintel-clean.train-full.yaml
-        batch-size: 1
+        batch-size: 4
         images: [0, 24, 49, 74, 99]
 
       - name: sintel-final
         source: ../../data/mpi-sintel-final.train-full.yaml
-        batch-size: 1
+        batch-size: 4
         images: [0, 24, 49, 74, 99]
 
     optimizer:

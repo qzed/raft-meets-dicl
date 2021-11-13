@@ -7,11 +7,11 @@ stages:
     data:
       source: ../../data/ufreiburg-flyingchairs2.train.aug-basic.fwbw.yaml
       epochs: 1
-      batch-size: 1   # Note: this will create a batch size of 2 due to forward-backward matching
+      batch-size: 3   # Note: this will create a batch size of 6 due to forward-backward matching
 
     validation:
       source: ../../data/ufreiburg-flyingchairs2.test.yaml
-      batch-size: 1
+      batch-size: 4
       images: [0, 24, 49, 74, 99]
 
     optimizer:
@@ -42,12 +42,12 @@ stages:
 
     data:
       source: ../../data/ufreiburg-flyingchairs2.train.aug-full.yaml
-      epochs: 25
-      batch-size: 2
+      epochs: 14      # ~100k steps
+      batch-size: 6
 
     validation:
       source: ../../data/ufreiburg-flyingchairs2.test.yaml
-      batch-size: 1
+      batch-size: 4
       images: [0, 24, 49, 74, 99]
 
     optimizer:

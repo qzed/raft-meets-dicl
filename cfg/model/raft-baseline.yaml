@@ -9,7 +9,7 @@ model:
     mixed-precision: false
 
   arguments:
-    iterations: 12
+    iterations: 4
 
 loss:
   type: raft/sequence
