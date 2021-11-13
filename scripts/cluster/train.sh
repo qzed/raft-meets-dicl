@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --nodes=1
 #SBATCH --ntasks=10
-#SBATCH --mem=24gb
+#SBATCH --mem=32gb
 #SBATCH --gres=gpu:2
 
 echo "============================== SETTING UP =============================="
