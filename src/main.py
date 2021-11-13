@@ -92,14 +92,25 @@ def main():
     chkpt_trim.add_argument('--keep-latest', type=int, help='keep specified number of latest checkpoints')
     chkpt_trim.add_argument('--keep-best', type=int, help='keep specified number of best checkpoints')
 
+    # subcommand gencfg
+    gencfg = subp.add_parser('gencfg', formatter_class=fmtcls, help='generate full config from parts')
+    gencfg.add_argument('-o', '--output', required=True, help='output file')
+    gencfg.add_argument('-c', '--config', help='full training configuration')
+    gencfg.add_argument('-d', '--data', help='training strategy and data')
+    gencfg.add_argument('-m', '--model', help='specification of the model')
+    gencfg.add_argument('-s', '--seeds', help='seed config for initializing RNGs')
+    gencfg.add_argument('-i', '--inspect', help='specification of metrics')
+    gencfg.add_argument('-e', '--env', '--environment', dest='env', help='environment config')
+
     # parse arguments
     args = parser.parse_args()
 
     # run subcommand
     commands = {
-        'train': cmd.train,
-        'evaluate': cmd.evaluate,
         'checkpoint': cmd.checkpoint,
+        'evaluate': cmd.evaluate,
+        'gencfg': cmd.generate_config,
+        'train': cmd.train,
     }
 
     commands[args.command](args)
