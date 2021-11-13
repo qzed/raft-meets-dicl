@@ -1,7 +1,7 @@
 mode: continuous
 
 stages:
-  - name: "MPI Sintel (basic augmentations only)"
+  - name: "MPI Sintel (clean, basic augmentations only)"
     id: train/sintel-0
 
     data:
@@ -18,9 +18,19 @@ stages:
       type: adam-w
 
       parameters:
-        lr: 0.0001125
-        weight_decay: 0.00001
-        eps: 1.0e-9
+        lr: &learning_rate 1.25e-4
+        weight_decay: 1.0e-5
+        eps: 1.0e-8
+
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate
+            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
 
     gradient:
       clip:
