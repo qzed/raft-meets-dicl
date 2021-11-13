@@ -1,7 +1,7 @@
 from .. import utils
 
 
-def evaluate(model, data, device, show_progress=True):
+def evaluate(model, model_adapter, data, device, show_progress=True):
     if show_progress:
         samples = utils.logging.progress(data, unit='batch', leave=False)
 
@@ -22,6 +22,8 @@ def evaluate(model, data, device, show_progress=True):
 
         # run model
         result = model(img1, img2)
+        result = model_adapter.wrap_result(result, img1.shape)
+
         final = result.final()
 
         # run evaluation per-sample instead of per-batch

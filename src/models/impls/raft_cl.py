@@ -6,9 +6,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.functional import Tensor
 
-from .. import Loss, Model, Result
+from .. import Loss, Model, ModelAdapter, Result
 
 
 # -- DICL/GA-Net based feature encoder -------------------------------------------------------------
@@ -741,6 +740,8 @@ class Raft(Model):
 
         super().__init__(RaftModule(upnet, dap_init, corr_radius), arguments)
 
+        self.adapter = RaftAdapter()
+
     def get_config(self):
         default_args = {'iterations': 12}
 
@@ -754,8 +755,19 @@ class Raft(Model):
             'arguments': default_args | self.arguments,
         }
 
+    def get_adapter(self) -> ModelAdapter:
+        return self.adapter
+
     def forward(self, img1, img2, iterations=12, flow_init=None):
-        return RaftResult(self.module(img1, img2, iterations, flow_init))
+        return self.module(img1, img2, iterations, flow_init)
+
+
+class RaftAdapter(ModelAdapter):
+    def __init__(self):
+        super().__init__()
+
+    def wrap_result(self, result, original_shape) -> Result:
+        return RaftResult(result)
 
 
 class RaftResult(Result):

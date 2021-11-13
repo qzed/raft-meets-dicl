@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Loss, Model, Result
+from .. import Model, ModelAdapter, Result
 
 
 class ConvBlock(nn.Sequential):
@@ -423,6 +423,8 @@ class Wip(Model):
         self.disp = disp
         self.dap_init = dap_init
 
+        self.adapter = WipAdapter()
+
     def get_config(self):
         default_args = {'iterations': [1]*5, 'dap': True}
 
@@ -436,9 +438,19 @@ class Wip(Model):
             'arguments': default_args | self.arguments,
         }
 
+    def get_adapter(self) -> ModelAdapter:
+        return self.adapter
+
     def forward(self, img1, img2, iterations=[1]*5, dap=True):
-        _, _, h, w = img1.shape
-        return WipResult(self.module(img1, img2, iterations, dap), img1.shape[2:])
+        return self.module(img1, img2, iterations, dap)
+
+
+class WipAdapter(ModelAdapter):
+    def __init__(self):
+        super().__init__()
+
+    def wrap_result(self, result, original_shape) -> Result:
+        return WipResult(result, original_shape)
 
 
 class WipResult(Result):
@@ -458,7 +470,7 @@ class WipResult(Result):
         flow = self.result[0]
 
         _b, _c, fh, fw = flow.shape
-        th, tw = self.shape
+        _b, _c, th, tw = self.shape
 
         flow = F.interpolate(flow.detach(), (th, tw), mode='bilinear', align_corners=True)
         flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)

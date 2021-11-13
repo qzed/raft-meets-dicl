@@ -359,6 +359,7 @@ class StrategyValidation(Validation):
 
             # run model
             result = ctx.model(img1, img2, **stage.model_args)
+            result = ctx.model_adapter.wrap_result(result, img1.shape)
 
             # compute loss
             loss = ctx.loss(ctx.model, result.output(), flow, valid, **stage.loss_args)

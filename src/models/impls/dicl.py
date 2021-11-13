@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Loss, Model, Result
+from .. import Loss, Model, ModelAdapter, Result
 from .. import common
 
 
@@ -532,6 +532,8 @@ class Dicl(Model):
 
         super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
 
+        self.adapter = DiclAdapter()
+
     def get_config(self):
         default_args = {
             'raw': False,
@@ -549,8 +551,19 @@ class Dicl(Model):
             'arguments': default_args | self.arguments,
         }
 
+    def get_adapter(self) -> ModelAdapter:
+        return self.adapter
+
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):
-        return DiclResult(self.module(img1, img2, raw, dap, ctx, context_scale), img1.shape)
+        return self.module(img1, img2, raw, dap, ctx, context_scale)
+
+
+class DiclAdapter(ModelAdapter):
+    def __init__(self):
+        super().__init__()
+
+    def wrap_result(self, result, original_shape) -> Result:
+        return DiclResult(result, original_shape)
 
 
 class DiclResult(Result):

@@ -1,4 +1,24 @@
+from typing import Dict
 import torch.nn as nn
+
+
+class Result:
+    def __init__(self):
+        pass
+
+    def output(self, batch_index=None):
+        raise NotImplementedError
+
+    def final(self):
+        raise NotImplementedError
+
+
+class ModelAdapter:
+    def __init__(self):
+        pass
+
+    def wrap_result(self, result, original_shape) -> Result:
+        raise NotImplementedError
 
 
 class Model(nn.Module):
@@ -15,22 +35,14 @@ class Model(nn.Module):
         self.module = module
         self.arguments = arguments
 
-    def get_config(self):
+    def get_config(self) -> Dict:
+        raise NotImplementedError
+
+    def get_adapter(self) -> ModelAdapter:
         raise NotImplementedError
 
     def __call__(self, img1, img2, **kwargs):
         return super().__call__(img1, img2, **(self.arguments | kwargs))
-
-
-class Result:
-    def __init__(self):
-        pass
-
-    def output(self, batch_index=None):
-        raise NotImplementedError
-
-    def final(self):
-        raise NotImplementedError
 
 
 class Loss:

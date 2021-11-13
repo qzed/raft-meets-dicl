@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Loss, Model, Result
+from .. import Loss, Model, ModelAdapter, Result
 
 
 def _make_norm2d(ty, num_channels, num_groups):
@@ -452,6 +452,8 @@ class Raft(Model):
 
         super().__init__(RaftModule(dropout, mixed_precision, upnet, corr_radius), arguments)
 
+        self.adapter = RaftAdapter()
+
     def get_config(self):
         default_args = {'iterations': 12}
 
@@ -466,14 +468,25 @@ class Raft(Model):
             'arguments': default_args | self.arguments,
         }
 
+    def get_adapter(self) -> ModelAdapter:
+        return self.adapter
+
     def forward(self, img1, img2, iterations=12, flow_init=None):
-        return RaftResult(self.module(img1, img2, iterations, flow_init))
+        return self.module(img1, img2, iterations, flow_init)
 
     def train(self, mode: bool = True):
         super().train(mode)
 
         if mode:
             self.module.freeze_batchnorm()
+
+
+class RaftAdapter(ModelAdapter):
+    def __init__(self):
+        super().__init__()
+
+    def wrap_result(self, result, original_shape) -> Result:
+        return RaftResult(result)
 
 
 class RaftResult(Result):

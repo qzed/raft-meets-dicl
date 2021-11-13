@@ -16,6 +16,7 @@ class TrainingContext:
     log: utils.logging.Logger
     strategy: Strategy
     model: nn.Module
+    model_adapter: models.ModelAdapter
     loss: models.Loss
     input: models.InputSpec
     inspector: Inspector
@@ -31,10 +32,12 @@ class TrainingContext:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, strategy, model, loss, input, inspector, checkpoints, device, loader_args={}):
+    def __init__(self, log, strategy, model, model_adapter, loss, input, inspector, checkpoints,
+                 device, loader_args={}):
         self.log = log
         self.strategy = strategy
         self.model = model
+        self.model_adapter = model_adapter
         self.loss = loss
         self.input = input
         self.inspector = inspector
@@ -206,6 +209,7 @@ class TrainingContext:
 
         # run model
         result = self.model(img1, img2, **stage.model_args)
+        result = self.model_adapter.wrap_result(result, img1.shape)
 
         # compute loss
         loss = self.loss(self.model, result.output(), flow, valid, **stage.loss_args)

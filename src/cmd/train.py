@@ -170,6 +170,7 @@ def _train(args):
 
     # prepare model
     model, loss, input = model.model, model.loss, model.input
+    model_adapter = model.get_adapter()
 
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
@@ -202,7 +203,8 @@ def _train(args):
 
     # training loop
     log = utils.logging.Logger()
-    tctx = TrainingContext(log, strat, model, loss, input, inspc, chkptm, device, env.loader_args)
+    tctx = TrainingContext(log, strat, model, model_adapter, loss, input, inspc, chkptm, device,
+                           env.loader_args)
 
     if args.detect_anomaly:
         log.warn('anomaly detection enabled')

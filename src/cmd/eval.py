@@ -126,6 +126,7 @@ def evaluate(args):
 
     model = models.load(args.model)
     model, loss, input = model.model, model.loss, model.input
+    model_adapter = model.get_adapter()
 
     logging.info(f"loading checkpoint, file='{args.checkpoint}'")
 
@@ -198,7 +199,7 @@ def evaluate(args):
     torch.set_grad_enabled(False)
 
     output = []
-    evtor = evaluation.evaluate(model, dataset, device)
+    evtor = evaluation.evaluate(model, model_adapter, dataset, device)
 
     for img1, img2, target, valid, est, out, meta in evtor:
         # eval returns per-sample data, add fake batch

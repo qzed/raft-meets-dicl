@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch.functional import Tensor
 
 from .. import common
-from .. import Loss, Model, Result
+from .. import Loss, Model, ModelAdapter, Result
 
 
 class ConvBlock(nn.Sequential):
@@ -561,6 +561,8 @@ class Wip(Model):
 
         super().__init__(WipModule(disp_range), arguments)
 
+        self.adapter = WipAdapter()
+
     def get_config(self):
         default_args = {}
 
@@ -572,11 +574,22 @@ class Wip(Model):
             'arguments': default_args | self.arguments,
         }
 
+    def get_adapter(self) -> ModelAdapter:
+        return self.adapter
+
     def forward(self, img1, img2):
-        return WipResult(self.module(img1, img2), img1.shape)
+        return self.module(img1, img2)
 
     def train(self, mode: bool = True):
         super().train(mode)
+
+
+class WipAdapter(ModelAdapter):
+    def __init__(self):
+        super().__init__()
+
+    def wrap_result(self, result, original_shape) -> Result:
+        return WipResult(result, original_shape)
 
 
 class WipResult(Result):
