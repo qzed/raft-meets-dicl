@@ -245,7 +245,7 @@ def estimate_backwards_flow(img1, img2, flow, valid, th_weight=0.25, s_motion=1.
     elif fill_method == 'average':
         flow_bw, valid_bw = fill_avg(flow_bw, valid_bw, **fill_args)
     elif fill_method == 'oriented':
-        pass        # TODO
+        raise NotImplementedError()     # TODO
     elif fill_method != 'none':
         raise ValueError(f"invalid fill method '{fill_method}'")
 
