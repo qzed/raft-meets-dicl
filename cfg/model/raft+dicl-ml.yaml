@@ -1,0 +1,30 @@
+name: RAFT+DICL multi-level config
+id: raft+dicl/ml
+
+model:
+  type: raft+dicl/ml
+
+  parameters:
+    droput: 0.0
+    mixed-precision: false
+    dap-init: identity
+
+  arguments:
+    iterations: 4
+    dap: true
+
+loss:
+  type: raft/sequence
+
+  arguments:
+    ord: 1
+    gamma: 0.85
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [128, 128]
