@@ -1,5 +1,5 @@
-name: MPI Sintel (clean)
-id: mpi-sintel-clean
+name: MPI Sintel
+id: mpi-sintel
 path: '../../../../datasets/mpi-sintel-flow/data'
 
 layout:
