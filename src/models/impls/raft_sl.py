@@ -307,7 +307,8 @@ class BasicUpdateBlock(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+                 corr_channels=256):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -318,7 +319,7 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
+        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type='instance', dropout=dropout)
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
 
@@ -419,18 +420,22 @@ class Raft(Model):
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
         upnet = bool(param_cfg.get('upnet', True))
         corr_radius = param_cfg.get('corr-radius', 4)
+        corr_channels = param_cfg.get('corr-channels', 256)
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, corr_radius, args)
+        return cls(dropout, mixed_precision, upnet, corr_radius, corr_channels, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4, arguments={}):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+                 corr_channels=256, arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
         self.corr_radius = corr_radius
+        self.corr_channels = corr_channels
 
-        super().__init__(RaftModule(dropout, mixed_precision, upnet, corr_radius), arguments)
+        super().__init__(RaftModule(dropout, mixed_precision, upnet, corr_radius, corr_channels),
+                         arguments)
 
         self.adapter = RaftAdapter()
 
@@ -443,6 +448,7 @@ class Raft(Model):
                 'dropout': self.dropout,
                 'mixed-precision': self.mixed_precision,
                 'corr-radius': self.corr_radius,
+                'corr-channels': self.corr_channels,
                 'upnet': self.upnet
             },
             'arguments': default_args | self.arguments,
