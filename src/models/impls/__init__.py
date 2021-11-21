@@ -6,5 +6,6 @@ from . import raft_sl
 from . import raft_dicl_sl
 from . import raft_dicl_ml
 from . import raft_dicl_ctf_l2
+from . import raft_dicl_ctf_l3
 from . import wip_recwarp
 from . import wip_warp
