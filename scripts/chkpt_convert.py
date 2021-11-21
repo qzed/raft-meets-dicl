@@ -5,6 +5,7 @@
 
 import argparse
 import logging
+import math
 import sys
 
 from datetime import datetime
@@ -147,6 +148,24 @@ def convert_init_raftcl_via_dicl(chkpt, metadata):
     return to_checkpoint('raft/cl', state, metadata)
 
 
+def convert_raft_dicl_sdap_to_fdap(chkpt, metadata):
+    chkpt = Checkpoint.from_dict(chkpt)
+    state = chkpt.state.model
+
+    # get radius
+    radius = chkpt.state.model['module.cvol.dap.0.conv1.weight'].shape[0]
+    radius = int(math.sqrt(radius) - 1) // 2
+
+    # get new DAP state
+    model = models.m.raft_dicl_ml.RaftPlusDicl(corr_radius=radius, dap_type='full', dap_init='identity')
+
+    # exchange DAP state
+    state = {k: v for k, v in state.items() if not k.startswith('module.cvol.dap.')}
+    state['module.cvol.dap.weight'] = model.state_dict()['module.cvol.dap.weight']
+
+    return to_checkpoint(chkpt.model, state, metadata)
+
+
 def main():
     utils.logging.setup()
 
@@ -156,6 +175,7 @@ def main():
         'dicl': convert_dicl,
         'init-warp1-via-dicl': convert_init_warp1_via_dicl,
         'init-raftcl-via-dicl': convert_init_raftcl_via_dicl,
+        'raft+dicl-ml-sdap-to-fdap': convert_raft_dicl_sdap_to_fdap,
     }
 
     # handle command-line input
