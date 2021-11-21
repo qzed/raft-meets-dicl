@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import Model, ModelAdapter, Result
+from .. import common
 
 
 # -- RAFT feature encoder --------------------------------------------------------------------------
@@ -412,13 +413,7 @@ class RaftPlusDiclModule(nn.Module):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
         batch, _c, h, w = img.shape
 
-        cy = torch.arange(h // 8, device=img.device)
-        cx = torch.arange(w // 8, device=img.device)
-
-        coords = torch.meshgrid(cy, cx, indexing='ij')[::-1]  # build transposed grid (h/8, w/8) x 2
-        coords = torch.stack(coords, dim=0).float()         # combine coordinates (2, h/8, w/8)
-        coords = coords.expand(batch, -1, -1, -1)           # expand to batch (batch, 2, h/8, w/8)
-
+        coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
     def upsample_flow(self, flow, mask):

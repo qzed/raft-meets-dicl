@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import Model, ModelAdapter, Result
+from .. import common
 
 
 class ConvBlock(nn.Sequential):
@@ -362,7 +363,7 @@ class WipModule(nn.Module):
         feat2 = self.fnet(img2)
 
         # initialize flow
-        coords = self.coordinate_grid((batch, *feat1[-1].shape[2:]), device=img1.device)
+        coords = common.grid.coordinate_grid(batch, *feat1[-1].shape[2:], device=img1.device)
 
         # coarse-to-fine warping
         out = []
@@ -378,7 +379,7 @@ class WipModule(nn.Module):
                 coords[:, 1, ...] = coords[:, 1, ...] * (h2 / h1)
 
             # recurrently update coordinates
-            coords0 = self.coordinate_grid((batch, *f1.shape[2:]), device=img1.device)
+            coords0 = common.grid.coordinate_grid(batch, *f1.shape[2:], device=img1.device)
 
             for j in range(iterations[i]):
                 coords = self.rfu[i](f1, f2, coords, dap=dap)
@@ -386,18 +387,6 @@ class WipModule(nn.Module):
                 out.append(coords - coords0)
 
         return out
-
-    def coordinate_grid(self, shape, device):
-        batch, h, w = shape
-
-        cy = torch.arange(h, dtype=torch.float, device=device)
-        cx = torch.arange(w, dtype=torch.float, device=device)
-
-        coords = torch.meshgrid(cy, cx, indexing='ij')[::-1]    # build transposed grid (h, w) x 2
-        coords = torch.stack(coords, dim=0)                 # combine coordinates (2, h, w)
-        coords = coords.expand(batch, -1, -1, -1)           # expand to batch (batch, 2, h, w)
-
-        return coords
 
 
 class Wip(Model):
