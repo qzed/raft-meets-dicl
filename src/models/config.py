@@ -44,6 +44,7 @@ def load_loss(cfg) -> model.Loss:
         m.raft_cl.SequenceLoss,
         m.raft_cl.SequenceCorrHingeLoss,
         m.raft_cl.SequenceCorrMseLoss,
+        m.raft_dicl_ctf_l2.MultiscaleSequenceLoss,
         m.wip_warp.MultiscaleLoss,
         m.wip_warp.MultiscaleCorrHingeLoss,
         m.wip_warp.MultiscaleCorrMseLoss,
@@ -63,6 +64,7 @@ def load_model(cfg) -> model.Model:
         m.raft_sl.Raft,
         m.raft_dicl_sl.RaftPlusDicl,
         m.raft_dicl_ml.RaftPlusDicl,
+        m.raft_dicl_ctf_l2.RaftPlusDicl,
         m.wip_recwarp.Wip,
         m.wip_warp.Wip,
     ]
