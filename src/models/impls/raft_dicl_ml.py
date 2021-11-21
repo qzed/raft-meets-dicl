@@ -302,10 +302,11 @@ class DisplacementAwareProjection(nn.Module):
 # -- Correlation module combining DICL with RAFT lookup/sampling -----------------------------------
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, dap_init='identity'):
+    def __init__(self, feature_dim, radius, dap_init='identity', dap_type='separate'):
         super().__init__()
 
         self.radius = radius
+        self.dap_type = dap_type
 
         self.mnet = nn.ModuleList([
             MatchingNet(feature_dim),
@@ -313,12 +314,26 @@ class CorrelationModule(nn.Module):
             MatchingNet(feature_dim),
             MatchingNet(feature_dim),
         ])
-        self.dap = nn.ModuleList([
-            DisplacementAwareProjection((radius, radius), init=dap_init),
-            DisplacementAwareProjection((radius, radius), init=dap_init),
-            DisplacementAwareProjection((radius, radius), init=dap_init),
-            DisplacementAwareProjection((radius, radius), init=dap_init),
-        ])
+
+        # DAP separated by layers
+        if self.dap_type == 'separate':
+            self.dap = nn.ModuleList([
+                DisplacementAwareProjection((radius, radius), init=dap_init),
+                DisplacementAwareProjection((radius, radius), init=dap_init),
+                DisplacementAwareProjection((radius, radius), init=dap_init),
+                DisplacementAwareProjection((radius, radius), init=dap_init),
+            ])
+
+        # DAP over all costs
+        elif self.dap_type == 'full':
+            n_channels = 4 * (2 * radius + 1)**2
+            self.dap = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
+
+            if dap_init == 'identity':
+                nn.init.eye_(self.dap.weight[:, :, 0, 0])
+
+        else:
+            raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
     def forward(self, fmap1, fmap2, coords, dap=True):
         batch, _, h, w = coords.shape
@@ -361,13 +376,19 @@ class CorrelationModule(nn.Module):
 
             # build cost volume for this level
             cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h, w)
-            if dap:
+            if dap and self.dap_type == 'separate':
                 cost = self.dap[i](cost)                        # (batch, 2r+1, 2r+1, h, w)
 
             cost = cost.reshape(batch, -1, h, w)                # (batch, (2r+1)^2, h, w)
             out.append(cost)
 
-        return torch.cat(out, dim=-3)
+        out = torch.cat(out, dim=-3)                            # (batch, C, h, w)
+
+        # DAP over all costs
+        if dap and self.dap_type == 'full':
+            out = self.dap(out)
+
+        return out
 
 
 # -- RAFT core / backend ---------------------------------------------------------------------------
@@ -496,7 +517,8 @@ class BasicUpdateBlock(nn.Module):
 class RaftPlusDiclModule(nn.Module):
     """RAFT+DICL multi-level flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4, dap_init='identity'):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+                 dap_init='identity', dap_type='separate'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -515,7 +537,7 @@ class RaftPlusDiclModule(nn.Module):
 
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
-        self.cvol = CorrelationModule(corr_dim, self.corr_radius, dap_init=dap_init)
+        self.cvol = CorrelationModule(corr_dim, self.corr_radius, dap_init=dap_init, dap_type=dap_type)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -616,19 +638,23 @@ class RaftPlusDicl(Model):
         upnet = bool(param_cfg.get('upnet', True))
         corr_radius = param_cfg.get('corr-radius', 4)
         dap_init = param_cfg.get('dap-init', 'identity')
+        dap_type = param_cfg.get('dap-type', 'separate')
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, corr_radius, dap_init, args)
+        return cls(dropout, mixed_precision, upnet, corr_radius, dap_init, dap_type, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4, dap_init='identity', arguments={}):
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+                 dap_init='identity', dap_type='separate', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
         self.corr_radius = corr_radius
         self.dap_init = dap_init
+        self.dap_type = dap_type
 
-        super().__init__(RaftPlusDiclModule(dropout, mixed_precision, upnet, corr_radius, dap_init), arguments)
+        super().__init__(RaftPlusDiclModule(dropout, mixed_precision, upnet, corr_radius, dap_init,
+                                            dap_type), arguments)
 
         self.adapter = RaftAdapter()
 
@@ -643,6 +669,7 @@ class RaftPlusDicl(Model):
                 'corr-radius': self.corr_radius,
                 'upnet': self.upnet,
                 'dap-init': self.dap_init,
+                'dap-type': self.dap_type,
             },
             'arguments': default_args | self.arguments,
         }
