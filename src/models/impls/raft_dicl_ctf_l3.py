@@ -1,4 +1,4 @@
-# RAFT+DICL coarse-to-fine (2 levels)
+# RAFT+DICL coarse-to-fine (3 levels)
 # - extended RAFT-based feature encoder
 # - weight-sharing for recurrent refinement unit across levels
 # - hidden state gets re-initialized per level (no upsampling)
@@ -116,7 +116,7 @@ class BasicEncoder(nn.Module):
             ResidualBlock(160, 160, norm_type, stride=1),
         )
 
-        self.layer5 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, H/16, 160)
+        self.layer5 = nn.Sequential(    # (H/16, W/16, 160) -> (H/16, H/16, 192)
             ResidualBlock(160, 192, norm_type, stride=2),
             ResidualBlock(192, 192, norm_type, stride=1),
         )
