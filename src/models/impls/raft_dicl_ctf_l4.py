@@ -462,7 +462,7 @@ class RaftPlusDiclModule(nn.Module):
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
 
-    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True):
+    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True, upnet=True):
         hdim, cdim = self.hidden_dim, self.context_dim
         b, _, h, w = img1.shape
 
@@ -576,7 +576,10 @@ class RaftPlusDiclModule(nn.Module):
             flow = coords1 - coords0
 
             # upsample flow estimate for output
-            flow_up = self.upnet(h_3, flow)
+            if upnet:
+                flow_up = self.upnet(h_3, flow)
+            else:
+                flow_up = 8 * F.interpolate(flow, (h, w), mode='bilinear', align_corners=True)
 
             out_3.append(flow_up)
 
@@ -607,7 +610,7 @@ class RaftPlusDicl(Model):
         self.adapter = RaftPlusDiclAdapter()
 
     def get_config(self):
-        default_args = {'iterations': (3, 4, 4, 3), 'dap': True}
+        default_args = {'iterations': (3, 4, 4, 3), 'dap': True, 'upnet': True}
 
         return {
             'type': self.type,
@@ -621,8 +624,8 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True):
-        return self.module(img1, img2, iterations=iterations, dap=dap)
+    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True, upnet=True):
+        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet)
 
     def train(self, mode: bool = True):
         super().train(mode)
