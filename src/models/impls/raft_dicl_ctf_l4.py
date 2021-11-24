@@ -462,7 +462,7 @@ class RaftPlusDiclModule(nn.Module):
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
 
-    def forward(self, img1, img2, iterations=(4, 3, 3), dap=True):
+    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True):
         hdim, cdim = self.hidden_dim, self.context_dim
         b, _, h, w = img1.shape
 
@@ -607,7 +607,7 @@ class RaftPlusDicl(Model):
         self.adapter = RaftPlusDiclAdapter()
 
     def get_config(self):
-        default_args = {'iterations': (4, 3, 3), 'dap': True}
+        default_args = {'iterations': (3, 4, 4, 3), 'dap': True}
 
         return {
             'type': self.type,
@@ -621,7 +621,7 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=(4, 3, 3), dap=True):
+    def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True):
         return self.module(img1, img2, iterations=iterations, dap=dap)
 
     def train(self, mode: bool = True):
