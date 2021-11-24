@@ -7,6 +7,7 @@ from . import fw_bw_batch
 from . import fw_bw_est
 from . import io
 from . import repeat
+from . import subset
 
 from .config import load
 

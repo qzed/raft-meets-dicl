@@ -8,6 +8,7 @@ from . import dataset
 from . import fw_bw_batch
 from . import fw_bw_est
 from . import repeat
+from . import subset
 
 
 def _load(path, cfg):
@@ -18,6 +19,7 @@ def _load(path, cfg):
         fw_bw_batch.ForwardsBackwardsBatch,
         fw_bw_est.ForwardsBackwardsEstimate,
         repeat.Repeat,
+        subset.Subset,
     ]
     types = {ty.type: ty for ty in types}
 
