@@ -1,4 +1,4 @@
-# RAFT+DICL coarse-to-fine (3 levels)
+# RAFT+DICL coarse-to-fine (4 levels)
 # - extended RAFT-based feature encoder
 # - weight-sharing for recurrent refinement unit across levels
 # - hidden state gets re-initialized per level (no upsampling)
