@@ -336,7 +336,7 @@ class CorrelationModule(nn.Module):
         else:
             raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
-    def forward(self, fmap1, fmap2, coords, dap=True):
+    def forward(self, fmap1, fmap2, coords, dap=True, mask_costs=[]):
         batch, _, h, w = coords.shape
         r = self.radius
 
@@ -377,6 +377,11 @@ class CorrelationModule(nn.Module):
 
             # build cost volume for this level
             cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h, w)
+
+            # mask costs if specified
+            if i + 3 in mask_costs:
+                cost = torch.zeros_like(cost)
+
             if dap and self.dap_type == 'separate':
                 cost = self.dap[i](cost)                        # (batch, 2r+1, 2r+1, h, w)
 
@@ -570,7 +575,7 @@ class RaftPlusDiclModule(nn.Module):
 
         return up_flow
 
-    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None):
+    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -599,7 +604,7 @@ class RaftPlusDiclModule(nn.Module):
             coords1 = coords1.detach()
 
             # index correlation volume
-            corr = self.cvol(fmap1, fmap2, coords1, dap)
+            corr = self.cvol(fmap1, fmap2, coords1, dap, mask_costs)
 
             # estimate delta for flow update
             flow = coords1 - coords0
@@ -654,7 +659,7 @@ class RaftPlusDicl(Model):
         self.adapter = RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': 12, 'dap': True}
+        default_args = {'iterations': 12, 'dap': True, 'mask_costs': []}
 
         return {
             'type': self.type,
@@ -672,8 +677,9 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None):
-        return self.module(img1, img2, iterations=iterations, dap=dap, flow_init=flow_init)
+    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None, mask_costs=[]):
+        return self.module(img1, img2, iterations=iterations, dap=dap, flow_init=flow_init,
+                           mask_costs=mask_costs)
 
     def train(self, mode: bool = True):
         super().train(mode)
