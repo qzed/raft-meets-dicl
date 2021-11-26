@@ -159,7 +159,7 @@ class CorrBlock:
 
             self.corr_pyramid.append(corr)                      # append pooled layer
 
-    def __call__(self, coords):
+    def __call__(self, coords, mask_costs=[]):
         r = self.radius
 
         # reshape to (batch, h, w, x/y=channel=2)
@@ -194,6 +194,11 @@ class CorrBlock:
 
             # flatten over (dim, h_out, w_out) and append
             corr = corr.view(batch, h, w, -1)
+
+            # mask costs if specified
+            if i + 3 in mask_costs:
+                corr = torch.zeros_like(corr)
+
             out.append(corr)
 
         # collect output
@@ -374,7 +379,7 @@ class RaftModule(nn.Module):
 
         return up_flow
 
-    def forward(self, img1, img2, iterations=12, flow_init=None):
+    def forward(self, img1, img2, iterations=12, flow_init=None, maks_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -402,7 +407,7 @@ class RaftModule(nn.Module):
             coords1 = coords1.detach()
 
             # indes correlation volume
-            corr = corr_vol(coords1)
+            corr = corr_vol(coords1, maks_costs)
 
             # estimate delta for flow update
             flow = coords1 - coords0
@@ -455,7 +460,7 @@ class Raft(Model):
         self.adapter = RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': 12}
+        default_args = {'iterations': 12, 'mask_costs': []}
 
         return {
             'type': self.type,
@@ -472,8 +477,8 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=12, flow_init=None):
-        return self.module(img1, img2, iterations, flow_init)
+    def forward(self, img1, img2, iterations=12, flow_init=None, mask_costs=[]):
+        return self.module(img1, img2, iterations, flow_init, mask_costs)
 
     def train(self, mode: bool = True):
         super().train(mode)
