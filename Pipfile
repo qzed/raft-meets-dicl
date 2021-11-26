@@ -15,6 +15,7 @@ tensorboard = "*"
 torch = "*"
 torchvision = "*"
 tqdm = "*"
+pandas = "*"
 
 [dev-packages]
 ipykernel = "*"
