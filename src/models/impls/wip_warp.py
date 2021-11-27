@@ -618,6 +618,9 @@ class WipResult(Result):
 
         return flow
 
+    def intermediate_flow(self):
+        return self.result
+
 
 class MultiscaleLoss(Loss):
     type = 'wip/warp/multiscale'

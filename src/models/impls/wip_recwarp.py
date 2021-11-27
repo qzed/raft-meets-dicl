@@ -466,3 +466,6 @@ class WipResult(Result):
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
         return flow
+
+    def intermediate_flow(self):
+        return self.result

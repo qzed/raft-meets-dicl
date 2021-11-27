@@ -12,6 +12,9 @@ class Result:
     def final(self):
         raise NotImplementedError
 
+    def intermediate_flow(self):
+        raise NotImplementedError
+
 
 class ModelAdapter:
     def __init__(self):

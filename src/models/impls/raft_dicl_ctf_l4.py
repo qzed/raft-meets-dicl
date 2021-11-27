@@ -657,3 +657,6 @@ class RaftPlusDiclResult(Result):
 
     def final(self):
         return self.result[-1][-1]
+
+    def intermediate_flow(self):
+        return self.result

@@ -780,6 +780,9 @@ class RaftResult(Result):
     def final(self):
         return self.result['flow'][-1]
 
+    def intermediate_flow(self):
+        return self.result['flow']
+
 
 class SequenceLoss(Loss):
     type = 'raft/cl/sequence'

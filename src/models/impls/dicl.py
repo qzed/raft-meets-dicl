@@ -592,6 +592,9 @@ class DiclResult(Result):
 
         return flow
 
+    def intermediate_flow(self):
+        return self.result
+
 
 class MultiscaleLoss(Loss):
     type = 'dicl/multiscale'
