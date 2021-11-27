@@ -379,7 +379,7 @@ class RaftModule(nn.Module):
 
         return up_flow
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, maks_costs=[]):
+    def forward(self, img1, img2, iterations=12, flow_init=None, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -407,7 +407,7 @@ class RaftModule(nn.Module):
             coords1 = coords1.detach()
 
             # indes correlation volume
-            corr = corr_vol(coords1, maks_costs)
+            corr = corr_vol(coords1, mask_costs)
 
             # estimate delta for flow update
             flow = coords1 - coords0
