@@ -236,6 +236,51 @@ class Crop(Augmentation):
         return img1, img2, flow, valid, meta
 
 
+class CropCenter(Augmentation):
+    type = 'crop-center'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        size = list(cfg['size'])
+        if len(size) != 2:
+            raise ValueError('invalid crop size, expected list or tuple with two elements')
+
+        return cls(size)
+
+    def __init__(self, size):
+        super().__init__()
+
+        self.size = size
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'size': self.size,
+        }
+
+    def process(self, img1, img2, flow, valid, meta):
+        assert img1.shape[:3] == img2.shape[:3]
+
+        # draw new upper-right corner coordinate randomly
+        x0 = (img1.shape[2] - self.size[0]) // 2
+        y0 = (img1.shape[1] - self.size[1]) // 2
+
+        # perform crop
+        img1 = img1[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+        img2 = img2[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+
+        if flow is not None:
+            flow = flow[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+            valid = valid[:, y0:y0+self.size[1], x0:x0+self.size[0]]
+
+        for m in meta:
+            m.original_extents = ((0, self.size[1]), (0, self.size[0]))
+
+        return img1, img2, flow, valid, meta
+
+
 class Flip(Augmentation):
     type = 'flip'
 
@@ -820,6 +865,7 @@ def _build_augmentation(cfg):
     types = [
         ColorJitter,
         Crop,
+        CropCenter,
         Flip,
         NoiseNormal,
         OcclusionForward,
