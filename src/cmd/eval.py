@@ -206,6 +206,7 @@ def evaluate(args):
         target = target.view(1, *target.shape) if target is not None else None
         valid = valid.view(1, *valid.shape) if valid is not None else None
         est = est.view(1, *est.shape) if est is not None else None
+        out = model_adapter.wrap_result(out, None)
 
         if target is not None:
             # compute loss
@@ -243,7 +244,7 @@ def evaluate(args):
                 valid = valid[0].detach().cpu().numpy()
 
             save_flow_image(path_flow, args.flow_format, meta.sample_id, img1, img2, target,
-                            valid, est, meta.original_extents, flow_visual_args,
+                            valid, est, out, meta.original_extents, flow_visual_args,
                             flow_visual_dark_args, flow_epe_args)
 
     if compute_metrics:
@@ -261,7 +262,7 @@ def evaluate(args):
             })
 
 
-def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, size,
+def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, out, size,
                     visual_args, visual_dark_args, epe_args):
     (h0, h1), (w0, w1) = size
     flow = flow[h0:h1, w0:w1]
@@ -280,6 +281,7 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, siz
         'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
         'visual:flow:dark': (save_flow_visual_dark, [flow], visual_dark_args, 'png'),
         'visual:warp:backwards': (save_flow_visual_warp_backwards, [img2, flow], {}, 'png'),
+        'visual:intermediate:flow': (save_intermediate_flow_visual, [out], visual_args, 'png'),
     }
 
     write, args, kwargs, ext = formats[format]
@@ -316,3 +318,51 @@ def save_flow_visual_fl_error(path, uv, uv_target, mask):
 
 def save_flow_visual_warp_backwards(path, img2, flow):
     cv2.imwrite(str(path), visual.warp_backwards(img2, flow)[:, :, ::-1] * 255)
+
+
+def save_intermediate_flow_visual(path, output, mrm=None, **kwargs):
+    output = output.intermediate_flow()
+
+    # unpack lists/dicts into flat dict
+    def unpack(data, key='', result={}):
+        if isinstance(data, (list, tuple)):
+            for i, x in enumerate(data):
+                result = unpack(x, f"{key}.{i}", result)
+        elif isinstance(data, dict):
+            for k, x in data.items():
+                result = unpack(x, f"{key}.{k}", result)
+        else:
+            result[key] = data
+
+        return result
+
+    output = unpack(output)
+
+    # convert to numpy (note: we know we have a guaranteed batch size of 1 here)
+    output = {k: uv[0].detach().cpu().permute(1, 2, 0).numpy() for k, uv in output.items()}
+
+    # get largest width for motion range normalization
+    ref_width = 0
+    for k, uv in output.items():
+        if ref_width < uv.shape[1]:
+            ref_width = uv.shape[1]
+
+    # compute maximum motion over all outputs if not fixed
+    if mrm is None:
+        mrm = 1e-5      # init to small epsilon
+
+        for k, uv in output.items():
+            mrm_lvl = np.amax(np.linalg.norm(uv, ord=2, axis=-1))
+            mrm_lvl = mrm_lvl * ref_width / uv.shape[1]
+
+            mrm = max(mrm, mrm_lvl)
+
+    # save intermediate flow
+    for k, uv in output.items():
+        p = path.parent / Path(f"{path.stem}{k}{path.suffix}")
+
+        # normalize flow to level
+        mrm_lvl = mrm * uv.shape[1] / ref_width
+
+        rgba = visual.flow_to_rgba(uv, mrm=mrm_lvl, **kwargs)
+        cv2.imwrite(str(p), visual.utils.rgba_to_bgra(rgba) * 255)
