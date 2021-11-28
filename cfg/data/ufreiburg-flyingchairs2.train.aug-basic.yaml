@@ -1,0 +1,10 @@
+type: augment
+
+augmentations:
+  - type: crop
+    size: [496, 368]
+
+  - type: flip
+    probability: [0.5, 0.1]
+
+source: ufreiburg-flyingchairs2.train.yaml

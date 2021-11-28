@@ -1,0 +1,74 @@
+mode: continuous
+
+stages:
+  - name: "FlyingChairs2 (basic augmentations only)"
+    id: train/chairs2-0
+
+    data:
+      source: ../../data/ufreiburg-flyingchairs2.train.aug-basic.yaml
+      epochs: 1
+      batch-size: 6
+
+    validation:
+      source: ../../data/ufreiburg-flyingchairs2.test.yaml
+      batch-size: 4
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: &learning_rate1 4.0e-4
+        weight_decay: 1.0e-4
+        eps: 1.0e-8
+
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate1
+            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
+
+  - name: "FlyingChairs2 (fully augmented)"
+    id: train/chairs2-1
+
+    data:
+      source: ../../data/ufreiburg-flyingchairs2.train.aug-full.yaml
+      epochs: 14      # ~100k steps
+      batch-size: 6
+
+    validation:
+      source: ../../data/ufreiburg-flyingchairs2.test.yaml
+      batch-size: 4
+      images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: &learning_rate2 4.0e-4
+        weight_decay: 1.0e-4
+        eps: 1.0e-8
+
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate2
+            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
