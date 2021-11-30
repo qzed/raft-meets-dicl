@@ -4,6 +4,7 @@ from . import raft
 from . import raft_cl
 from . import raft_sl
 from . import raft_sl_ctf_l2
+from . import raft_sl_ctf_l3
 from . import raft_dicl_sl
 from . import raft_dicl_ml
 from . import raft_dicl_ctf_l2
