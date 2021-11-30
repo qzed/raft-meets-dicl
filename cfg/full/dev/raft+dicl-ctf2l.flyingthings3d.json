@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-11-21T23:57:24.573286",
-    "commit": "c6c8491f2e2884d9b75586a7b3d3ec30e035e146",
+    "timestamp": "2021-11-30T15:37:59.831052",
+    "commit": "~47947c36a4242d15da2b844512d8038beb214ec1",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -41,7 +41,7 @@
                 "ord": 1,
                 "gamma": 0.85,
                 "alpha": [
-                    0.5,
+                    0.6,
                     1.0
                 ]
             }
