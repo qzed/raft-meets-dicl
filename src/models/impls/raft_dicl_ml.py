@@ -152,7 +152,7 @@ class EncoderOutputNet(nn.Module):
 class StackEncoder(nn.Module):
     """Encoder for frame 1 (feature stack)"""
 
-    def __init__(self, input_dim, output_dim, levels=4):
+    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch'):
         super().__init__()
 
         if levels < 1 or levels > 4:
@@ -162,19 +162,19 @@ class StackEncoder(nn.Module):
 
         # keep spatial resolution and channel count, output networks for each
         # level (with dilation)
-        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim)
+        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 2:
-            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256)
-            self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256, norm_type=norm_type)
+            self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2, norm_type=norm_type)
 
         if levels >= 3:
-            self.down4 = ResidualBlock(in_planes=256, out_planes=256)
-            self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4)
+            self.down4 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
+            self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4, norm_type=norm_type)
 
         if levels == 4:
-            self.down5 = ResidualBlock(in_planes=256, out_planes=256)
-            self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8)
+            self.down5 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
+            self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8, norm_type=norm_type)
 
         # initialize weights
         for m in self.modules():
@@ -213,7 +213,7 @@ class StackEncoder(nn.Module):
 class PyramidEncoder(nn.Module):
     """Encoder for frame 2 (feature pyramid)"""
 
-    def __init__(self, input_dim, output_dim, levels=4):
+    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch'):
         super().__init__()
 
         if levels < 1 or levels > 4:
@@ -223,19 +223,19 @@ class PyramidEncoder(nn.Module):
 
         # go down in spatial resolution but up in channels, output networks for
         # each level (no dilation)
-        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim)
+        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 2:
-            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2)
-            self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2, norm_type=norm_type)
+            self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 3:
-            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2)
-            self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim)
+            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2, norm_type=norm_type)
+            self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 4:
-            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2)
-            self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim)
+            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2, norm_type=norm_type)
+            self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim, norm_type=norm_type)
 
         # initialize weights
         for m in self.modules():
@@ -581,8 +581,8 @@ class RaftPlusDiclModule(nn.Module):
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
         self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
-        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels)
-        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels)
+        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type='instance')
+        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type='instance')
 
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
