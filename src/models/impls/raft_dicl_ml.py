@@ -152,19 +152,29 @@ class EncoderOutputNet(nn.Module):
 class StackEncoder(nn.Module):
     """Encoder for frame 1 (feature stack)"""
 
-    def __init__(self, input_dim, output_dim, norm_type='batch'):
+    def __init__(self, input_dim, output_dim, levels=4):
         super().__init__()
 
-        # keep spatial resolution and channel count
-        self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256)
-        self.down4 = ResidualBlock(in_planes=256, out_planes=256)
-        self.down5 = ResidualBlock(in_planes=256, out_planes=256)
+        if levels < 1 or levels > 4:
+            raise ValueError("levels must be between 1 and 4 (inclusive)")
 
-        # output networks for each level (with dilation)
-        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
-        self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2, norm_type=norm_type)
-        self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4, norm_type=norm_type)
-        self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8, norm_type=norm_type)
+        self.levels = levels
+
+        # keep spatial resolution and channel count, output networks for each
+        # level (with dilation)
+        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim)
+
+        if levels >= 2:
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256)
+            self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2)
+
+        if levels >= 3:
+            self.down4 = ResidualBlock(in_planes=256, out_planes=256)
+            self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4)
+
+        if levels == 4:
+            self.down5 = ResidualBlock(in_planes=256, out_planes=256)
+            self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8)
 
         # initialize weights
         for m in self.modules():
@@ -177,30 +187,55 @@ class StackEncoder(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x3, x = self.out3(x), self.down3(x)
-        x4, x = self.out4(x), self.down4(x)
-        x5, x = self.out5(x), self.down5(x)
+        x3 = self.out3(x)
+
+        if self.levels == 1:
+            return x3
+
+        x = self.down3(x)
+        x4 = self.out4(x)
+
+        if self.levels == 2:
+            return x3, x4
+
+        x = self.down4(x)
+        x5 = self.out5(x)
+
+        if self.levels == 3:
+            return x3, x4, x5
+
+        x = self.down5(x)
         x6 = self.out6(x)
 
-        return (x3, x4, x5, x6)
+        return x3, x4, x5, x6
 
 
 class PyramidEncoder(nn.Module):
     """Encoder for frame 2 (feature pyramid)"""
 
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, levels=4):
         super().__init__()
 
-        # go down in spatial resolution but up in channels
-        self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2)
-        self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2)
-        self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2)
+        if levels < 1 or levels > 4:
+            raise ValueError("levels must be between 1 and 4 (inclusive)")
 
-        # output networks for each level (no dilation)
+        self.levels = levels
+
+        # go down in spatial resolution but up in channels, output networks for
+        # each level (no dilation)
         self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim)
-        self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim)
-        self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim)
-        self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim)
+
+        if levels >= 2:
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2)
+            self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim)
+
+        if levels >= 3:
+            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2)
+            self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim)
+
+        if levels >= 4:
+            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2)
+            self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim)
 
         # initialize weights
         for m in self.modules():
@@ -213,12 +248,27 @@ class PyramidEncoder(nn.Module):
                     nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        x3, x = self.out3(x), self.down3(x)
-        x4, x = self.out4(x), self.down4(x)
-        x5, x = self.out5(x), self.down5(x)
+        x3 = self.out3(x)
+
+        if self.levels == 1:
+            return x3
+
+        x = self.down3(x)
+        x4 = self.out4(x)
+
+        if self.levels == 2:
+            return x3, x4
+
+        x = self.down4(x)
+        x5 = self.out5(x)
+
+        if self.levels == 3:
+            return x3, x4, x5
+
+        x = self.down5(x)
         x6 = self.out6(x)
 
-        return (x3, x4, x5, x6)
+        return x3, x4, x5, x6
 
 
 # -- DICL matching net and DAP ---------------------------------------------------------------------
@@ -303,31 +353,24 @@ class DisplacementAwareProjection(nn.Module):
 # -- Correlation module combining DICL with RAFT lookup/sampling -----------------------------------
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, dap_init='identity', dap_type='separate'):
+    def __init__(self, feature_dim, levels, radius, dap_init='identity', dap_type='separate'):
         super().__init__()
 
         self.radius = radius
         self.dap_type = dap_type
 
-        self.mnet = nn.ModuleList([
-            MatchingNet(feature_dim),
-            MatchingNet(feature_dim),
-            MatchingNet(feature_dim),
-            MatchingNet(feature_dim),
-        ])
+        self.mnet = nn.ModuleList([MatchingNet(feature_dim) for _ in range(levels)])
 
         # DAP separated by layers
         if self.dap_type == 'separate':
             self.dap = nn.ModuleList([
-                DisplacementAwareProjection((radius, radius), init=dap_init),
-                DisplacementAwareProjection((radius, radius), init=dap_init),
-                DisplacementAwareProjection((radius, radius), init=dap_init),
-                DisplacementAwareProjection((radius, radius), init=dap_init),
+                DisplacementAwareProjection((radius, radius), init=dap_init)
+                for _ in range(levels)
             ])
 
         # DAP over all costs
         elif self.dap_type == 'full':
-            n_channels = 4 * (2 * radius + 1)**2
+            n_channels = levels * (2 * radius + 1)**2
             self.dap = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
 
             if dap_init == 'identity':
@@ -523,7 +566,7 @@ class BasicUpdateBlock(nn.Module):
 class RaftPlusDiclModule(nn.Module):
     """RAFT+DICL multi-level flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
                  dap_init='identity', dap_type='separate'):
         super().__init__()
 
@@ -533,17 +576,18 @@ class RaftPlusDiclModule(nn.Module):
         self.context_dim = cdim = 128
 
         corr_dim = 32
-        corr_levels = 4
+        self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
         self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
-        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim)
-        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim)
+        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels)
+        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels)
 
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
-        self.cvol = CorrelationModule(corr_dim, self.corr_radius, dap_init=dap_init, dap_type=dap_type)
+        self.cvol = CorrelationModule(feature_dim=corr_dim, levels=self.corr_levels,
+                                      radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -636,25 +680,27 @@ class RaftPlusDicl(Model):
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
         upnet = bool(param_cfg.get('upnet', True))
+        corr_levels = param_cfg.get('corr-levels', 4)
         corr_radius = param_cfg.get('corr-radius', 4)
         dap_init = param_cfg.get('dap-init', 'identity')
         dap_type = param_cfg.get('dap-type', 'separate')
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, corr_radius, dap_init, dap_type, args)
+        return cls(dropout, mixed_precision, upnet, corr_levels, corr_radius, dap_init, dap_type, args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
                  dap_init='identity', dap_type='separate', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
+        self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.dap_init = dap_init
         self.dap_type = dap_type
 
-        super().__init__(RaftPlusDiclModule(dropout, mixed_precision, upnet, corr_radius, dap_init,
-                                            dap_type), arguments)
+        super().__init__(RaftPlusDiclModule(dropout, mixed_precision, upnet, corr_levels,
+                                            corr_radius, dap_init, dap_type), arguments)
 
         self.adapter = RaftAdapter()
 
@@ -666,6 +712,7 @@ class RaftPlusDicl(Model):
             'parameters': {
                 'dropout': self.dropout,
                 'mixed-precision': self.mixed_precision,
+                'corr-levels': self.corr_levels,
                 'corr-radius': self.corr_radius,
                 'upnet': self.upnet,
                 'dap-init': self.dap_init,
