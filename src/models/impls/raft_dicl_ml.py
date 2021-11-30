@@ -567,7 +567,7 @@ class RaftPlusDiclModule(nn.Module):
     """RAFT+DICL multi-level flow estimation network"""
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
-                 dap_init='identity', dap_type='separate'):
+                 dap_init='identity', dap_type='separate', encoder_norm='instance', context_norm='batch'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -580,11 +580,11 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=256, norm_type='instance', dropout=dropout)
-        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type='instance')
-        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type='instance')
+        self.fnet = BasicEncoder(output_dim=256, norm_type=encoder_norm, dropout=dropout)
+        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type=encoder_norm)
+        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_dim, levels=corr_levels, norm_type=encoder_norm)
 
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
+        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
         self.cvol = CorrelationModule(feature_dim=corr_dim, levels=self.corr_levels,
                                       radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type)
@@ -684,13 +684,19 @@ class RaftPlusDicl(Model):
         corr_radius = param_cfg.get('corr-radius', 4)
         dap_init = param_cfg.get('dap-init', 'identity')
         dap_type = param_cfg.get('dap-type', 'separate')
+        encoder_norm = param_cfg.get('encoder-norm', 'instance')
+        context_norm = param_cfg.get('context-norm', 'batch')
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, corr_levels, corr_radius, dap_init, dap_type, args)
+        return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+                   corr_levels=corr_levels, corr_radius=corr_radius, dap_init=dap_init,
+                   dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
+                   arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
-                 dap_init='identity', dap_type='separate', arguments={}):
+                 dap_init='identity', dap_type='separate', encoder_norm='instance',
+                 context_norm='batch', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
@@ -698,9 +704,13 @@ class RaftPlusDicl(Model):
         self.corr_radius = corr_radius
         self.dap_init = dap_init
         self.dap_type = dap_type
+        self.encoder_norm = encoder_norm
+        self.context_norm = context_norm
 
-        super().__init__(RaftPlusDiclModule(dropout, mixed_precision, upnet, corr_levels,
-                                            corr_radius, dap_init, dap_type), arguments)
+        super().__init__(RaftPlusDiclModule(
+            dropout=dropout, mixed_precision=mixed_precision, upnet=upnet, corr_levels=corr_levels,
+            corr_radius=corr_radius, dap_init=dap_init, dap_type=dap_type,
+            encoder_norm=encoder_norm, context_norm=context_norm), arguments)
 
         self.adapter = RaftAdapter()
 
@@ -717,6 +727,8 @@ class RaftPlusDicl(Model):
                 'upnet': self.upnet,
                 'dap-init': self.dap_init,
                 'dap-type': self.dap_type,
+                'encoder-norm': self.encoder_norm,
+                'context-norm': self.context_norm,
             },
             'arguments': default_args | self.arguments,
         }
