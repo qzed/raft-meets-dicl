@@ -452,7 +452,9 @@ class Raft(Model):
                 'mixed-precision': self.mixed_precision,
                 'corr-radius': self.corr_radius,
                 'corr-channels': self.corr_channels,
-                'upnet': self.upnet
+                'upnet': self.upnet,
+                'encoder-norm': self.encoder_norm,
+                'context-norm': self.context_norm,
             },
             'arguments': default_args | self.arguments,
         }
