@@ -309,7 +309,7 @@ class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
-                 corr_channels=256):
+                 corr_channels=256, encoder_norm='instance', context_norm='batch'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -320,8 +320,8 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type='instance', dropout=dropout)
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=dropout)
+        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
+        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
 
     def freeze_batchnorm(self):
@@ -416,20 +416,28 @@ class Raft(Model):
         upnet = bool(param_cfg.get('upnet', True))
         corr_radius = param_cfg.get('corr-radius', 4)
         corr_channels = param_cfg.get('corr-channels', 256)
+        encoder_norm = param_cfg.get('encoder-norm', 'instance')
+        context_norm = param_cfg.get('context-norm', 'batch')
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout, mixed_precision, upnet, corr_radius, corr_channels, args)
+        return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+                   corr_radius=corr_radius, corr_channels=corr_channels, encoder_norm=encoder_norm,
+                   context_norm=context_norm, arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
-                 corr_channels=256, arguments={}):
+                 corr_channels=256, encoder_norm='instance', context_norm='batch', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
+        self.encoder_norm = encoder_norm
+        self.context_norm = context_norm
 
-        super().__init__(RaftModule(dropout, mixed_precision, upnet, corr_radius, corr_channels),
+        super().__init__(RaftModule(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+                                    corr_radius=corr_radius, corr_channels=corr_channels,
+                                    encoder_norm=encoder_norm, context_norm=context_norm),
                          arguments)
 
         self.adapter = RaftAdapter()
