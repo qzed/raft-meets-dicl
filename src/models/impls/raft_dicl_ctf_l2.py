@@ -417,22 +417,21 @@ class Up8Network(nn.Module):
 
 
 class RaftPlusDiclModule(nn.Module):
-    def __init__(self, corr_radius=4, dap_init='identity', encoder_norm='instance',
-                 context_norm='batch', mnet_norm='batch'):
+    def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
+                 dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch'):
         super().__init__()
 
-        self.hidden_dim = hdim = 128
-        self.context_dim = cdim = 128
+        self.hidden_dim = hdim = recurrent_channels
+        self.context_dim = cdim = context_channels
 
-        corr_dim = 32
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=corr_dim, norm_type=encoder_norm, dropout=0)
+        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
 
-        self.corr_3 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-        self.corr_4 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+        self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+        self.corr_4 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
@@ -524,6 +523,9 @@ class RaftPlusDicl(Model):
 
         param_cfg = cfg['parameters']
         corr_radius = param_cfg.get('corr-radius', 4)
+        corr_channels = param_cfg.get('corr-channels', 32)
+        context_channels = param_cfg.get('context-channels', 128)
+        recurrent_channels = param_cfg.get('recurrent-channels', 128)
         dap_init = param_cfg.get('dap-init', 'identity')
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
@@ -531,19 +533,25 @@ class RaftPlusDicl(Model):
 
         args = cfg.get('arguments', {})
 
-        return cls(corr_radius=corr_radius, dap_init=dap_init, encoder_norm=encoder_norm,
+        return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
+                   recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, arguments=args)
 
-    def __init__(self, corr_radius=4, dap_init='identity', encoder_norm='instance',
-                 context_norm='batch', mnet_norm='batch', arguments={}):
+    def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
+                 dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
+                 arguments={}):
         self.corr_radius = corr_radius
+        self.corr_channels = corr_channels
+        self.context_channels = context_channels
+        self.recurrent_channels = recurrent_channels
         self.dap_init = dap_init
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
 
-        super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, dap_init=dap_init,
-                                            encoder_norm=encoder_norm, context_norm=context_norm,
+        super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
+                                            context_channels=context_channels, recurrent_channels=recurrent_channels,
+                                            dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
                                             mnet_norm=mnet_norm),
                          arguments)
 
@@ -556,6 +564,9 @@ class RaftPlusDicl(Model):
             'type': self.type,
             'parameters': {
                 'corr-radius': self.corr_radius,
+                'corr-channels': self.corr_channels,
+                'context-channels': self.context_channels,
+                'recurrent-channels': self.recurrent_channels,
                 'dap-init': self.dap_init,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
