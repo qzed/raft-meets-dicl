@@ -276,10 +276,10 @@ class PyramidEncoder(nn.Module):
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            _make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -287,10 +287,10 @@ class ConvBlock(nn.Sequential):
 class DeconvBlock(nn.Sequential):
     """Basic deconvolution (transposed convolution) block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            _make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -298,13 +298,13 @@ class DeconvBlock(nn.Sequential):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self, feature_channels):
+    def __init__(self, feature_channels, norm_type='batch'):
         super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
-            ConvBlock(128, 128, kernel_size=3, padding=1),
-            ConvBlock(128, 64, kernel_size=3, padding=1),
-            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2),
+            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
+            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
@@ -353,13 +353,17 @@ class DisplacementAwareProjection(nn.Module):
 # -- Correlation module combining DICL with RAFT lookup/sampling -----------------------------------
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, levels, radius, dap_init='identity', dap_type='separate'):
+    def __init__(self, feature_dim, levels, radius, dap_init='identity', dap_type='separate',
+                 norm_type='batch'):
         super().__init__()
 
         self.radius = radius
         self.dap_type = dap_type
 
-        self.mnet = nn.ModuleList([MatchingNet(feature_dim) for _ in range(levels)])
+        self.mnet = nn.ModuleList([
+            MatchingNet(feature_dim, norm_type=norm_type)
+            for _ in range(levels)
+        ])
 
         # DAP separated by layers
         if self.dap_type == 'separate':
@@ -567,7 +571,8 @@ class RaftPlusDiclModule(nn.Module):
     """RAFT+DICL multi-level flow estimation network"""
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
-                 dap_init='identity', dap_type='separate', encoder_norm='instance', context_norm='batch'):
+                 dap_init='identity', dap_type='separate', encoder_norm='instance',
+                 context_norm='batch', mnet_norm='batch'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -587,7 +592,8 @@ class RaftPlusDiclModule(nn.Module):
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
         self.cvol = CorrelationModule(feature_dim=corr_dim, levels=self.corr_levels,
-                                      radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type)
+                                      radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type,
+                                      norm_type=mnet_norm)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -686,17 +692,18 @@ class RaftPlusDicl(Model):
         dap_type = param_cfg.get('dap-type', 'separate')
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
+        mnet_norm = param_cfg.get('mnet-norm', 'batch')
 
         args = cfg.get('arguments', {})
 
         return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
                    corr_levels=corr_levels, corr_radius=corr_radius, dap_init=dap_init,
                    dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
-                   arguments=args)
+                   mnet_norm=mnet_norm, arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
                  dap_init='identity', dap_type='separate', encoder_norm='instance',
-                 context_norm='batch', arguments={}):
+                 context_norm='batch', mnet_norm='batch', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.upnet = upnet
@@ -706,11 +713,12 @@ class RaftPlusDicl(Model):
         self.dap_type = dap_type
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
+        self.mnet_norm = mnet_norm
 
         super().__init__(RaftPlusDiclModule(
             dropout=dropout, mixed_precision=mixed_precision, upnet=upnet, corr_levels=corr_levels,
             corr_radius=corr_radius, dap_init=dap_init, dap_type=dap_type,
-            encoder_norm=encoder_norm, context_norm=context_norm), arguments)
+            encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm), arguments)
 
         self.adapter = RaftAdapter()
 
@@ -729,6 +737,7 @@ class RaftPlusDicl(Model):
                 'dap-type': self.dap_type,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
+                'mnet-norm': self.mnet_norm,
             },
             'arguments': default_args | self.arguments,
         }
