@@ -351,12 +351,12 @@ class Up8Network(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, encoder_norm='instance',
-                 context_norm='batch'):
+    def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
+                 recurrent_channels=128, encoder_norm='instance', context_norm='batch'):
         super().__init__()
 
-        self.hidden_dim = hdim = 128
-        self.context_dim = cdim = 128
+        self.hidden_dim = hdim = recurrent_channels
+        self.context_dim = cdim = context_channels
 
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
@@ -496,23 +496,29 @@ class Raft(Model):
         dropout = float(param_cfg.get('dropout', 0.0))
         corr_radius = param_cfg.get('corr-radius', 4)
         corr_channels = param_cfg.get('corr-channels', 256)
+        context_channels = param_cfg.get('context-channels', 128)
+        recurrent_channels = param_cfg.get('recurrent-channels', 128)
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
 
         args = cfg.get('arguments', {})
 
         return cls(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
+                   context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm, arguments=args)
 
-    def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, encoder_norm='instance',
-                 context_norm='batch', arguments={}):
+    def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
+                 recurrent_channels=128, encoder_norm='instance', context_norm='batch', arguments={}):
         self.dropout = dropout
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
+        self.context_channels = context_channels
+        self.recurrent_channels = recurrent_channels
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
 
         super().__init__(RaftModule(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
+                                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm), arguments)
 
         self.adapter = RaftAdapter()
@@ -526,6 +532,8 @@ class Raft(Model):
                 'dropout': self.dropout,
                 'corr-radius': self.corr_radius,
                 'corr-channels': self.corr_channels,
+                'context-channels': self.context_channels,
+                'recurrent-channels': self.recurrent_channels,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
             },
