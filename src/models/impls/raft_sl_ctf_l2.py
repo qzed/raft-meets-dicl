@@ -289,7 +289,7 @@ class FlowHead(nn.Module):
 class BasicUpdateBlock(nn.Module):
     """Network to compute single flow update delta"""
 
-    def __init__(self, corr_planes, input_dim=128, hidden_dim=128, upnet=True):
+    def __init__(self, corr_planes, input_dim=128, hidden_dim=128):
         super().__init__()
 
         # network for flow update delta
@@ -342,7 +342,7 @@ class Up8Network(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=256, encoder_norm='instance', context_norm='batch'):
         super().__init__()
 
@@ -365,7 +365,7 @@ class RaftModule(nn.Module):
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
 
-    def forward(self, img1, img2, iterations=(4, 3)):
+    def forward(self, img1, img2, iterations=(4, 3), upnet=True):
         batch, _c, h, w = img1.shape
         hdim, cdim = self.hidden_dim, self.context_dim
 
@@ -437,7 +437,10 @@ class RaftModule(nn.Module):
             flow = coords1 - coords0
 
             # upsample flow estimate
-            flow_up = self.upnet(h_3, flow)
+            if upnet:
+                flow_up = self.upnet(h_3, flow)
+            else:
+                flow_up = 8 * F.interpolate(flow, (h, w), mode='bilinear', align_corners=True)
 
             out_3.append(flow_up)
 
@@ -454,7 +457,6 @@ class Raft(Model):
         param_cfg = cfg['parameters']
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
-        upnet = bool(param_cfg.get('upnet', True))
         corr_radius = param_cfg.get('corr-radius', 4)
         corr_channels = param_cfg.get('corr-channels', 256)
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
@@ -462,28 +464,27 @@ class Raft(Model):
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
-                   corr_radius=corr_radius, corr_channels=corr_channels, encoder_norm=encoder_norm,
-                   context_norm=context_norm, arguments=args)
+        return cls(dropout=dropout, mixed_precision=mixed_precision, corr_radius=corr_radius,
+                   corr_channels=corr_channels, encoder_norm=encoder_norm, context_norm=context_norm,
+                   arguments=args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_radius=4,
-                 corr_channels=256, encoder_norm='instance', context_norm='batch', arguments={}):
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4, corr_channels=256,
+                 encoder_norm='instance', context_norm='batch', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
-        self.upnet = upnet
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
 
-        super().__init__(RaftModule(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+        super().__init__(RaftModule(dropout=dropout, mixed_precision=mixed_precision,
                                     corr_radius=corr_radius, corr_channels=corr_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm), arguments)
 
         self.adapter = RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': (4, 3)}
+        default_args = {'iterations': (4, 3), 'upnet': True}
 
         return {
             'type': self.type,
@@ -492,7 +493,6 @@ class Raft(Model):
                 'mixed-precision': self.mixed_precision,
                 'corr-radius': self.corr_radius,
                 'corr-channels': self.corr_channels,
-                'upnet': self.upnet,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
             },
@@ -502,8 +502,8 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=(4, 3)):
-        return self.module(img1, img2, iterations)
+    def forward(self, img1, img2, iterations=(4, 3), upnet=True):
+        return self.module(img1, img2, iterations=iterations, upnet=upnet)
 
     def train(self, mode: bool = True):
         super().train(mode)
