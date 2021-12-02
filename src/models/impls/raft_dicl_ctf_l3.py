@@ -161,10 +161,10 @@ class BasicEncoder(nn.Module):
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            _make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -172,10 +172,10 @@ class ConvBlock(nn.Sequential):
 class DeconvBlock(nn.Sequential):
     """Basic deconvolution (transposed convolution) block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            _make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -183,13 +183,13 @@ class DeconvBlock(nn.Sequential):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self, feature_channels):
+    def __init__(self, feature_channels, norm_type='batch'):
         super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
-            ConvBlock(128, 128, kernel_size=3, padding=1),
-            ConvBlock(128, 64, kernel_size=3, padding=1),
-            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2),
+            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
+            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
@@ -238,11 +238,11 @@ class DisplacementAwareProjection(nn.Module):
 # -- Correlation module ----------------------------------------------------------------------------
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, dap_init='identity'):
+    def __init__(self, feature_dim, radius, dap_init='identity', norm_type='batch'):
         super().__init__()
 
         self.radius = radius
-        self.mnet = MatchingNet(feature_dim)
+        self.mnet = MatchingNet(feature_dim, norm_type=norm_type)
         self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
 
     def forward(self, f1, f2, coords, dap=True):
@@ -426,7 +426,8 @@ class Up8Network(nn.Module):
 
 
 class RaftPlusDiclModule(nn.Module):
-    def __init__(self, corr_radius=4, dap_init='identity'):
+    def __init__(self, corr_radius=4, dap_init='identity', encoder_norm='instance',
+                 context_norm='batch', mnet_norm='batch'):
         super().__init__()
 
         self.hidden_dim = hdim = 128
@@ -436,12 +437,12 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=corr_dim, norm_type='instance', dropout=0)
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0)
+        self.fnet = BasicEncoder(output_dim=corr_dim, norm_type=encoder_norm, dropout=0)
+        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
 
-        self.corr_3 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init)
-        self.corr_4 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init)
-        self.corr_5 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init)
+        self.corr_3 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+        self.corr_4 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+        self.corr_5 = CorrelationModule(corr_dim, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
@@ -557,16 +558,27 @@ class RaftPlusDicl(Model):
         param_cfg = cfg['parameters']
         corr_radius = param_cfg.get('corr-radius', 4)
         dap_init = param_cfg.get('dap-init', 'identity')
+        encoder_norm = param_cfg.get('encoder-norm', 'instance')
+        context_norm = param_cfg.get('context-norm', 'batch')
+        mnet_norm = param_cfg.get('mnet-norm', 'batch')
 
         args = cfg.get('arguments', {})
 
-        return cls(corr_radius, dap_init, args)
+        return cls(corr_radius=corr_radius, dap_init=dap_init, encoder_norm=encoder_norm,
+                   context_norm=context_norm, mnet_norm=mnet_norm, arguments=args)
 
-    def __init__(self, corr_radius=4, dap_init='identity', arguments={}):
+    def __init__(self, corr_radius=4, dap_init='identity', encoder_norm='instance',
+                 context_norm='batch', mnet_norm='batch', arguments={}):
         self.corr_radius = corr_radius
         self.dap_init = dap_init
+        self.encoder_norm = encoder_norm
+        self.context_norm = context_norm
+        self.mnet_norm = mnet_norm
 
-        super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, dap_init=dap_init), arguments)
+        super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, dap_init=dap_init,
+                                            encoder_norm=encoder_norm, context_norm=context_norm,
+                                            mnet_norm=mnet_norm),
+                         arguments)
 
         self.adapter = RaftPlusDiclAdapter()
 
@@ -578,6 +590,9 @@ class RaftPlusDicl(Model):
             'parameters': {
                 'corr-radius': self.corr_radius,
                 'dap-init': self.dap_init,
+                'encoder-norm': self.encoder_norm,
+                'context-norm': self.context_norm,
+                'mnet-norm': self.mnet_norm,
             },
             'arguments': default_args | self.arguments,
         }
