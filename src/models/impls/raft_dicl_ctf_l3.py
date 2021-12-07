@@ -427,7 +427,8 @@ class Up8Network(nn.Module):
 
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
-                 dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch'):
+                 dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
+                 share_dicl=False):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -440,8 +441,13 @@ class RaftPlusDiclModule(nn.Module):
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
 
         self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-        self.corr_4 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-        self.corr_5 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+
+        if share_dicl:
+            self.corr_4 = self.corr_3
+            self.corr_5 = self.corr_3
+        else:
+            self.corr_4 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+            self.corr_5 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
@@ -566,16 +572,17 @@ class RaftPlusDicl(Model):
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
+        share_dicl = param_cfg.get('share-dicl', False)
 
         args = cfg.get('arguments', {})
 
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
-                   context_norm=context_norm, mnet_norm=mnet_norm, arguments=args)
+                   context_norm=context_norm, mnet_norm=mnet_norm, share_dicl=share_dicl, arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 arguments={}):
+                 share_dicl=False, arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -584,11 +591,12 @@ class RaftPlusDicl(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
+        self.share_dicl = share_dicl
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm),
+                                            mnet_norm=mnet_norm, share_dicl=share_dicl),
                          arguments)
 
         self.adapter = RaftPlusDiclAdapter()
@@ -607,6 +615,7 @@ class RaftPlusDicl(Model):
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
                 'mnet-norm': self.mnet_norm,
+                'share-dicl': self.share_dicl,
             },
             'arguments': default_args | self.arguments,
         }
