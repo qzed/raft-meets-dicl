@@ -358,7 +358,7 @@
                 "optimizer": {
                     "type": "adam-w",
                     "parameters": {
-                        "lr": 0.0004,
+                        "lr": 0.0001,
                         "weight_decay": 0.0001,
                         "eps": 1e-08
                     }
@@ -389,7 +389,7 @@
                         {
                             "type": "one-cycle",
                             "parameters": {
-                                "max_lr": 0.0004,
+                                "max_lr": 0.0001,
                                 "total_steps": "({n_epochs} * {n_batches}) // {n_accum} + 100",
                                 "pct_start": 0.05,
                                 "cycle_momentum": false,
