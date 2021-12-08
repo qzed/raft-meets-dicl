@@ -18,7 +18,7 @@ loss:
   arguments:
     ord: 1
     gamma: 0.85
-    alpha: [0.14, 0.27, 0.50, 1.0]
+    alpha: [0.17, 0.32, 0.60, 1.0]
 
 input:
   clip: [0, 1]
