@@ -1,0 +1,28 @@
+name: RAFT coarse-to-fine four-level
+id: raft/sl-ctf-l4
+
+model:
+  type: raft/sl-ctf-l4
+
+  parameters:
+    corr-radius: 4
+
+  arguments:
+    iterations: [4, 3, 3, 3]
+
+loss:
+  type: raft+dicl/mlseq
+
+  arguments:
+    ord: 1
+    gamma: 0.85
+    alpha: [0.23, 0.38, 0.60, 1.0]
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [64, 64]
