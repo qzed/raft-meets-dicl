@@ -1,0 +1,29 @@
+name: RAFT with feature sampling
+id: raft/fs
+
+model:
+  type: raft/fs
+
+  parameters:
+    droput: 0.0
+    mixed-precision: false
+    corr-levels: 4
+
+  arguments:
+    iterations: 4
+
+loss:
+  type: raft/sequence
+
+  arguments:
+    ord: 1
+    gamma: 0.85
+
+input:
+  clip: [0, 1]
+  range: [-1, 1]
+
+  padding:
+    type: modulo
+    mode: zeros
+    size: [8, 8]

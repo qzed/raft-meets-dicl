@@ -60,6 +60,7 @@ def load_model(cfg) -> model.Model:
         m.dicl.Dicl,
         m.dicl_64to8.Dicl,
         m.raft.Raft,
+        m.raft_fs.Raft,
         m.raft_cl.Raft,
         m.raft_sl.Raft,
         m.raft_sl_ctf_l2.Raft,
