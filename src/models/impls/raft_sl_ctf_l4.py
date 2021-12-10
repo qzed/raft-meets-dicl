@@ -442,7 +442,7 @@ class RaftModule(nn.Module):
 
         # iteratively predict flow
         out_5 = []
-        for _ in range(iterations[0]):
+        for _ in range(iterations[1]):
             coords1 = coords1.detach()
 
             # index correlation volume
@@ -470,7 +470,7 @@ class RaftModule(nn.Module):
 
         # iteratively predict flow
         out_4 = []
-        for _ in range(iterations[1]):
+        for _ in range(iterations[2]):
             coords1 = coords1.detach()
 
             # index correlation volume
@@ -498,7 +498,7 @@ class RaftModule(nn.Module):
 
         # iteratively predict flow
         out_3 = []
-        for _ in range(iterations[2]):
+        for _ in range(iterations[3]):
             coords1 = coords1.detach()
 
             # index correlation volume
