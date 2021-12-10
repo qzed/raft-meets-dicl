@@ -84,7 +84,7 @@ class EncoderOutputNet(nn.Module):
         return x
 
 
-class BasicEncoder(nn.Module):
+class RaftFeatureEncoder(nn.Module):
     """Feature / context encoder network"""
 
     def __init__(self, output_dim=32, norm_type='batch', dropout=0.0):
@@ -147,7 +147,7 @@ class BasicEncoder(nn.Module):
         return x3, x4
 
 
-# -- DICL matching net -----------------------------------------------------------------------------
+# -- DICL-based feature encoder --------------------------------------------------------------------
 
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
@@ -170,6 +170,134 @@ class ConvBlockTransposed(nn.Sequential):
             nn.ReLU(inplace=True),
         )
 
+
+class GaConv2xBlock(nn.Module):
+    """2x convolution block for GA-Net based feature encoder"""
+
+    def __init__(self, c_in, c_out, norm_type='batch'):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
+        self.bn2 = _make_norm2d(norm_type, num_channels=c_out, num_groups=8)
+        self.relu2 = nn.ReLU(inplace=True)
+
+    def forward(self, x, res):
+        x = self.conv1(x)
+        x = self.relu1(x)
+
+        assert x.shape == res.shape
+
+        x = torch.cat((x, res), dim=1)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
+
+        return x
+
+
+class GaConv2xBlockTransposed(nn.Module):
+    """Transposed convolution + convolution block for GA-Net based feature encoder"""
+
+    def __init__(self, c_in, c_out, norm_type='batch'):
+        super().__init__()
+
+        self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
+        self.bn2 = _make_norm2d(norm_type, num_channels=c_out, num_groups=8)
+        self.relu2 = nn.ReLU(inplace=True)
+
+    def forward(self, x, res):
+        x = self.conv1(x)
+        x = self.relu1(x)
+
+        assert x.shape == res.shape
+
+        x = torch.cat((x, res), dim=1)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = self.relu2(x)
+
+        return x
+
+
+class DiclFeatureEncoder(nn.Module):
+    """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
+
+    def __init__(self, output_dim, norm_type='batch'):
+        super().__init__()
+
+        self.conv0 = nn.Sequential(
+            ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
+        )
+
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+
+        self.deconv4a = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
+
+        self.conv1b = GaConv2xBlock(32, 48, norm_type=norm_type)
+        self.conv2b = GaConv2xBlock(48, 64, norm_type=norm_type)
+        self.conv3b = GaConv2xBlock(64, 96, norm_type=norm_type)
+        self.conv4b = GaConv2xBlock(96, 128, norm_type=norm_type)
+
+        self.deconv4b = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+
+        self.outconv4 = ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv3 = ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+
+        # initialize weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                if m.weight is not None:
+                    nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        x = res0 = self.conv0(x)                # -> 32, H/2, W/2
+
+        x = res1 = self.conv1a(x)               # -> 48, H/4, W/4
+        x = res2 = self.conv2a(x)               # -> 64, H/8, W/8
+        x = res3 = self.conv3a(x)               # -> 96, H/16, W/16
+        x = res4 = self.conv4a(x)               # -> 128, H/32, W/32
+
+        x = res3 = self.deconv4a(x, res3)       # -> 96, H/16, W/16
+        x = res2 = self.deconv3a(x, res2)       # -> 64, H/8, W/8
+        x = res1 = self.deconv2a(x, res1)       # -> 48, H/4, W/4
+        x = res0 = self.deconv1a(x, res0)       # -> 32, H/2, W/2
+
+        x = res1 = self.conv1b(x, res1)         # -> 48, H/4, W/4
+        x = res2 = self.conv2b(x, res2)         # -> 64, H/8, W/8
+        x = res3 = self.conv3b(x, res3)         # -> 96, H/16, W/16
+        x = res4 = self.conv4b(x, res4)         # -> 128, H/32, W/32
+
+        x = self.deconv4b(x, res3)              # -> 96, H/16, W/16
+        x4 = self.outconv4(x)                   # -> 32, H/16, W/16
+
+        x = self.deconv3b(x, res2)              # -> 64, H/8, W/8
+        x3 = self.outconv3(x)                   # -> 32, H/8, W/8
+
+        return x3, x4
+
+
+# -- DICL matching net -----------------------------------------------------------------------------
 
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
@@ -513,7 +641,7 @@ class Up8Network(nn.Module):
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False, upsample_hidden='none'):
+                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -522,8 +650,19 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
+        if encoder_type == 'raft':
+            self.fnet = RaftFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
+        elif encoder_type == 'dicl':
+            self.fnet = DiclFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm)
+        else:
+            raise ValueError(f"unsupported feature encoder type: '{encoder_type}'")
+
+        if context_type == 'raft':
+            self.cnet = RaftFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
+        elif context_type == 'dicl':
+            self.cnet = DiclFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm)
+        else:
+            raise ValueError(f"unsupported context encoder type: '{context_type}'")
 
         self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
@@ -640,6 +779,8 @@ class RaftPlusDicl(Model):
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
+        encoder_type = param_cfg.get('encoder-type', 'raft')
+        context_type = param_cfg.get('context-type', 'raft')
         share_dicl = param_cfg.get('share-dicl', False)
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
@@ -647,12 +788,13 @@ class RaftPlusDicl(Model):
 
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
-                   context_norm=context_norm, mnet_norm=mnet_norm, share_dicl=share_dicl,
-                   upsample_hidden=upsample_hidden, arguments=args)
+                   context_norm=context_norm, mnet_norm=mnet_norm, encoder_type=encoder_type,
+                   context_type=context_type, share_dicl=share_dicl, upsample_hidden=upsample_hidden,
+                   arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False, upsample_hidden='none', arguments={}):
+                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none', arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -661,14 +803,16 @@ class RaftPlusDicl(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
+        self.encoder_type = encoder_type
+        self.context_type = context_type
         self.share_dicl = share_dicl
         self.upsample_hidden = upsample_hidden
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm, share_dicl=share_dicl,
-                                            upsample_hidden=upsample_hidden),
+                                            mnet_norm=mnet_norm, encoder_type=encoder_type, context_type=context_type,
+                                            share_dicl=share_dicl, upsample_hidden=upsample_hidden),
                          arguments)
 
         self.adapter = RaftPlusDiclAdapter()
@@ -687,6 +831,8 @@ class RaftPlusDicl(Model):
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
                 'mnet-norm': self.mnet_norm,
+                'encoder-type': self.encoder_type,
+                'context-type': self.context_type,
                 'share-dicl': self.share_dicl,
                 'upsample-hidden': self.upsample_hidden,
             },
