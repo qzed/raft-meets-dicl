@@ -374,14 +374,7 @@
                     "arguments": {}
                 },
                 "loss": {
-                    "arguments": {
-                        "alpha": [
-                            1.0,
-                            0.5,
-                            0.25,
-                            0.25
-                        ]
-                    }
+                    "arguments": {}
                 },
                 "gradient": {
                     "accumulate": 1,
