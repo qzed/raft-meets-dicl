@@ -160,8 +160,8 @@ class ConvBlock(nn.Sequential):
         )
 
 
-class DeconvBlock(nn.Sequential):
-    """Basic deconvolution (transposed convolution) block"""
+class ConvBlockTransposed(nn.Sequential):
+    """Basic transposed convolution block"""
 
     def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
@@ -180,7 +180,7 @@ class MatchingNet(nn.Sequential):
             ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
             ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
             ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
-            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 

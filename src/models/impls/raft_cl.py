@@ -24,8 +24,8 @@ class ConvBlock(nn.Sequential):
         )
 
 
-class DeconvBlock(nn.Sequential):
-    """Basic deconvolution block"""
+class ConvBlockTransposed(nn.Sequential):
+    """Basic transposed convolution block"""
 
     def __init__(self, c_in, c_out, **kwargs):
         super().__init__(
@@ -63,8 +63,8 @@ class GaConv2xBlock(nn.Module):
         return x
 
 
-class GaDeconv2xBlock(nn.Module):
-    """Deconvolution + convolution block for GA-Net based feature encoder"""
+class GaConv2xBlockTransposed(nn.Module):
+    """Transposed convolution + convolution block for GA-Net based feature encoder"""
 
     def __init__(self, c_in, c_out):
         super().__init__()
@@ -110,12 +110,12 @@ class FeatureNet(nn.Module):
         self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
         self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
 
-        self.deconv6a = GaDeconv2xBlock(192, 160)
-        self.deconv5a = GaDeconv2xBlock(160, 128)
-        self.deconv4a = GaDeconv2xBlock(128, 96)
-        self.deconv3a = GaDeconv2xBlock(96, 64)
-        self.deconv2a = GaDeconv2xBlock(64, 48)
-        self.deconv1a = GaDeconv2xBlock(48, 32)
+        self.deconv6a = GaConv2xBlockTransposed(192, 160)
+        self.deconv5a = GaConv2xBlockTransposed(160, 128)
+        self.deconv4a = GaConv2xBlockTransposed(128, 96)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32)
 
         self.conv1b = GaConv2xBlock(32, 48)
         self.conv2b = GaConv2xBlock(48, 64)
@@ -124,10 +124,10 @@ class FeatureNet(nn.Module):
         self.conv5b = GaConv2xBlock(128, 160)
         self.conv6b = GaConv2xBlock(160, 192)
 
-        self.deconv6b = GaDeconv2xBlock(192, 160)
-        self.deconv5b = GaDeconv2xBlock(160, 128)
-        self.deconv4b = GaDeconv2xBlock(128, 96)
-        self.deconv3b = GaDeconv2xBlock(96, 64)
+        self.deconv6b = GaConv2xBlockTransposed(192, 160)
+        self.deconv5b = GaConv2xBlockTransposed(160, 128)
+        self.deconv4b = GaConv2xBlockTransposed(128, 96)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -491,7 +491,7 @@ class MatchingNet(nn.Sequential):
             ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
             ConvBlock(128, 128, kernel_size=3, padding=1),
             ConvBlock(128, 64, kernel_size=3, padding=1),
-            DeconvBlock(64, 32, kernel_size=4, padding=1, stride=2),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
