@@ -519,7 +519,7 @@ class RaftModule(nn.Module):
 
             out_3.append(flow_up)
 
-        return out_5, out_4, out_3
+        return out_6, out_5, out_4, out_3
 
 
 class Raft(Model):
