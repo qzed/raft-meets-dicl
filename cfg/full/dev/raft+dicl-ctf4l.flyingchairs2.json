@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-11-24T17:27:50.983661",
-    "commit": "~c0d84ead72649f65f11a9249f737e261f74b6b95",
+    "timestamp": "2021-12-10T15:00:21.780815",
+    "commit": "~511c0bce2ef1e083d8d2f70ecdedbf88462f0c16",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -25,16 +25,24 @@
             "type": "raft+dicl/ctf-l4",
             "parameters": {
                 "corr-radius": 4,
-                "dap-init": "identity"
+                "corr-channels": 32,
+                "context-channels": 128,
+                "recurrent-channels": 128,
+                "dap-init": "identity",
+                "encoder-norm": "instance",
+                "context-norm": "batch",
+                "mnet-norm": "batch",
+                "share-dicl": false
             },
             "arguments": {
                 "iterations": [
+                    4,
                     3,
-                    4,
-                    4,
+                    3,
                     3
                 ],
-                "dap": true
+                "dap": true,
+                "upnet": true
             }
         },
         "loss": {
@@ -43,9 +51,9 @@
                 "ord": 1,
                 "gamma": 0.85,
                 "alpha": [
-                    0.14,
-                    0.27,
-                    0.5,
+                    0.23,
+                    0.38,
+                    0.6,
                     1.0
                 ]
             }
@@ -63,8 +71,8 @@
                 "type": "modulo",
                 "mode": "zeros",
                 "size": [
-                    64,
-                    64
+                    128,
+                    128
                 ]
             }
         }
