@@ -278,6 +278,36 @@ class CorrelationModule(nn.Module):
         return cost.reshape(batch, -1, h, w)                    # (batch, (2r+1)^2, h, w)
 
 
+# -- Hidden state upsampling -----------------------------------------------------------------------
+
+class HUpNone(nn.Module):
+    def __init__(self, recurrent_channels) -> None:
+        super().__init__()
+
+    def forward(self, h_prev, h_init):
+        return h_init
+
+
+class HUpBilinear(nn.Module):
+    def __init__(self, recurrent_channels) -> None:
+        super().__init__()
+
+        # this acts as per-pixel linear layer to assure any scaling needs are
+        # met when upsampling and can weight between hidden and init tensors
+        self.conv1 = nn.Conv2d(recurrent_channels, recurrent_channels, 1)
+
+        # init conv as identity
+        nn.init.eye_(self.conv1.weight[:, :, 0, 0])
+
+    def forward(self, h_prev, h_init):
+        batch, c, h, w, = h_init.shape
+
+        h_prev = self.conv1(h_prev)
+        h_prev = F.interpolate(h_prev, (h, w), mode='bilinear', align_corners=True)
+
+        return h_init + h_prev
+
+
 # -- RAFT core / backend ---------------------------------------------------------------------------
 
 class BasicMotionEncoder(nn.Module):
@@ -419,7 +449,7 @@ class Up8Network(nn.Module):
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False):
+                 share_dicl=False, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -439,6 +469,13 @@ class RaftPlusDiclModule(nn.Module):
             self.corr_4 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+
+        if upsample_hidden == 'none':
+            self.upnet_h = HUpNone(recurrent_channels)
+        elif upsample_hidden == 'bilinear':
+            self.upnet_h = HUpBilinear(recurrent_channels)
+        else:
+            raise ValueError(f"value upsample_hidden='{upsample_hidden}' not supported")
 
         self.upnet = Up8Network(hidden_dim=hdim)
 
@@ -494,6 +531,8 @@ class RaftPlusDiclModule(nn.Module):
         coords1 = coords0 + flow
 
         # fine iterations with flow upsampling
+        h_3 = self.upnet_h(h_4, h_3)
+
         out_3 = []
         for _ in range(iterations[1]):
             coords1 = coords1.detach()
@@ -536,16 +575,18 @@ class RaftPlusDicl(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         share_dicl = param_cfg.get('share-dicl', False)
+        upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
 
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
-                   context_norm=context_norm, mnet_norm=mnet_norm, share_dicl=share_dicl, arguments=args)
+                   context_norm=context_norm, mnet_norm=mnet_norm, share_dicl=share_dicl,
+                   upsample_hidden=upsample_hidden, arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False, arguments={}):
+                 share_dicl=False, upsample_hidden='none', arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -555,11 +596,13 @@ class RaftPlusDicl(Model):
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
         self.share_dicl = share_dicl
+        self.upsample_hidden = upsample_hidden
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm, share_dicl=share_dicl),
+                                            mnet_norm=mnet_norm, share_dicl=share_dicl,
+                                            upsample_hidden=upsample_hidden),
                          arguments)
 
         self.adapter = RaftPlusDiclAdapter()
@@ -579,6 +622,7 @@ class RaftPlusDicl(Model):
                 'context-norm': self.context_norm,
                 'mnet-norm': self.mnet_norm,
                 'share-dicl': self.share_dicl,
+                'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
         }
