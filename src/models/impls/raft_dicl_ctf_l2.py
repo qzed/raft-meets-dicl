@@ -297,6 +297,218 @@ class DiclFeatureEncoder(nn.Module):
         return x3, x4
 
 
+# -- RFPM feature encoder --------------------------------------------------------------------------
+# Implementation of "Detail Preserving Residual Feature Pyramid Modules for
+# Optical Flow" by Long and Lang, 2021 (https://arxiv.org/abs/2107.10990). We
+# use the RAFT-based encoder above as a base.
+
+class RfpmRfdBlock(nn.Module):
+    """Block for residual feature downlsampling with max-pooling"""
+
+    def __init__(self, in_planes, out_planes, norm_type='group', stride=2):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
+        self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
+        self.relu = nn.ReLU(inplace=True)
+
+        self.norm1 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
+        self.norm2 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
+
+        self.downsample = None
+        if stride > 1:
+            self.downsample = nn.Sequential(
+                nn.MaxPool2d(kernel_size=3, stride=stride, padding=1),
+                nn.Conv2d(in_planes, out_planes, kernel_size=1),
+                _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8),
+            )
+
+    def forward(self, x):
+        # WFD downsampling
+        y = x
+        y = self.relu(self.norm1(self.conv1(y)))
+        y = self.relu(self.norm2(self.conv2(y)))
+
+        # downsampling via pooling
+        if self.downsample is not None:
+            x = self.downsample(x)
+
+        return self.relu(x + y)
+
+
+class RfpmRepairMaskNet(nn.Module):
+    """Repair mask for corrections between pyramids"""
+
+    def __init__(self, num_channels):
+        super().__init__()
+
+        # network for mask
+        self.net_a = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1),
+            nn.Sigmoid(),
+        )
+
+        # network for bias
+        self.net_b = nn.Sequential(
+            nn.Conv2d(num_channels, num_channels, kernel_size=3, padding=1),
+            nn.Tanh(),
+        )
+
+    def forward(self, left, x):
+        return x * self.net_a(left) + self.net_b(left)
+
+
+class RfpmOutputNet(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dim=128, norm_type='batch', dropout=0):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=1)
+        self.norm1 = _make_norm2d(norm_type, num_channels=hidden_dim, num_groups=8)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(hidden_dim, output_dim, kernel_size=1)
+        self.dropout = nn.Dropout2d(p=dropout)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.norm1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.dropout(x)
+        return x
+
+
+class RfpmFeatureEncoder(nn.Module):
+    """RFPM feature encoder using three internal pyramids"""
+
+    def __init__(self, output_dim=32, norm_type='batch', dropout=0.0):
+        super().__init__()
+
+        # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.norm1 = _make_norm2d(norm_type, num_channels=64, num_groups=8)
+        self.relu1 = nn.ReLU(inplace=True)
+
+        # left-/base-pyramid
+        self.layer1_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+        )
+
+        self.layer2_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
+        )
+
+        self.layer3_left = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
+        )
+
+        self.layer4_left = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
+        )
+
+        # center pyramid
+        self.layer1_center = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+        )
+
+        self.layer2_center = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
+            RfpmRfdBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
+        )
+
+        self.layer3_center = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
+            RfpmRfdBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
+        )
+
+        self.layer4_center = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
+            RfpmRfdBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
+        )
+
+        # right pyramid
+        self.layer1_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+        )
+
+        self.layer2_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
+        )
+
+        self.layer3_right = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
+        )
+
+        self.layer4_right = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
+        )
+
+        # repair masks
+        self.mask1_lc = RfpmRepairMaskNet(64)
+        self.mask1_cr = RfpmRepairMaskNet(64)
+
+        self.mask2_lc = RfpmRepairMaskNet(96)
+        self.mask2_cr = RfpmRepairMaskNet(96)
+
+        self.mask3_lc = RfpmRepairMaskNet(128)
+        self.mask3_cr = RfpmRepairMaskNet(128)
+
+        self.mask4_lc = RfpmRepairMaskNet(160)
+        self.mask4_cr = RfpmRepairMaskNet(160)
+
+        # output blocks
+        self.out3 = RfpmOutputNet(3*128, output_dim, 3*160, norm_type=norm_type, dropout=dropout)
+        self.out4 = RfpmOutputNet(3*160, output_dim, 3*192, norm_type=norm_type, dropout=dropout)
+
+        # initialize weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                if m.weight is not None:
+                    nn.init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        # input layer
+        x = self.relu1(self.norm1(self.conv1(x)))
+
+        # level 1
+        xl, xc, xr = self.layer1_left(x), self.layer1_center(x), self.layer1_right(x)
+        xc = self.mask1_lc(xl, xc)
+        xr = self.mask1_cr(xc, xr)
+
+        # level 2
+        xl, xc, xr = self.layer2_left(xl), self.layer2_center(xc), self.layer2_right(xr)
+        xc = self.mask2_lc(xl, xc)
+        xr = self.mask2_cr(xc, xr)
+
+        # level 3
+        xl, xc, xr = self.layer3_left(xl), self.layer3_center(xc), self.layer3_right(xr)
+        xc = self.mask3_lc(xl, xc)
+        xr = self.mask3_cr(xc, xr)
+
+        x3 = self.out3(torch.cat((xl, xc, xr), dim=1))
+
+        # level 4
+        xl, xc, xr = self.layer4_left(xl), self.layer4_center(xc), self.layer4_right(xr)
+        xc = self.mask4_lc(xl, xc)
+        xr = self.mask4_cr(xc, xr)
+
+        x4 = self.out4(torch.cat((xl, xc, xr), dim=1))
+
+        return x3, x4
+
+
 # -- DICL matching net -----------------------------------------------------------------------------
 
 class MatchingNet(nn.Sequential):
@@ -654,6 +866,8 @@ class RaftPlusDiclModule(nn.Module):
             self.fnet = RaftFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
         elif encoder_type == 'dicl':
             self.fnet = DiclFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm)
+        elif encoder_type == 'rfpm-raft':
+            self.fnet = RfpmFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
         else:
             raise ValueError(f"unsupported feature encoder type: '{encoder_type}'")
 
@@ -661,6 +875,8 @@ class RaftPlusDiclModule(nn.Module):
             self.cnet = RaftFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
         elif context_type == 'dicl':
             self.cnet = DiclFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm)
+        elif context_type == 'rfpm-raft':
+            self.cnet = RfpmFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
         else:
             raise ValueError(f"unsupported context encoder type: '{context_type}'")
 
