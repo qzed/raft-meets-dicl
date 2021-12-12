@@ -925,6 +925,32 @@ class Up8Network(nn.Module):
         return up_flow
 
 
+def _make_encoder(encoder_type, output_dim, norm_type, dropout):
+    if encoder_type == 'raft':
+        return RaftFeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout)
+    elif encoder_type == 'raft-avgpool':
+        return RaftPoolFeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, pool_type='avg')
+    elif encoder_type == 'raft-maxpool':
+        return RaftPoolFeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, pool_type='max')
+    elif encoder_type == 'dicl':
+        return DiclFeatureEncoder(output_dim=output_dim, norm_type=norm_type)
+    elif encoder_type == 'rfpm-raft':
+        return RfpmFeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout)
+    else:
+        raise ValueError(f"unsupported feature encoder type: '{type}'")
+
+
+def _make_hidden_state_upsampler(type, recurrent_channels):
+    if type == 'none':
+        return HUpNone(recurrent_channels)
+    elif type == 'bilinear':
+        return HUpBilinear(recurrent_channels)
+    elif type == 'crossattn':
+        return HUpCrossAttn(recurrent_channels)
+    else:
+        raise ValueError(f"value upsample_hidden='{type}' not supported")
+
+
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
@@ -937,34 +963,10 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        if encoder_type == 'raft':
-            self.fnet = RaftFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
-        elif context_type == 'raft-avgpool':
-            self.fnet = RaftPoolFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0, pool_type='avg')
-        elif context_type == 'raft-maxpool':
-            self.fnet = RaftPoolFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0, pool_type='max')
-        elif encoder_type == 'dicl':
-            self.fnet = DiclFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm)
-        elif encoder_type == 'rfpm-raft':
-            self.fnet = RfpmFeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
-        else:
-            raise ValueError(f"unsupported feature encoder type: '{encoder_type}'")
-
-        if context_type == 'raft':
-            self.cnet = RaftFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
-        elif context_type == 'raft-avgpool':
-            self.cnet = RaftPoolFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0, pool_type='avg')
-        elif context_type == 'raft-maxpool':
-            self.cnet = RaftPoolFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0, pool_type='max')
-        elif context_type == 'dicl':
-            self.cnet = DiclFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm)
-        elif context_type == 'rfpm-raft':
-            self.cnet = RfpmFeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
-        else:
-            raise ValueError(f"unsupported context encoder type: '{context_type}'")
+        self.fnet = _make_encoder(encoder_type, corr_channels, encoder_norm, dropout=0)
+        self.cnet = _make_encoder(context_type, hdim + cdim, context_norm, dropout=0)
 
         self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-
         if share_dicl:
             self.corr_4 = self.corr_3
         else:
@@ -972,15 +974,7 @@ class RaftPlusDiclModule(nn.Module):
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
-        if upsample_hidden == 'none':
-            self.upnet_h = HUpNone(recurrent_channels)
-        elif upsample_hidden == 'bilinear':
-            self.upnet_h = HUpBilinear(recurrent_channels)
-        elif upsample_hidden == 'crossattn':
-            self.upnet_h = HUpCrossAttn(recurrent_channels)
-        else:
-            raise ValueError(f"value upsample_hidden='{upsample_hidden}' not supported")
-
+        self.upnet_h = _make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
         self.upnet = Up8Network(hidden_dim=hdim)
 
     def freeze_batchnorm(self):
