@@ -318,7 +318,7 @@ class RfpmRfdBlock(nn.Module):
         self.downsample = None
         if stride > 1:
             self.downsample = nn.Sequential(
-                nn.MaxPool2d(kernel_size=3, stride=stride, padding=1),
+                nn.MaxPool2d(kernel_size=2, stride=stride),
                 nn.Conv2d(in_planes, out_planes, kernel_size=1),
                 _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8),
             )
