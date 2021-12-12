@@ -12,19 +12,6 @@ from .. import Loss, Model, ModelAdapter, Result
 from .. import common
 
 
-def _make_norm2d(ty, num_channels, num_groups):
-    if ty == 'group':
-        return nn.GroupNorm(num_groups=num_groups, num_channels=num_channels)
-    elif ty == 'batch':
-        return nn.BatchNorm2d(num_channels)
-    elif ty == 'instance':
-        return nn.InstanceNorm2d(num_channels)
-    elif ty == 'none':
-        return nn.Sequential()
-    else:
-        raise ValueError(f"unknown norm type '{ty}'")
-
-
 class ResidualBlock(nn.Module):
     """Residual block for feature / context encoder"""
 
@@ -35,10 +22,10 @@ class ResidualBlock(nn.Module):
         self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
         self.relu = nn.ReLU(inplace=True)
 
-        self.norm1 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        self.norm2 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
+        self.norm1 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
+        self.norm2 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
         if stride > 1:
-            self.norm3 = _make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
+            self.norm3 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
 
         self.downsample = None
         if stride > 1:
@@ -66,7 +53,7 @@ class BasicEncoder(nn.Module):
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
-        self.norm1 = _make_norm2d(norm_type, num_channels=64, num_groups=8)
+        self.norm1 = common.norm.make_norm2d(norm_type, num_channels=64, num_groups=8)
         self.relu1 = nn.ReLU(inplace=True)
 
         # residual blocks
