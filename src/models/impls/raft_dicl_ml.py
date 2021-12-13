@@ -185,15 +185,19 @@ class CorrelationModule(nn.Module):
         else:
             raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
+        # build lookup kernel
+        dx = torch.linspace(-radius, radius, 2 * radius + 1)
+        dy = torch.linspace(-radius, radius, 2 * radius + 1)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+
+        self.register_buffer('delta', delta, persistent=False)
+
     def forward(self, fmap1, fmap2, coords, dap=True, mask_costs=[]):
         batch, _, h, w = coords.shape
         r = self.radius
 
         # build lookup kernel
-        dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
-        delta = delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)        # reshape for broadcasting
+        delta = self.delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)   # reshape for broadcasting
 
         coords = coords.permute(0, 2, 3, 1)                     # (batch, h, w, 2)
         coords = coords.view(batch, 1, h, 1, w, 2)              # reshape for broadcasting

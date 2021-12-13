@@ -17,20 +17,23 @@ class CorrelationModule(nn.Module):
         self.mnet = dicl.MatchingNet(2 * feature_dim, norm_type=norm_type)
         self.dap = dicl.DisplacementAwareProjection((radius, radius), init=dap_init)
 
+        # build lookup kernel
+        dx = torch.linspace(-radius, radius, 2 * radius + 1)
+        dy = torch.linspace(-radius, radius, 2 * radius + 1)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+
+        self.register_buffer('delta', delta, persistent=False)
+
     def forward(self, f1, f2, coords, dap=True):
         batch, c, h, w = f1.shape
         r = self.radius
 
-        # build lookup kernel
-        dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
-        delta = delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)        # reshape for broadcasting
+        # build interpolation map for grid-sampling
+        delta = self.delta.view(1, 2*r + 1, 1, 2*r + 1, 1, 2)   # reshape for broadcasting
 
         coords = coords.permute(0, 2, 3, 1)                     # (batch, h, w, 2)
         coords = coords.view(batch, 1, h, 1, w, 2)              # reshape for broadcasting
 
-        # build interpolation map for grid-sampling
         centroids = coords + delta                              # broadcasts to (b, 2r+1, h, 2r+1, w, 2)
 
         # F.grid_sample() takes coordinates in range [-1, 1], convert them
