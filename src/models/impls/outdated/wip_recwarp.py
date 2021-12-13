@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Model, ModelAdapter, Result
-from .. import common
+from ... import Model, ModelAdapter, Result
+from ... import common
 
-from . import dicl
+from .. import dicl
 
 
 class FeatureNet(nn.Module):

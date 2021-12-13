@@ -7,11 +7,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import common
-from .. import Loss, Model, ModelAdapter, Result
+from ... import common
+from ... import Loss, Model, ModelAdapter, Result
 
-from . import dicl
-from . import raft
+from .. import dicl
+from .. import raft
 
 
 class FeatureEncoder(nn.Module):
