@@ -309,7 +309,7 @@ class BasicUpdateBlock(nn.Module):
 
         # compute mask for upscaling
         if self.mask is not None:
-            mask = 0.25 * self.mask(h)      # scale to balance gradiens, dim (N, 8*8*9, h/8, w/8)
+            mask = 0.25 * self.mask(h)      # scale to balance gradients, dim (N, 8*8*9, h/8, w/8)
         else:
             mask = None
 

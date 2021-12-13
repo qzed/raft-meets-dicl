@@ -11,6 +11,7 @@ from .. import common
 from .. import Loss, Model, ModelAdapter, Result
 
 from . import dicl
+from . import raft
 
 
 class FeatureEncoder(nn.Module):
@@ -172,40 +173,6 @@ class MotionEncoder(nn.Sequential):
         return super().forward(mvol)
 
 
-class SepConvGru(nn.Module):
-    """Convolutional 2-part (horizontal/vertical) GRU for flow updates"""
-
-    def __init__(self, hidden_dim=128, input_dim=128):
-        super().__init__()
-
-        # horizontal GRU
-        self.convz1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-        self.convr1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-        self.convq1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-
-        # vertical GRU
-        self.convz2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-        self.convr2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-        self.convq2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-
-    def forward(self, h, x):
-        # horizontal GRU
-        hx = torch.cat([h, x], dim=1)                               # input vector
-        z = torch.sigmoid(self.convz1(hx))                          # update gate vector
-        r = torch.sigmoid(self.convr1(hx))                          # reset gate vector
-        q = torch.tanh(self.convq1(torch.cat((r * h, x), dim=1)))   # candidate activation
-        h = (1.0 - z) * h + z * q                                   # output vector
-
-        # vertical GRU
-        hx = torch.cat([h, x], dim=1)                               # input vector
-        z = torch.sigmoid(self.convz2(hx))                          # update gate vector
-        r = torch.sigmoid(self.convr2(hx))                          # reset gate vector
-        q = torch.tanh(self.convq2(torch.cat((r * h, x), dim=1)))   # candidate activation
-        h = (1.0 - z) * h + z * q                                   # output vector
-
-        return h
-
-
 class FlowHead(nn.Module):
     """Head to compute delta-flow from GRU hidden-state"""
 
@@ -298,7 +265,7 @@ class RecurrentLevelUnit(nn.Module):
             dicl.DisplacementAwareProjection(disp_range),
         ])
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
-        self.gru = SepConvGru(hidden_dim, input_dim=mf_channels)
+        self.gru = raft.SepConvGru(hidden_dim, input_dim=mf_channels)
         self.fhead = FlowHead(input_dim=hidden_dim)
         # self.fhead = FlowHead2(input_dim=hidden_dim, disp_range=disp_range)
 

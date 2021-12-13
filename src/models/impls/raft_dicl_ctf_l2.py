@@ -610,89 +610,6 @@ class HUpCrossAttn(nn.Module):
 
 # -- RAFT core / backend ---------------------------------------------------------------------------
 
-class BasicMotionEncoder(nn.Module):
-    """Encoder to combine correlation and flow for GRU input"""
-
-    def __init__(self, corr_planes):
-        super().__init__()
-
-        # correlation input network
-        self.convc1 = nn.Conv2d(corr_planes, 256, 1, padding=0)
-        self.convc2 = nn.Conv2d(256, 192, 3, padding=1)
-
-        # flow input network
-        self.convf1 = nn.Conv2d(2, 128, 7, padding=3)
-        self.convf2 = nn.Conv2d(128, 64, 3, padding=1)
-
-        # combination network
-        self.conv = nn.Conv2d(192 + 64, 128 - 2, 3, padding=1)
-
-        self.output_dim = 128                           # (128 - 2) + 2
-
-    def forward(self, flow, corr):
-        # correlation input network
-        cor = F.relu(self.convc1(corr))
-        cor = F.relu(self.convc2(cor))
-
-        # flow input network
-        flo = F.relu(self.convf1(flow))
-        flo = F.relu(self.convf2(flo))
-
-        # combination network
-        combined = torch.cat([cor, flo], dim=1)         # concatenate along channels
-        combined = F.relu(self.conv(combined))
-
-        return torch.cat([combined, flow], dim=1)
-
-
-class SepConvGru(nn.Module):
-    """Convolutional 2-part (horizontal/vertical) GRU for flow updates"""
-
-    def __init__(self, hidden_dim=128, input_dim=128+128):
-        super().__init__()
-
-        # horizontal GRU
-        self.convz1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-        self.convr1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-        self.convq1 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (1, 5), padding=(0, 2))
-
-        # vertical GRU
-        self.convz2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-        self.convr2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-        self.convq2 = nn.Conv2d(hidden_dim + input_dim, hidden_dim, (5, 1), padding=(2, 0))
-
-    def forward(self, h, x):
-        # horizontal GRU
-        hx = torch.cat([h, x], dim=1)                               # input vector
-        z = torch.sigmoid(self.convz1(hx))                          # update gate vector
-        r = torch.sigmoid(self.convr1(hx))                          # reset gate vector
-        q = torch.tanh(self.convq1(torch.cat((r * h, x), dim=1)))   # candidate activation
-        h = (1.0 - z) * h + z * q                                   # output vector
-
-        # vertical GRU
-        hx = torch.cat([h, x], dim=1)                               # input vector
-        z = torch.sigmoid(self.convz2(hx))                          # update gate vector
-        r = torch.sigmoid(self.convr2(hx))                          # reset gate vector
-        q = torch.tanh(self.convq2(torch.cat((r * h, x), dim=1)))   # candidate activation
-        h = (1.0 - z) * h + z * q                                   # output vector
-
-        return h
-
-
-class FlowHead(nn.Module):
-    """Head to compute delta-flow from GRU hidden-state"""
-
-    def __init__(self, input_dim=128, hidden_dim=256):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        return self.conv2(self.relu(self.conv1(x)))
-
-
 class BasicUpdateBlock(nn.Module):
     """Network to compute single flow update delta"""
 
@@ -700,9 +617,9 @@ class BasicUpdateBlock(nn.Module):
         super().__init__()
 
         # network for flow update delta
-        self.enc = BasicMotionEncoder(corr_planes)
-        self.gru = SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
-        self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256)
+        self.enc = raft.BasicMotionEncoder(corr_planes)
+        self.gru = raft.SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
+        self.flow = raft.FlowHead(input_dim=hidden_dim, hidden_dim=256)
 
     def forward(self, h, x, corr, flow):
         # compute GRU input from flow
