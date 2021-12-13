@@ -7,66 +7,9 @@ from .. import common
 
 from . import raft
 
+from .raft_sl import CorrBlock
 from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
 from .raft_dicl_ctf_l2 import RaftFeatureEncoder
-
-
-class CorrBlock:
-    """Correlation volume for matching costs"""
-
-    def __init__(self, fmap1, fmap2, radius=4):
-        super().__init__()
-
-        self.radius = radius
-        self.corr_pyramid = []
-
-        # all-pairs correlation
-        batch, dim, h, w = fmap1.shape
-
-        fmap1 = fmap1.view(batch, dim, h*w)                     # flatten h, w dimensions
-        fmap2 = fmap2.view(batch, dim, h*w)
-
-        corr = torch.matmul(fmap1.transpose(1, 2), fmap2)       # dot-product (for each h, w)
-        corr = corr.view(batch, h, w, 1, h, w)                  # reshape back to volume
-        corr = corr / torch.tensor(dim).float().sqrt()          # normalize
-
-        self.corr = corr                                        # (batch, h, w, 1, h, w)
-
-    def __call__(self, coords):
-        r = self.radius
-
-        # reshape to (batch, h, w, x/y=channel=2)
-        coords = coords.permute(0, 2, 3, 1)
-        batch, h, w, _c = coords.shape
-
-        # build lookup kernel
-        dx = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        dy = torch.linspace(-r, r, 2 * r + 1, device=coords.device)
-        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), dim=-1)  # to (2r+1, 2r+1, 2)
-
-        # reshape correlation volume for sampling
-        batch, h1, w1, dim, h2, w2 = self.corr.shape             # reshape to (n, c, h_in, w_in)
-        corr = self.corr.view(batch * h1 * w1, dim, h2, w2)
-
-        # build interpolation map for grid-sampling
-        centroids = coords.view(batch, h, w, 1, 1, 2)       # reshape for broadcasting
-        centroids = centroids + delta                       # broadcasts to (..., 2r+1, 2r+1, 2)
-
-        # F.grid_sample() takes coordinates in range [-1, 1], convert them
-        centroids[..., 0] = 2 * centroids[..., 0] / (w - 1) - 1
-        centroids[..., 1] = 2 * centroids[..., 1] / (h - 1) - 1
-
-        # reshape coordinates for sampling to (batch*h*w, h_out=2r+1, w_out=2r+1, x/y=2)
-        centroids = centroids.reshape(batch * h * w, 2 * r + 1, 2 * r + 1, 2)
-
-        # sample, this generates a tensor of (batch*h*w, dim, h_out=2r+1, w_out=2r+1)
-        corr = F.grid_sample(corr, centroids, align_corners=True)
-
-        # flatten over (dim, h_out=2r+1, w_out=2r+1) to (batch, h, w, scores=-1)
-        corr = corr.view(batch, h, w, -1)
-
-        corr = corr.permute(0, 3, 1, 2)                     # reshape to (batch, scores, h, w)
-        return corr.contiguous().float()
 
 
 class RaftModule(nn.Module):
