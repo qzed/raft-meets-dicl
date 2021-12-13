@@ -7,7 +7,6 @@ from .. import common
 
 from . import raft
 
-from .raft_sl import CorrBlock
 from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
 from .raft_dicl_ctf_l4 import BasicEncoder
 
@@ -68,7 +67,7 @@ class RaftModule(nn.Module):
         flow = coords1 - coords0
 
         # build correlation volume
-        corr_vol = CorrBlock(f6_1, f6_2, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f6_1, f6_2, num_levels=1, radius=self.corr_radius)
 
         # iteratively predict flow
         out_6 = []
@@ -96,7 +95,7 @@ class RaftModule(nn.Module):
         coords1 = coords0 + flow
 
         # build correlation volume
-        corr_vol = CorrBlock(f5_1, f5_2, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f5_1, f5_2, num_levels=1, radius=self.corr_radius)
 
         # iteratively predict flow
         out_5 = []
@@ -124,7 +123,7 @@ class RaftModule(nn.Module):
         coords1 = coords0 + flow
 
         # build correlation volume
-        corr_vol = CorrBlock(f4_1, f4_2, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f4_1, f4_2, num_levels=1, radius=self.corr_radius)
 
         # iteratively predict flow
         out_4 = []
@@ -152,7 +151,7 @@ class RaftModule(nn.Module):
         coords1 = coords0 + flow
 
         # build correlation volume
-        corr_vol = CorrBlock(f3_1, f3_2, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f3_1, f3_2, num_levels=1, radius=self.corr_radius)
 
         # iteratively predict flow
         out_3 = []
