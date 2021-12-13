@@ -5,10 +5,11 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
+from ..common.encoders.raft.p36 import FeatureEncoder
+
 from . import raft
 
 from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
-from .raft_dicl_ctf_l4 import BasicEncoder
 
 
 class RaftModule(nn.Module):
@@ -24,8 +25,8 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
+        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
