@@ -16,28 +16,7 @@ from .. import common
 from . import dicl
 from . import raft
 
-from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
-
-
-# -- RAFT-based feature encoder --------------------------------------------------------------------
-
-class EncoderOutputNet(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim=128, norm_type='batch', dropout=0):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1)
-        self.norm1 = common.norm.make_norm2d(norm_type, num_channels=hidden_dim, num_groups=8)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(hidden_dim, output_dim, kernel_size=1)
-        self.dropout = nn.Dropout2d(p=dropout)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.norm1(x)
-        x = self.relu1(x)
-        x = self.conv2(x)
-        x = self.dropout(x)
-        return x
+from .raft_dicl_ctf_l2 import EncoderOutputNet, MultiscaleSequenceAdapter
 
 
 class BasicEncoder(nn.Module):
@@ -112,8 +91,6 @@ class BasicEncoder(nn.Module):
         return x3, x4, x5
 
 
-# -- Correlation module ----------------------------------------------------------------------------
-
 class CorrelationModule(nn.Module):
     def __init__(self, feature_dim, radius, dap_init='identity', norm_type='batch'):
         super().__init__()
@@ -163,8 +140,6 @@ class CorrelationModule(nn.Module):
 
         return cost.reshape(batch, -1, h, w)                    # (batch, (2r+1)^2, h, w)
 
-
-# -- RAFT core / backend ---------------------------------------------------------------------------
 
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
