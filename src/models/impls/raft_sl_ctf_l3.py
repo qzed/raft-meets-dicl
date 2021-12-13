@@ -183,7 +183,7 @@ class Raft(Model):
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm), arguments)
 
-        self.adapter = common.adapters.msseq.MultiscaleSequenceAdapter()
+        self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (4, 3, 3), 'upnet': True}

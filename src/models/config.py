@@ -40,7 +40,7 @@ def load_input(cfg) -> input.InputSpec:
 
 def load_loss(cfg) -> model.Loss:
     types = [
-        common.loss.msseq.MultiscaleSequenceLoss,
+        common.loss.mlseq.MultiLevelSequenceLoss,
         m.dicl.MultiscaleLoss,
         m.raft.SequenceLoss,
         m.outdated.raft_cl.SequenceLoss,

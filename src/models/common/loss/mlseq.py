@@ -4,7 +4,9 @@ import torch.nn.functional as F
 from ... import Loss
 
 
-class MultiscaleSequenceLoss(Loss):
+class MultiLevelSequenceLoss(Loss):
+    """Multi-level sequence loss"""
+
     type = 'raft+dicl/mlseq'
 
     @classmethod

@@ -1,1 +1,1 @@
-from . import msseq
+from . import mlseq

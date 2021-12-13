@@ -174,7 +174,7 @@ class RaftPlusDicl(Model):
                                             share_dicl=share_dicl, upsample_hidden=upsample_hidden),
                          arguments)
 
-        self.adapter = common.adapters.msseq.MultiscaleSequenceAdapter()
+        self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (4, 3), 'dap': True, 'upnet': True}

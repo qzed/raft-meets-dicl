@@ -1,15 +1,15 @@
 from ... import ModelAdapter, Result
 
 
-class MultiscaleSequenceAdapter(ModelAdapter):
+class MultiLevelSequenceAdapter(ModelAdapter):
     def __init__(self):
         super().__init__()
 
     def wrap_result(self, result, original_shape) -> Result:
-        return MultiscaleSequenceResult(result, original_shape)
+        return MultiLevelSequenceResult(result, original_shape)
 
 
-class MultiscaleSequenceResult(Result):
+class MultiLevelSequenceResult(Result):
     def __init__(self, output, shape):
         super().__init__()
 
