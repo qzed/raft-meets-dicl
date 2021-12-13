@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from ... import Loss, Model, ModelAdapter, Result
 from ... import common
 
+from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+
 from .. import dicl
 from .. import raft
 
@@ -18,36 +20,36 @@ class FeatureNet(nn.Module):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            dicl.ConvBlock(3, 32, kernel_size=3, padding=1),
-            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
-            dicl.ConvBlock(32, 32, kernel_size=3, padding=1),
+            ConvBlock(3, 32, kernel_size=3, padding=1),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
+            ConvBlock(32, 32, kernel_size=3, padding=1),
         )
 
-        self.conv1a = dicl.ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
-        self.conv2a = dicl.ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
-        self.conv3a = dicl.ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
-        self.conv4a = dicl.ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
-        self.conv5a = dicl.ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
-        self.conv6a = dicl.ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
+        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
+        self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
 
-        self.deconv6a = dicl.GaConv2xBlockTransposed(192, 160)
-        self.deconv5a = dicl.GaConv2xBlockTransposed(160, 128)
-        self.deconv4a = dicl.GaConv2xBlockTransposed(128, 96)
-        self.deconv3a = dicl.GaConv2xBlockTransposed(96, 64)
-        self.deconv2a = dicl.GaConv2xBlockTransposed(64, 48)
-        self.deconv1a = dicl.GaConv2xBlockTransposed(48, 32)
+        self.deconv6a = GaConv2xBlockTransposed(192, 160)
+        self.deconv5a = GaConv2xBlockTransposed(160, 128)
+        self.deconv4a = GaConv2xBlockTransposed(128, 96)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32)
 
-        self.conv1b = dicl.GaConv2xBlock(32, 48)
-        self.conv2b = dicl.GaConv2xBlock(48, 64)
-        self.conv3b = dicl.GaConv2xBlock(64, 96)
-        self.conv4b = dicl.GaConv2xBlock(96, 128)
-        self.conv5b = dicl.GaConv2xBlock(128, 160)
-        self.conv6b = dicl.GaConv2xBlock(160, 192)
+        self.conv1b = GaConv2xBlock(32, 48)
+        self.conv2b = GaConv2xBlock(48, 64)
+        self.conv3b = GaConv2xBlock(64, 96)
+        self.conv4b = GaConv2xBlock(96, 128)
+        self.conv5b = GaConv2xBlock(128, 160)
+        self.conv6b = GaConv2xBlock(160, 192)
 
-        self.deconv6b = dicl.GaConv2xBlockTransposed(192, 160)
-        self.deconv5b = dicl.GaConv2xBlockTransposed(160, 128)
-        self.deconv4b = dicl.GaConv2xBlockTransposed(128, 96)
-        self.deconv3b = dicl.GaConv2xBlockTransposed(96, 64)
+        self.deconv6b = GaConv2xBlockTransposed(192, 160)
+        self.deconv5b = GaConv2xBlockTransposed(160, 128)
+        self.deconv4b = GaConv2xBlockTransposed(128, 96)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -87,10 +89,10 @@ class FeatureNetDown(nn.Module):
     def __init__(self, output_channels):
         super().__init__()
 
-        self.outconv6 = dicl.ConvBlock(160, output_channels, kernel_size=3, padding=1)
-        self.outconv5 = dicl.ConvBlock(128, output_channels, kernel_size=3, padding=1)
-        self.outconv4 = dicl.ConvBlock(96, output_channels, kernel_size=3, padding=1)
-        self.outconv3 = dicl.ConvBlock(64, output_channels, kernel_size=3, padding=1)
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         x6 = self.outconv6(x[3])                # -> 32, H/64, W/64
@@ -107,10 +109,10 @@ class FeatureNetUp(nn.Module):
     def __init__(self, output_channels):
         super().__init__()
 
-        self.outconv6 = dicl.ConvBlock(160, output_channels, kernel_size=3, padding=1)
-        self.outconv5 = dicl.ConvBlock(128, output_channels, kernel_size=3, padding=1)
-        self.outconv4 = dicl.ConvBlock(96, output_channels, kernel_size=3, padding=1)
-        self.outconv3 = dicl.ConvBlock(64, output_channels, kernel_size=3, padding=1)
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
         self.mask5 = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),

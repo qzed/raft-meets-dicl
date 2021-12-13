@@ -13,6 +13,8 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
+from ..common.blocks.raft import ResidualBlock
+
 from . import raft
 
 from .raft_dicl_sl import CorrelationModule
@@ -32,28 +34,28 @@ class BasicEncoder(nn.Module):
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            raft.ResidualBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            raft.ResidualBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            raft.ResidualBlock(128, 160, norm_type, stride=2),
-            raft.ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         self.layer5 = nn.Sequential(    # (H/16, W/16, 160) -> (H/16, H/16, 192)
-            raft.ResidualBlock(160, 192, norm_type, stride=2),
-            raft.ResidualBlock(192, 192, norm_type, stride=1),
+            ResidualBlock(160, 192, norm_type, stride=2),
+            ResidualBlock(192, 192, norm_type, stride=1),
         )
 
         # output blocks

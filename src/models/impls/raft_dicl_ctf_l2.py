@@ -15,7 +15,9 @@ import torch.nn.functional as F
 from .. import Loss, Model, ModelAdapter, Result
 from .. import common
 
-from . import dicl
+from ..common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+from ..common.blocks.raft import ResidualBlock
+
 from . import raft
 
 from .raft_dicl_sl import CorrelationModule
@@ -55,23 +57,23 @@ class RaftFeatureEncoder(nn.Module):
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            raft.ResidualBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            raft.ResidualBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            raft.ResidualBlock(128, 160, norm_type, stride=2),
-            raft.ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         # output blocks
@@ -120,18 +122,18 @@ class RaftPoolFeatureEncoder(nn.Module):
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            raft.ResidualBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            raft.ResidualBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         # output convolution            # (H/8, W/8, 128) -> (H/8, W/8, output_dim)
@@ -189,31 +191,31 @@ class DiclFeatureEncoder(nn.Module):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            dicl.ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
-            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
         )
 
-        self.conv1a = dicl.ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv2a = dicl.ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv3a = dicl.ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv4a = dicl.ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
 
-        self.deconv4a = dicl.GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3a = dicl.GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
-        self.deconv2a = dicl.GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
-        self.deconv1a = dicl.GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
+        self.deconv4a = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
 
-        self.conv1b = dicl.GaConv2xBlock(32, 48, norm_type=norm_type)
-        self.conv2b = dicl.GaConv2xBlock(48, 64, norm_type=norm_type)
-        self.conv3b = dicl.GaConv2xBlock(64, 96, norm_type=norm_type)
-        self.conv4b = dicl.GaConv2xBlock(96, 128, norm_type=norm_type)
+        self.conv1b = GaConv2xBlock(32, 48, norm_type=norm_type)
+        self.conv2b = GaConv2xBlock(48, 64, norm_type=norm_type)
+        self.conv3b = GaConv2xBlock(64, 96, norm_type=norm_type)
+        self.conv4b = GaConv2xBlock(96, 128, norm_type=norm_type)
 
-        self.deconv4b = dicl.GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3b = dicl.GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv4b = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
 
-        self.outconv4 = dicl.ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
-        self.outconv3 = dicl.ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv4 = ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv3 = ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
 
         # initialize weights
         for m in self.modules():
@@ -345,65 +347,65 @@ class RfpmFeatureEncoder(nn.Module):
 
         # left-/base-pyramid
         self.layer1_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            raft.ResidualBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3_left = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            raft.ResidualBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4_left = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            raft.ResidualBlock(128, 160, norm_type, stride=2),
-            raft.ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         # center pyramid
         self.layer1_center = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2_center = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
             RfpmRfdBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3_center = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
             RfpmRfdBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4_center = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
             RfpmRfdBlock(128, 160, norm_type, stride=2),
-            raft.ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         # right pyramid
         self.layer1_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
-            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            raft.ResidualBlock(64, 96, norm_type, stride=2),
-            raft.ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2),
+            ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3_right = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            raft.ResidualBlock(96, 128, norm_type, stride=2),
-            raft.ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2),
+            ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4_right = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            raft.ResidualBlock(128, 160, norm_type, stride=2),
-            raft.ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2),
+            ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         # repair masks

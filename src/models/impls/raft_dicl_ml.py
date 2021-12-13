@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Model, ModelAdapter, Result
+from .. import Model, ModelAdapter
 from .. import common
+
+from ..common.blocks.raft import ResidualBlock
 
 from . import dicl
 from . import raft
@@ -44,15 +46,15 @@ class StackEncoder(nn.Module):
         self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 2:
-            self.down3 = raft.ResidualBlock(in_planes=input_dim, out_planes=256, norm_type=norm_type)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256, norm_type=norm_type)
             self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2, norm_type=norm_type)
 
         if levels >= 3:
-            self.down4 = raft.ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
+            self.down4 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
             self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4, norm_type=norm_type)
 
         if levels == 4:
-            self.down5 = raft.ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
+            self.down5 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
             self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8, norm_type=norm_type)
 
         # initialize weights
@@ -105,15 +107,15 @@ class PyramidEncoder(nn.Module):
         self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 2:
-            self.down3 = raft.ResidualBlock(in_planes=input_dim, out_planes=384, stride=2, norm_type=norm_type)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2, norm_type=norm_type)
             self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 3:
-            self.down4 = raft.ResidualBlock(in_planes=384, out_planes=576, stride=2, norm_type=norm_type)
+            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2, norm_type=norm_type)
             self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim, norm_type=norm_type)
 
         if levels >= 4:
-            self.down5 = raft.ResidualBlock(in_planes=576, out_planes=864, stride=2, norm_type=norm_type)
+            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2, norm_type=norm_type)
             self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim, norm_type=norm_type)
 
         # initialize weights

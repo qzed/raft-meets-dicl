@@ -11,38 +11,7 @@ import torch.nn.functional as F
 from .. import Loss, Model, ModelAdapter, Result
 from .. import common
 
-
-class ResidualBlock(nn.Module):
-    """Residual block for feature / context encoder"""
-
-    def __init__(self, in_planes, out_planes, norm_type='group', stride=1):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
-
-        self.norm1 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        self.norm2 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        if stride > 1:
-            self.norm3 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-
-        self.downsample = None
-        if stride > 1:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride),
-                self.norm3,
-            )
-
-    def forward(self, x):
-        y = x
-        y = self.relu(self.norm1(self.conv1(y)))
-        y = self.relu(self.norm2(self.conv2(y)))
-
-        if self.downsample is not None:
-            x = self.downsample(x)
-
-        return self.relu(x + y)
+from ..common.blocks.raft import ResidualBlock
 
 
 class BasicEncoder(nn.Module):
