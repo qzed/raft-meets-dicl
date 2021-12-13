@@ -48,7 +48,7 @@ class ResidualBlock(nn.Module):
 class BasicEncoder(nn.Module):
     """Feature / context encoder network"""
 
-    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0):
+    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0, init_mode='fan_out'):
         super().__init__()
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
@@ -81,7 +81,7 @@ class BasicEncoder(nn.Module):
         # initialize weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode=init_mode, nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
                 if m.weight is not None:
                     nn.init.constant_(m.weight, 1)
