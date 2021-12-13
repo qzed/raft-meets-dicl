@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
+from ..common.blocks.dicl import MatchingNet, DisplacementAwareProjection
 from ..common.blocks.raft import ResidualBlock
 
-from . import dicl
 from . import raft
 
 
@@ -163,14 +163,14 @@ class CorrelationModule(nn.Module):
         self.dap_type = dap_type
 
         self.mnet = nn.ModuleList([
-            dicl.MatchingNet(2 * feature_dim, norm_type=norm_type)
+            MatchingNet(2 * feature_dim, norm_type=norm_type)
             for _ in range(levels)
         ])
 
         # DAP separated by layers
         if self.dap_type == 'separate':
             self.dap = nn.ModuleList([
-                dicl.DisplacementAwareProjection((radius, radius), init=dap_init)
+                DisplacementAwareProjection((radius, radius), init=dap_init)
                 for _ in range(levels)
             ])
 

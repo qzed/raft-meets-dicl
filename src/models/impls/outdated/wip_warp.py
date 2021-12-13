@@ -10,9 +10,8 @@ import torch.nn.functional as F
 from ... import common
 from ... import Loss, Model, ModelAdapter, Result
 
-from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed, MatchingNet, DisplacementAwareProjection
 
-from .. import dicl
 from .. import raft
 
 
@@ -113,7 +112,7 @@ class CorrelationVolume(nn.Module):
 
         self.disp_range = disp_range
         self.feat_channels = feat_channels
-        self.mnet = dicl.MatchingNet(2 * feat_channels)
+        self.mnet = MatchingNet(2 * feat_channels)
 
     def forward(self, fmap1, fmap2):
         batch, c, h, w = fmap1.shape
@@ -260,11 +259,11 @@ class RecurrentLevelUnit(nn.Module):
             CorrelationVolume(disp_range, feat_channels),
         ])
         self.dap = nn.ModuleList([
-            dicl.DisplacementAwareProjection(disp_range),
-            dicl.DisplacementAwareProjection(disp_range),
-            dicl.DisplacementAwareProjection(disp_range),
-            dicl.DisplacementAwareProjection(disp_range),
-            dicl.DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
+            DisplacementAwareProjection(disp_range),
         ])
         self.menet = MotionEncoder(disp_range, feat_channels, mf_channels - 2)
         self.gru = raft.SepConvGru(hidden_dim, input_dim=mf_channels)
@@ -314,7 +313,7 @@ class WipModule(nn.Module):
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
-                if isinstance(m, dicl.DisplacementAwareProjection):
+                if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2):

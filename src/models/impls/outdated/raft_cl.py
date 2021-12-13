@@ -5,9 +5,8 @@ import torch.nn.functional as F
 from ... import Loss, Model, ModelAdapter, Result
 from ... import common
 
-from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed, MatchingNet, DisplacementAwareProjection
 
-from .. import dicl
 from .. import raft
 
 
@@ -184,16 +183,16 @@ class CorrelationModule(nn.Module):
         self.toplevel = toplevel
 
         self.mnet = nn.ModuleList([
-            dicl.MatchingNet(2 * feature_dim),
-            dicl.MatchingNet(2 * feature_dim),
-            dicl.MatchingNet(2 * feature_dim),
-            dicl.MatchingNet(2 * feature_dim),
+            MatchingNet(2 * feature_dim),
+            MatchingNet(2 * feature_dim),
+            MatchingNet(2 * feature_dim),
+            MatchingNet(2 * feature_dim),
         ])
         self.dap = nn.ModuleList([
-            dicl.DisplacementAwareProjection((radius, radius)),
-            dicl.DisplacementAwareProjection((radius, radius)),
-            dicl.DisplacementAwareProjection((radius, radius)),
-            dicl.DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
+            DisplacementAwareProjection((radius, radius)),
         ])
 
     def forward(self, fmap1, fmap2, coords, dap=True):
@@ -284,7 +283,7 @@ class RaftModule(nn.Module):
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
-                if isinstance(m, dicl.DisplacementAwareProjection):
+                if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def freeze_batchnorm(self):

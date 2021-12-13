@@ -4,6 +4,8 @@
 #
 # Link: https://github.com/jytime/DICL-Flow
 
+import numpy as np
+
 import torch
 import torch.nn as nn
 
@@ -84,5 +86,60 @@ class GaConv2xBlockTransposed(nn.Module):
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu2(x)
+
+        return x
+
+
+class MatchingNet(nn.Sequential):
+    """Matching network to compute cost from stacked features"""
+
+    def __init__(self, input_channels, norm_type='batch'):
+        super().__init__(
+            ConvBlock(input_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
+            nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
+        )
+
+    def forward(self, mvol):
+        b, du, dv, c2, h, w = mvol.shape
+
+        mvol = mvol.view(b * du * dv, c2, h, w)             # reshape for convolutional networks
+        cost = super().forward(mvol)                        # compute cost -> (b, du, dv, 1, h, w)
+        cost = cost.view(b, du, dv, h, w)                   # reshape back to reduced volume
+
+        return cost
+
+
+class DisplacementAwareProjection(nn.Module):
+    """Displacement aware projection layer"""
+
+    def __init__(self, disp_range, init='identity'):
+        super().__init__()
+
+        if init not in ['identity', 'standard']:
+            raise ValueError(f"unknown init value '{init}'")
+
+        disp_range = np.asarray(disp_range)
+        assert disp_range.shape == (2,)     # displacement range for u and v
+
+        # compute number of channels aka. displacement possibilities
+        n_channels = np.prod(2 * disp_range + 1)
+
+        # output channels are weighted sums over input channels (i.e. displacement possibilities)
+        self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
+
+        # initialize DAP layers via identity matrices if specified
+        if init == 'identity':
+            nn.init.eye_(self.conv1.weight[:, :, 0, 0])
+
+    def forward(self, x):
+        batch, du, dv, h, w = x.shape
+
+        x = x.view(batch, du * dv, h, w)    # combine displacement ranges to channels
+        x = self.conv1(x)                   # apply 1x1 convolution to combine channels
+        x = x.view(batch, du, dv, h, w)     # separate displacement ranges again
 
         return x

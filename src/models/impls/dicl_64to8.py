@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from .. import Model, ModelAdapter
-from ..common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+from ..common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed, DisplacementAwareProjection
 
 from . import dicl
 
@@ -125,7 +125,7 @@ class DiclModule(nn.Module):
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
-                if isinstance(m, dicl.DisplacementAwareProjection):
+                if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):

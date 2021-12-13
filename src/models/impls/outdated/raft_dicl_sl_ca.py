@@ -5,7 +5,8 @@ import torch.nn.functional as F
 from ... import Model, ModelAdapter
 from ... import common
 
-from .. import dicl
+from ...common.blocks.dicl import MatchingNet, DisplacementAwareProjection
+
 from .. import raft
 
 
@@ -38,9 +39,9 @@ class CorrelationModule(nn.Module):
         super().__init__()
 
         self.radius = radius
-        self.mnet = dicl.MatchingNet(2*feature_dim + 2, norm_type=norm_type)
+        self.mnet = MatchingNet(2*feature_dim + 2, norm_type=norm_type)
         self.emb = PairEmbedding(2*feature_dim + 2, embedding_dim)
-        self.dap = dicl.DisplacementAwareProjection((radius, radius), init=dap_init)
+        self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
 
         # build lookup kernel
         dx = torch.linspace(-radius, radius, 2 * radius + 1)

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from ... import Model, ModelAdapter, Result
 from ... import common
 
-from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
+from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed, MatchingNet, DisplacementAwareProjection
 
 from .. import dicl
 
@@ -106,8 +106,8 @@ class RecurrentFlowUnit(nn.Module):
 
         self.disp = range
 
-        self.mnet = dicl.MatchingNet(2 * feature_channels)
-        self.dap = dicl.DisplacementAwareProjection(range)
+        self.mnet = MatchingNet(2 * feature_channels)
+        self.dap = DisplacementAwareProjection(range)
         self.flow = dicl.FlowRegression()
 
     def forward(self, feat1, feat2, coords, dap=True):
@@ -197,7 +197,7 @@ class WipModule(nn.Module):
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
-                if isinstance(m, dicl.DisplacementAwareProjection):
+                if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2, iterations=[1]*5, dap=True):
