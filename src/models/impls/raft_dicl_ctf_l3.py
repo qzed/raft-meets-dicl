@@ -21,7 +21,7 @@ from .raft_dicl_sl import CorrelationModule
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft', context_type='raft', share_dicl=False):
+                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -44,6 +44,7 @@ class RaftPlusDiclModule(nn.Module):
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
+        self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -99,6 +100,8 @@ class RaftPlusDiclModule(nn.Module):
         coords0 = common.grid.coordinate_grid(b, h // 16, w // 16, device=img1.device)
         coords1 = coords0 + flow
 
+        h_4 = self.upnet_h(h_5, h_4)
+
         # middle iterations
         out_4 = []
         for _ in range(iterations[1]):
@@ -121,6 +124,8 @@ class RaftPlusDiclModule(nn.Module):
 
         coords0 = common.grid.coordinate_grid(b, h // 8, w // 8, device=img1.device)
         coords1 = coords0 + flow
+
+        h_3 = self.upnet_h(h_4, h_3)
 
         # fine iterations with flow upsampling
         out_3 = []
@@ -167,17 +172,20 @@ class RaftPlusDicl(Model):
         encoder_type = param_cfg.get('encoder-type', 'raft')
         context_type = param_cfg.get('context-type', 'raft')
         share_dicl = param_cfg.get('share-dicl', False)
+        upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
 
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, encoder_type=encoder_type,
-                   context_type=context_type, share_dicl=share_dicl, arguments=args)
+                   context_type=context_type, share_dicl=share_dicl, upsample_hidden=upsample_hidden,
+                   arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft', context_type='raft', share_dicl=False, arguments={}):
+                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none',
+                 arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -189,12 +197,13 @@ class RaftPlusDicl(Model):
         self.encoder_type = encoder_type
         self.context_type = context_type
         self.share_dicl = share_dicl
+        self.upsample_hidden = upsample_hidden
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
                                             mnet_norm=mnet_norm, encoder_type=encoder_type, context_type=context_type,
-                                            share_dicl=share_dicl),
+                                            share_dicl=share_dicl, upsample_hidden=upsample_hidden),
                          arguments)
 
         self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
@@ -216,6 +225,7 @@ class RaftPlusDicl(Model):
                 'context-type': self.context_type,
                 'mnet-norm': self.mnet_norm,
                 'share-dicl': self.share_dicl,
+                'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
         }

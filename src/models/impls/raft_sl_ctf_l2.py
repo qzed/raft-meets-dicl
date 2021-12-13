@@ -13,7 +13,7 @@ class RaftModule(nn.Module):
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft'):
+                 encoder_type='raft', context_type='raft', upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -27,6 +27,7 @@ class RaftModule(nn.Module):
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
+        self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -86,6 +87,8 @@ class RaftModule(nn.Module):
         coords0 = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img1.device)
         coords1 = coords0 + flow
 
+        h_3 = self.upnet_h(h_4, h_3)
+
         # build correlation volume
         corr_vol = raft.CorrBlock(f3_1, f3_2, num_levels=1, radius=self.corr_radius)
 
@@ -132,17 +135,19 @@ class Raft(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
         encoder_type = param_cfg.get('encoder-type', 'raft')
         context_type = param_cfg.get('context-type', 'raft')
+        upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
 
         return cls(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm,
-                   encoder_type=encoder_type, context_type=context_type, arguments=args)
+                   encoder_type=encoder_type, context_type=context_type,
+                   upsample_hidden=upsample_hidden, arguments=args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft', arguments={}):
+                 encoder_type='raft', context_type='raft', upsample_hidden='none', arguments={}):
         self.dropout = dropout
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -152,11 +157,13 @@ class Raft(Model):
         self.context_norm = context_norm
         self.encoder_type = encoder_type
         self.context_type = context_type
+        self.upsample_hidden = upsample_hidden
 
         super().__init__(RaftModule(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm,
-                                    encoder_type=encoder_type, context_type=context_type), arguments)
+                                    encoder_type=encoder_type, context_type=context_type,
+                                    upsample_hidden=upsample_hidden), arguments)
 
         self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
 
@@ -175,6 +182,7 @@ class Raft(Model):
                 'context-norm': self.context_norm,
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
+                'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
         }
