@@ -20,6 +20,9 @@ class CorrelationModule(nn.Module):
 
         self.register_buffer('delta', delta, persistent=False)
 
+        # set output dimension
+        self.output_dim = (2 * self.radius + 1)**2
+
     def forward(self, f1, f2, coords, dap=True):
         batch, c, h, w = f1.shape
         r = self.radius

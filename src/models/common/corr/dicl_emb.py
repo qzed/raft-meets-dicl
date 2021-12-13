@@ -30,7 +30,7 @@ class PairEmbedding(nn.Sequential):
 
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, embedding_dim, dap_init='identity', norm_type='batch'):
+    def __init__(self, feature_dim, radius, embedding_dim=32, dap_init='identity', norm_type='batch'):
         super().__init__()
 
         self.radius = radius
@@ -44,6 +44,9 @@ class CorrelationModule(nn.Module):
         delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
 
         self.register_buffer('delta', delta, persistent=False)
+
+        # set output dimension
+        self.output_dim = (2 * self.radius + 1)**2 + embedding_dim
 
     def forward(self, f1, f2, coords, dap=True):
         batch, c, h, w = f1.shape

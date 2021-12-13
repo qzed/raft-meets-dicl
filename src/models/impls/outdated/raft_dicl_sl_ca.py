@@ -1,98 +1,8 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
 from ... import Model, ModelAdapter
-from ... import common
-
-from ...common.corr.dicl_emb import CorrelationModule
 
 from .. import raft
 
-
-class RaftPlusDiclModule(nn.Module):
-    """RAFT+DICL single-level flow estimation network"""
-
-    def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
-                 corr_channels=32, context_channels=128, recurrent_channels=128,
-                 embedding_channels=32, dap_init='identity', encoder_norm='instance',
-                 context_norm='batch', mnet_norm='batch'):
-        super().__init__()
-
-        self.mixed_precision = mixed_precision
-
-        self.hidden_dim = hdim = recurrent_channels
-        self.context_dim = cdim = context_channels
-
-        self.corr_radius = corr_radius
-        corr_planes = (2 * self.corr_radius + 1)**2 + embedding_channels
-
-        self.fnet = raft.BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = raft.BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = raft.Up8Network(hdim)
-        self.cvol = CorrelationModule(corr_channels, self.corr_radius, embedding_channels,
-                                      dap_init=dap_init, norm_type=mnet_norm)
-
-    def freeze_batchnorm(self):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
-
-    def initialize_flow(self, img):
-        # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
-        batch, _c, h, w = img.shape
-
-        coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
-        return coords, coords.clone()
-
-    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, flow_init=None):
-        hdim, cdim = self.hidden_dim, self.context_dim
-
-        # run feature network
-        with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-            fmap1, fmap2 = self.fnet((img1, img2))
-
-        fmap1, fmap2 = fmap1.float(), fmap2.float()
-
-        # run context network
-        with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-            h, x = torch.split(self.cnet(img1), (hdim, cdim), dim=1)
-            h, x = torch.tanh(h), torch.relu(x)
-
-        # initialize flow
-        coords0, coords1 = self.initialize_flow(img1)
-        if flow_init is not None:
-            coords1 += flow_init
-
-        flow = coords1 - coords0
-
-        # iteratively predict flow
-        out = []
-        for _ in range(iterations):
-            coords1 = coords1.detach()
-
-            # index correlation volume
-            corr = self.cvol(fmap1, fmap2, coords1, dap)
-
-            # estimate delta for flow update
-            flow = coords1 - coords0
-            with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-                h, d = self.update_block(h, x, corr, flow)
-
-            # update flow estimate
-            coords1 = coords1 + d
-            flow = coords1 - coords0
-
-            # upsample flow estimate
-            if upnet:
-                flow_up = self.upnet(h, flow)
-            else:
-                flow_up = 8 * F.interpolate(flow, img1.shape[2:], mode='bilinear', align_corners=True)
-
-            out.append(flow_up)
-
-        return out
+from ..raft_dicl_sl import RaftPlusDiclModule
 
 
 class RaftPlusDicl(Model):
@@ -139,12 +49,13 @@ class RaftPlusDicl(Model):
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
 
+        corr_args = {'embedding_dim': embedding_channels}
+
         super().__init__(RaftPlusDiclModule(dropout=dropout, mixed_precision=mixed_precision,
                                             corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
-                                            embedding_channels=embedding_channels, dap_init=dap_init,
-                                            encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm), arguments)
+                                            dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
+                                            mnet_norm=mnet_norm, corr_type='dicl-emb', corr_args=corr_args), arguments)
 
         self.adapter = raft.RaftAdapter()
 

@@ -13,38 +13,40 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
-from ..common.corr.dicl import CorrelationModule
-
 from . import raft
 
 
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none'):
+                 encoder_type='raft', context_type='raft', corr_type='dicl', corr_args={},
+                 share_dicl=False, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
         self.context_dim = cdim = context_channels
 
         self.corr_radius = corr_radius
-        corr_planes = (2 * self.corr_radius + 1)**2
 
         self.fnet = common.encoders.make_encoder_p36(encoder_type, corr_channels, norm_type=encoder_norm, dropout=0)
         self.cnet = common.encoders.make_encoder_p36(context_type, hdim + cdim, norm_type=context_norm, dropout=0)
 
-        self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+        self.corr_3 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                            norm_type=mnet_norm, **corr_args)
 
         if share_dicl:
             self.corr_4 = self.corr_3
             self.corr_5 = self.corr_3
             self.corr_6 = self.corr_3
         else:
-            self.corr_4 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-            self.corr_5 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
-            self.corr_6 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
+            self.corr_4 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                                norm_type=mnet_norm, **corr_args)
+            self.corr_5 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                                norm_type=mnet_norm, **corr_args)
+            self.corr_6 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                                norm_type=mnet_norm, **corr_args)
 
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.update_block = raft.BasicUpdateBlock(self.corr_3.output_dim, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
@@ -202,6 +204,8 @@ class RaftPlusDicl(Model):
         context_type = param_cfg.get('context-type', 'raft')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         share_dicl = param_cfg.get('share-dicl', False)
+        corr_type = param_cfg.get('corr-type', 'dicl')
+        corr_args = param_cfg.get('corr-args', {})
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
@@ -209,13 +213,13 @@ class RaftPlusDicl(Model):
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, encoder_type=encoder_type,
-                   context_type=context_type, share_dicl=share_dicl, upsample_hidden=upsample_hidden,
-                   arguments=args)
+                   context_type=context_type, share_dicl=share_dicl, corr_type=corr_type, corr_args=corr_args,
+                   upsample_hidden=upsample_hidden, arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft', context_type='raft', share_dicl=False, upsample_hidden='none',
-                 arguments={}):
+                 encoder_type='raft', context_type='raft', share_dicl=False, corr_type='dicl', corr_args={},
+                 upsample_hidden='none', arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -227,13 +231,16 @@ class RaftPlusDicl(Model):
         self.context_type = context_type
         self.mnet_norm = mnet_norm
         self.share_dicl = share_dicl
+        self.corr_type = corr_type
+        self.corr_args = corr_args
         self.upsample_hidden = upsample_hidden
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
                                             mnet_norm=mnet_norm, encoder_type=encoder_type, context_type=context_type,
-                                            share_dicl=share_dicl, upsample_hidden=upsample_hidden),
+                                            corr_type=corr_type, corr_args=corr_args, share_dicl=share_dicl,
+                                            upsample_hidden=upsample_hidden),
                          arguments)
 
         self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
@@ -255,6 +262,8 @@ class RaftPlusDicl(Model):
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
                 'share-dicl': self.share_dicl,
+                'corr-type': self.corr_type,
+                'corr-args': self.corr_args,
                 'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
