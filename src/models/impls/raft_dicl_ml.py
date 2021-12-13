@@ -483,7 +483,7 @@ class RaftPlusDicl(Model):
             recurrent_channels=recurrent_channels, dap_init=dap_init, dap_type=dap_type,
             encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm), arguments)
 
-        self.adapter = RaftAdapter()
+        self.adapter = raft.RaftAdapter()
 
     def get_config(self):
         default_args = {'iterations': 12, 'dap': True, 'mask_costs': []}
@@ -520,30 +520,3 @@ class RaftPlusDicl(Model):
 
         if mode:
             self.module.freeze_batchnorm()
-
-
-class RaftAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
-
-    def wrap_result(self, result, original_shape) -> Result:
-        return RaftResult(result)
-
-
-class RaftResult(Result):
-    def __init__(self, output):
-        super().__init__()
-
-        self.result = output
-
-    def output(self, batch_index=None):
-        if batch_index is None:
-            return self.result
-
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
-
-    def final(self):
-        return self.result[-1]
-
-    def intermediate_flow(self):
-        return self.result

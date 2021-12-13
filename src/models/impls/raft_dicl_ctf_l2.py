@@ -846,7 +846,7 @@ class RaftPlusDicl(Model):
                                             share_dicl=share_dicl, upsample_hidden=upsample_hidden),
                          arguments)
 
-        self.adapter = RaftPlusDiclAdapter()
+        self.adapter = MultiscaleSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (4, 3), 'dap': True, 'upnet': True}
@@ -883,15 +883,15 @@ class RaftPlusDicl(Model):
             self.module.freeze_batchnorm()
 
 
-class RaftPlusDiclAdapter(ModelAdapter):
+class MultiscaleSequenceAdapter(ModelAdapter):
     def __init__(self):
         super().__init__()
 
     def wrap_result(self, result, original_shape) -> Result:
-        return RaftPlusDiclResult(result, original_shape)
+        return MultiscaleSequenceResult(result, original_shape)
 
 
-class RaftPlusDiclResult(Result):
+class MultiscaleSequenceResult(Result):
     def __init__(self, output, shape):
         super().__init__()
 
