@@ -13,9 +13,9 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
-from . import raft
+from ..common.corr.dicl import CorrelationModule
 
-from .raft_dicl_sl import CorrelationModule
+from . import raft
 
 
 class RaftPlusDiclModule(nn.Module):

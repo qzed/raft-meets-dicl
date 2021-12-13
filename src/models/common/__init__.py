@@ -1,5 +1,6 @@
 from . import adapters
 from . import blocks
+from . import corr
 from . import encoders
 from . import grid
 from . import hsup
