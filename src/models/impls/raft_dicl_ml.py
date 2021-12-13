@@ -1,10 +1,3 @@
-# Modified implementation of "RAFT: Recurrent All Pairs Field Transforms for
-# Optical Flow" by Teed and Deng, based on the original implementation for this
-# paper. Naive RAFT+DICL multi-level approach.
-#
-# Link: https://github.com/princeton-vl/RAFT
-# License: BSD 3-Clause License
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
