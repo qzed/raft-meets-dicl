@@ -67,12 +67,12 @@ def load_model(cfg) -> model.Model:
         m.raft_sl_ctf_l3.Raft,
         m.raft_sl_ctf_l4.Raft,
         m.raft_dicl_sl.RaftPlusDicl,
-        m.raft_dicl_sl_ca.RaftPlusDicl,
         m.raft_dicl_ml.RaftPlusDicl,
         m.raft_dicl_ctf_l2.RaftPlusDicl,
         m.raft_dicl_ctf_l3.RaftPlusDicl,
         m.raft_dicl_ctf_l4.RaftPlusDicl,
         m.outdated.raft_cl.Raft,
+        m.outdated.raft_dicl_sl_ca.RaftPlusDicl,
         m.outdated.wip_recwarp.Wip,
         m.outdated.wip_warp.Wip,
     ]
