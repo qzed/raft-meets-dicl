@@ -281,22 +281,13 @@ class FlowHead(nn.Module):
 class BasicUpdateBlock(nn.Module):
     """Network to compute single flow update delta"""
 
-    def __init__(self, corr_planes, input_dim=128, hidden_dim=128, upnet=True):
+    def __init__(self, corr_planes, input_dim=128, hidden_dim=128):
         super().__init__()
 
         # network for flow update delta
         self.enc = BasicMotionEncoder(corr_planes)
         self.gru = SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
         self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256)
-
-        # mask for upsampling
-        self.mask = None
-        if upnet:
-            self.mask = nn.Sequential(
-                nn.Conv2d(128, 256, 3, padding=1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
-            )
 
     def forward(self, h, x, corr, flow):
         # compute GRU input from flow
@@ -307,19 +298,43 @@ class BasicUpdateBlock(nn.Module):
         h = self.gru(h, x)                  # update hidden state (N, hidden, h/8, w/8)
         d = self.flow(h)                    # compute flow delta from hidden state (N, 2, h/8, w/8)
 
-        # compute mask for upscaling
-        if self.mask is not None:
-            mask = 0.25 * self.mask(h)      # scale to balance gradients, dim (N, 8*8*9, h/8, w/8)
-        else:
-            mask = None
+        return h, d
 
-        return h, mask, d
+
+class Up8Network(nn.Module):
+    """RAFT 8x flow upsampling module for finest level"""
+
+    def __init__(self, hidden_dim=128):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(hidden_dim, 256, 3, padding=1)
+        self.relu1 = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
+
+    def forward(self, hidden, flow):
+        batch, c, h, w = flow.shape
+
+        # prepare mask
+        mask = self.conv2(self.relu1(self.conv1(hidden)))
+        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
+        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
+
+        # prepare flow
+        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
+        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
+
+        # perform upsampling
+        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
+        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
+        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
+
+        return up_flow
 
 
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch'):
         super().__init__()
@@ -335,7 +350,9 @@ class RaftModule(nn.Module):
 
         self.fnet = BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
-        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
+
+        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.upnet = Up8Network(hidden_dim=hdim)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -349,25 +366,7 @@ class RaftModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def upsample_flow(self, flow, mask):
-        batch, c, h, w = flow.shape
-
-        # prepare mask
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
-
-        # prepare flow
-        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
-        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
-
-        # perform upsampling
-        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
-        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
-
-        return up_flow
-
-    def forward(self, img1, img2, iterations=12, flow_init=None, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -389,6 +388,8 @@ class RaftModule(nn.Module):
         if flow_init is not None:
             coords1 += flow_init
 
+        flow = coords1 - coords0
+
         # iteratively predict flow
         out = []
         for _ in range(iterations):
@@ -398,18 +399,18 @@ class RaftModule(nn.Module):
             corr = corr_vol(coords1, mask_costs)
 
             # estimate delta for flow update
-            flow = coords1 - coords0
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-                h, mask, d = self.update_block(h, x, corr, flow)
+                h, d = self.update_block(h, x, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
+            flow = coords1 - coords0
 
             # upsample flow estimate
-            if mask is not None:
-                flow_up = self.upsample_flow(coords1 - coords0, mask.float())
+            if upnet:
+                flow_up = self.upnet(h, flow)
             else:
-                flow_up = F.interpolate(coords1 - coords0, img1.shape[2:], mode='bilinear', align_corners=True)
+                flow_up = 8 * F.interpolate(flow, img1.shape[2:], mode='bilinear', align_corners=True)
 
             out.append(flow_up)
 
@@ -426,7 +427,6 @@ class Raft(Model):
         param_cfg = cfg['parameters']
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
-        upnet = bool(param_cfg.get('upnet', True))
         corr_levels = param_cfg.get('corr-levels', 4)
         corr_radius = param_cfg.get('corr-radius', 4)
         corr_channels = param_cfg.get('corr-channels', 256)
@@ -437,17 +437,16 @@ class Raft(Model):
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+        return cls(dropout=dropout, mixed_precision=mixed_precision,
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm, arguments=args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
-        self.upnet = upnet
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -456,7 +455,7 @@ class Raft(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
 
-        super().__init__(RaftModule(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+        super().__init__(RaftModule(dropout=dropout, mixed_precision=mixed_precision,
                                     corr_levels=corr_levels, corr_radius=corr_radius,
                                     corr_channels=corr_channels, context_channels=context_channels,
                                     recurrent_channels=recurrent_channels, encoder_norm=encoder_norm,
@@ -465,7 +464,7 @@ class Raft(Model):
         self.adapter = RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': 12, 'mask_costs': []}
+        default_args = {'iterations': 12, 'upnet': True, 'mask_costs': []}
 
         return {
             'type': self.type,
@@ -477,7 +476,6 @@ class Raft(Model):
                 'corr-channels': self.corr_channels,
                 'context-channels': self.context_channels,
                 'recurrent-channels': self.recurrent_channels,
-                'upnet': self.upnet,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
             },
@@ -487,8 +485,8 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, mask_costs=[]):
-        return self.module(img1, img2, iterations, flow_init, mask_costs)
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, mask_costs=[]):
+        return self.module(img1, img2, iterations, flow_init, upnet, mask_costs)
 
     def train(self, mode: bool = True):
         super().train(mode)

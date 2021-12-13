@@ -325,7 +325,7 @@ class CorrelationModule(nn.Module):
 class RaftPlusDiclModule(nn.Module):
     """RAFT+DICL multi-level flow estimation network"""
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch'):
         super().__init__()
@@ -344,7 +344,10 @@ class RaftPlusDiclModule(nn.Module):
         self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_channels, levels=corr_levels, norm_type=encoder_norm)
 
         self.cnet = BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
+
+        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.upnet = raft.Up8Network(hidden_dim=hdim)
+
         self.cvol = CorrelationModule(feature_dim=corr_channels, levels=self.corr_levels,
                                       radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type,
                                       norm_type=mnet_norm)
@@ -361,25 +364,7 @@ class RaftPlusDiclModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def upsample_flow(self, flow, mask):
-        batch, c, h, w = flow.shape
-
-        # prepare mask
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
-
-        # prepare flow
-        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
-        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
-
-        # perform upsampling
-        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
-        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
-
-        return up_flow
-
-    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, flow_init=None, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -402,6 +387,8 @@ class RaftPlusDiclModule(nn.Module):
         if flow_init is not None:
             coords1 += flow_init
 
+        flow = coords1 - coords0
+
         # iteratively predict flow
         out = []
         for _ in range(iterations):
@@ -413,16 +400,17 @@ class RaftPlusDiclModule(nn.Module):
             # estimate delta for flow update
             flow = coords1 - coords0
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-                h, mask, d = self.update_block(h, x, corr, flow)
+                h, d = self.update_block(h, x, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
+            flow = coords1 - coords0
 
             # upsample flow estimate
-            if mask is not None:
-                flow_up = self.upsample_flow(coords1 - coords0, mask.float())
+            if upnet:
+                flow_up = self.upnet(h, flow)
             else:
-                flow_up = F.interpolate(coords1 - coords0, img1.shape[2:], mode='bilinear', align_corners=True)
+                flow_up = 8 * F.interpolate(flow, img1.shape[2:], mode='bilinear', align_corners=True)
 
             out.append(flow_up)
 
@@ -439,7 +427,6 @@ class RaftPlusDicl(Model):
         param_cfg = cfg['parameters']
         dropout = float(param_cfg.get('dropout', 0.0))
         mixed_precision = bool(param_cfg.get('mixed-precision', False))
-        upnet = bool(param_cfg.get('upnet', True))
         corr_levels = param_cfg.get('corr-levels', 4)
         corr_radius = param_cfg.get('corr-radius', 4)
         corr_channels = param_cfg.get('corr-channels', 32)
@@ -453,19 +440,18 @@ class RaftPlusDicl(Model):
 
         args = cfg.get('arguments', {})
 
-        return cls(dropout=dropout, mixed_precision=mixed_precision, upnet=upnet,
+        return cls(dropout=dropout, mixed_precision=mixed_precision,
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    dap_init=dap_init, dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
                    mnet_norm=mnet_norm, arguments=args)
 
-    def __init__(self, dropout=0.0, mixed_precision=False, upnet=True, corr_levels=4, corr_radius=4,
+    def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
                  arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
-        self.upnet = upnet
         self.corr_levels = corr_levels
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -478,7 +464,7 @@ class RaftPlusDicl(Model):
         self.mnet_norm = mnet_norm
 
         super().__init__(RaftPlusDiclModule(
-            dropout=dropout, mixed_precision=mixed_precision, upnet=upnet, corr_levels=corr_levels,
+            dropout=dropout, mixed_precision=mixed_precision, corr_levels=corr_levels,
             corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
             recurrent_channels=recurrent_channels, dap_init=dap_init, dap_type=dap_type,
             encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm), arguments)
@@ -486,7 +472,7 @@ class RaftPlusDicl(Model):
         self.adapter = raft.RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': 12, 'dap': True, 'mask_costs': []}
+        default_args = {'iterations': 12, 'dap': True, 'upnet': True, 'mask_costs': []}
 
         return {
             'type': self.type,
@@ -498,7 +484,6 @@ class RaftPlusDicl(Model):
                 'corr-channels': self.corr_channels,
                 'context-channels': self.context_channels,
                 'recurrent-channels': self.recurrent_channels,
-                'upnet': self.upnet,
                 'dap-init': self.dap_init,
                 'dap-type': self.dap_type,
                 'encoder-norm': self.encoder_norm,
@@ -511,8 +496,8 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=12, dap=True, flow_init=None, mask_costs=[]):
-        return self.module(img1, img2, iterations=iterations, dap=dap, flow_init=flow_init,
+    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, flow_init=None, mask_costs=[]):
+        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet, flow_init=flow_init,
                            mask_costs=mask_costs)
 
     def train(self, mode: bool = True):

@@ -254,7 +254,7 @@ class CorrelationModule(nn.Module):
 class RaftModule(nn.Module):
     """RAFT flow estimation network with cost learning"""
 
-    def __init__(self, upnet=True, dap_init='identity', corr_radius=3):
+    def __init__(self, dap_init='identity', corr_radius=3):
         super().__init__()
 
         self.feature_dim = 32
@@ -269,7 +269,8 @@ class RaftModule(nn.Module):
         self.fnet_d = FeatureNetDown(self.feature_dim)
 
         self.cnet = raft.BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0.0)
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, upnet=upnet)
+        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.cvol = CorrelationModule(self.feature_dim, corr_radius)
 
         # initialize weights
@@ -301,25 +302,7 @@ class RaftModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def upsample_flow(self, flow, mask):
-        batch, c, h, w = flow.shape
-
-        # prepare mask
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
-
-        # prepare flow
-        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
-        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
-
-        # perform upsampling
-        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
-        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
-
-        return up_flow
-
-    def forward(self, img1, img2, iterations=12, flow_init=None):
+    def forward(self, img1, img2, iterations=12, upnet=True, flow_init=None):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -335,6 +318,8 @@ class RaftModule(nn.Module):
         if flow_init is not None:
             coords1 += flow_init
 
+        flow = coords1 - coords0
+
         # iteratively predict flow
         out = []
         for _ in range(iterations):
@@ -344,17 +329,17 @@ class RaftModule(nn.Module):
             corr = self.cvol(fmap1, fmap2, coords1)
 
             # estimate delta for flow update
-            flow = coords1 - coords0
-            h, mask, d = self.update_block(h, x, corr, flow)
+            h, d = self.update_block(h, x, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
+            flow = coords1 - coords0
 
             # upsample flow estimate
-            if mask is not None:
-                flow_up = self.upsample_flow(coords1 - coords0, mask.float())
+            if upnet:
+                flow_up = self.upnet(h, flow)
             else:
-                flow_up = F.interpolate(coords1 - coords0, img1.shape[2:], mode='bilinear', align_corners=True)
+                flow_up = 8 * F.interpolate(flow, img1.shape[2:], mode='bilinear', align_corners=True)
 
             out.append(flow_up)
 
@@ -369,32 +354,29 @@ class Raft(Model):
         cls._typecheck(cfg)
 
         param_cfg = cfg['parameters']
-        upnet = bool(param_cfg.get('upnet', True))
         dap_init = param_cfg.get('dap-init', 'identity')
         corr_radius = param_cfg.get('corr-radius', 3)
 
         args = cfg.get('arguments', {})
 
-        return cls(upnet, dap_init, corr_radius, args)
+        return cls(dap_init, corr_radius, args)
 
-    def __init__(self, upnet=True, dap_init='identity', corr_radius=3, arguments={}):
-        self.upnet = upnet
+    def __init__(self, dap_init='identity', corr_radius=3, arguments={}):
         self.dap_init = dap_init
         self.corr_radius = corr_radius
 
-        super().__init__(RaftModule(upnet, dap_init, corr_radius), arguments)
+        super().__init__(RaftModule(dap_init, corr_radius), arguments)
 
         self.adapter = RaftAdapter()
 
     def get_config(self):
-        default_args = {'iterations': 12}
+        default_args = {'iterations': 12, 'upnet': True}
 
         return {
             'type': self.type,
             'parameters': {
                 'corr-radius': self.corr_radius,
                 'dap-init': self.dap_init,
-                'upnet': self.upnet
             },
             'arguments': default_args | self.arguments,
         }
@@ -402,8 +384,8 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return self.adapter
 
-    def forward(self, img1, img2, iterations=12, flow_init=None):
-        return self.module(img1, img2, iterations, flow_init)
+    def forward(self, img1, img2, iterations=12, upnet=True, flow_init=None):
+        return self.module(img1, img2, iterations, upnet, flow_init)
 
 
 class RaftAdapter(ModelAdapter):

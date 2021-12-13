@@ -175,59 +175,6 @@ class CorrelationModule(nn.Module):
 
 # -- RAFT core / backend ---------------------------------------------------------------------------
 
-class BasicUpdateBlock(nn.Module):
-    """Network to compute single flow update delta"""
-
-    def __init__(self, corr_planes, input_dim=128, hidden_dim=128):
-        super().__init__()
-
-        # network for flow update delta
-        self.enc = raft.BasicMotionEncoder(corr_planes)
-        self.gru = raft.SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
-        self.flow = raft.FlowHead(input_dim=hidden_dim, hidden_dim=256)
-
-    def forward(self, h, x, corr, flow):
-        # compute GRU input from flow
-        m = self.enc(flow, corr)            # motion features
-        x = torch.cat((x, m), dim=1)        # input for GRU
-
-        # update hidden state and compute flow delta
-        h = self.gru(h, x)                  # update hidden state (N, hidden, h/8, w/8)
-        d = self.flow(h)                    # compute flow delta from hidden state (N, 2, h/8, w/8)
-
-        return h, d
-
-
-class Up8Network(nn.Module):
-    """RAFT 8x flow upsampling module for finest level"""
-
-    def __init__(self, hidden_dim=128):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(hidden_dim, 256, 3, padding=1)
-        self.relu1 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
-
-    def forward(self, hidden, flow):
-        batch, c, h, w = flow.shape
-
-        # prepare mask
-        mask = self.conv2(self.relu1(self.conv1(hidden)))
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
-
-        # prepare flow
-        up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
-        up_flow = up_flow.view(batch, c, 9, 1, 1, h, w)     # reshape for broadcasting
-
-        # perform upsampling
-        up_flow = torch.sum(mask * up_flow, dim=2)          # perform actual weighted upsampling
-        up_flow = up_flow.permute(0, 1, 4, 2, 5, 3)         # switch to (batch, c, h, 8, w, 8)
-        up_flow = up_flow.reshape(batch, 2, h*8, w*8)       # combine upsampled dimensions
-
-        return up_flow
-
-
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
@@ -254,9 +201,8 @@ class RaftPlusDiclModule(nn.Module):
             self.corr_5 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
             self.corr_6 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
-        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-
-        self.upnet = Up8Network(hidden_dim=hdim)
+        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        self.upnet = raft.Up8Network(hidden_dim=hdim)
 
     def freeze_batchnorm(self):
         for m in self.modules():
