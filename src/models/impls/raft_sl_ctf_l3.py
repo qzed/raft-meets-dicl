@@ -13,38 +13,7 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter, Result
 from .. import common
 
-
-class ResidualBlock(nn.Module):
-    """Residual block for feature / context encoder"""
-
-    def __init__(self, in_planes, out_planes, norm_type='group', stride=1):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
-
-        self.norm1 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        self.norm2 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-        if stride > 1:
-            self.norm3 = common.norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
-
-        self.downsample = None
-        if stride > 1:
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride),
-                self.norm3,
-            )
-
-    def forward(self, x):
-        y = x
-        y = self.relu(self.norm1(self.conv1(y)))
-        y = self.relu(self.norm2(self.conv2(y)))
-
-        if self.downsample is not None:
-            x = self.downsample(x)
-
-        return self.relu(x + y)
+from . import raft
 
 
 class EncoderOutputNet(nn.Module):
@@ -79,28 +48,28 @@ class BasicEncoder(nn.Module):
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            raft.ResidualBlock(64, 64, norm_type, stride=1),
+            raft.ResidualBlock(64, 64, norm_type, stride=1),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            raft.ResidualBlock(64, 96, norm_type, stride=2),
+            raft.ResidualBlock(96, 96, norm_type, stride=1),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            raft.ResidualBlock(96, 128, norm_type, stride=2),
+            raft.ResidualBlock(128, 128, norm_type, stride=1),
         )
 
         self.layer4 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            ResidualBlock(128, 160, norm_type, stride=2),
-            ResidualBlock(160, 160, norm_type, stride=1),
+            raft.ResidualBlock(128, 160, norm_type, stride=2),
+            raft.ResidualBlock(160, 160, norm_type, stride=1),
         )
 
         self.layer5 = nn.Sequential(    # (H/16, W/16, 160) -> (H/16, H/16, 192)
-            ResidualBlock(160, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            raft.ResidualBlock(160, 192, norm_type, stride=2),
+            raft.ResidualBlock(192, 192, norm_type, stride=1),
         )
 
         # output blocks
