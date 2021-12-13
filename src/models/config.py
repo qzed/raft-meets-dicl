@@ -1,3 +1,4 @@
+from . import common
 from . import model
 from . import impls as m
 from . import input
@@ -39,9 +40,9 @@ def load_input(cfg) -> input.InputSpec:
 
 def load_loss(cfg) -> model.Loss:
     types = [
+        common.loss.msseq.MultiscaleSequenceLoss,
         m.dicl.MultiscaleLoss,
         m.raft.SequenceLoss,
-        m.raft_dicl_ctf_l2.MultiscaleSequenceLoss,
         m.outdated.raft_cl.SequenceLoss,
         m.outdated.raft_cl.SequenceCorrHingeLoss,
         m.outdated.raft_cl.SequenceCorrMseLoss,

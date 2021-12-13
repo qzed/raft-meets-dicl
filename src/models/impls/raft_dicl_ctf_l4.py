@@ -18,7 +18,6 @@ from ..common.encoders.raft.p36 import FeatureEncoder
 from . import raft
 
 from .raft_dicl_sl import CorrelationModule
-from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
 
 
 class RaftPlusDiclModule(nn.Module):
@@ -222,7 +221,7 @@ class RaftPlusDicl(Model):
                                             mnet_norm=mnet_norm, share_dicl=share_dicl),
                          arguments)
 
-        self.adapter = MultiscaleSequenceAdapter()
+        self.adapter = common.adapters.msseq.MultiscaleSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (3, 4, 4, 3), 'dap': True, 'upnet': True}

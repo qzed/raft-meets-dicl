@@ -9,8 +9,6 @@ from ..common.encoders.raft.p36 import FeatureEncoder
 
 from . import raft
 
-from .raft_dicl_ctf_l2 import MultiscaleSequenceAdapter
-
 
 class RaftModule(nn.Module):
     """RAFT flow estimation network"""
@@ -216,7 +214,7 @@ class Raft(Model):
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm), arguments)
 
-        self.adapter = MultiscaleSequenceAdapter()
+        self.adapter = common.adapters.msseq.MultiscaleSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (4, 3, 3, 3), 'upnet': True}

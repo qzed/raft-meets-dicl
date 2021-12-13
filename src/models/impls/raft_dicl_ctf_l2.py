@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Loss, Model, ModelAdapter, Result
+from .. import Model, ModelAdapter
 from .. import common
 
 from . import raft
@@ -283,7 +283,7 @@ class RaftPlusDicl(Model):
                                             share_dicl=share_dicl, upsample_hidden=upsample_hidden),
                          arguments)
 
-        self.adapter = MultiscaleSequenceAdapter()
+        self.adapter = common.adapters.msseq.MultiscaleSequenceAdapter()
 
     def get_config(self):
         default_args = {'iterations': (4, 3), 'dap': True, 'upnet': True}
@@ -318,91 +318,3 @@ class RaftPlusDicl(Model):
 
         if mode:
             self.module.freeze_batchnorm()
-
-
-class MultiscaleSequenceAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
-
-    def wrap_result(self, result, original_shape) -> Result:
-        return MultiscaleSequenceResult(result, original_shape)
-
-
-class MultiscaleSequenceResult(Result):
-    def __init__(self, output, shape):
-        super().__init__()
-
-        self.result = output        # list of lists (level, iteration)
-        self.shape = shape
-
-    def output(self, batch_index=None):
-        if batch_index is None:
-            return self.result
-
-        return [[x[batch_index].view(1, *x.shape[1:]) for x in level] for level in self.result]
-
-    def final(self):
-        return self.result[-1][-1]
-
-    def intermediate_flow(self):
-        return self.result
-
-
-class MultiscaleSequenceLoss(Loss):
-    type = 'raft+dicl/mlseq'
-
-    @classmethod
-    def from_config(cls, cfg):
-        cls._typecheck(cfg)
-
-        return cls(cfg.get('arguments', {}))
-
-    def __init__(self, arguments={}):
-        super().__init__(arguments)
-
-    def get_config(self):
-        default_args = {
-            'ord': 1,
-            'gamma': 0.8,
-            'alpha': (1.0, 0.5),
-        }
-
-        return {
-            'type': self.type,
-            'arguments': default_args | self.arguments,
-        }
-
-    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=(0.4, 1.0)):
-        loss = 0.0
-
-        for i_level, level in enumerate(result):
-            n_predictions = len(level)
-
-            for i_seq, flow in enumerate(level):
-                # weight for level and sequence index
-                weight = alpha[i_level] * gamma**(n_predictions - i_seq - 1)
-
-                # upsample if needed
-                if flow.shape != target.shape:
-                    flow = self.upsample(flow, shape=target.shape)
-
-                # compute flow distance according to specified norm
-                dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
-
-                # Only calculate error for valid pixels.
-                dist = dist[valid]
-
-                # update loss
-                loss = loss + weight * dist.mean()
-
-        return loss
-
-    def upsample(self, flow, shape, mode='bilinear'):
-        _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = shape
-
-        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
-        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
-        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
-
-        return flow
