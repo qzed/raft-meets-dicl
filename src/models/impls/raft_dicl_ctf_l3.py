@@ -13,8 +13,6 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
-from ..common.encoders.raft.p35 import FeatureEncoder
-
 from . import raft
 
 from .raft_dicl_sl import CorrelationModule
@@ -23,7 +21,7 @@ from .raft_dicl_sl import CorrelationModule
 class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False):
+                 encoder_type='raft', context_type='raft', share_dicl=False):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -32,8 +30,8 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=0)
-        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=0)
+        self.fnet = common.encoders.make_encoder_p35(encoder_type, corr_channels, norm_type=encoder_norm, dropout=0)
+        self.cnet = common.encoders.make_encoder_p35(context_type, hdim + cdim, norm_type=context_norm, dropout=0)
 
         self.corr_3 = CorrelationModule(corr_channels, radius=self.corr_radius, dap_init=dap_init, norm_type=mnet_norm)
 
@@ -166,17 +164,20 @@ class RaftPlusDicl(Model):
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
+        encoder_type = param_cfg.get('encoder-type', 'raft')
+        context_type = param_cfg.get('context-type', 'raft')
         share_dicl = param_cfg.get('share-dicl', False)
 
         args = cfg.get('arguments', {})
 
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
-                   context_norm=context_norm, mnet_norm=mnet_norm, share_dicl=share_dicl, arguments=args)
+                   context_norm=context_norm, mnet_norm=mnet_norm, encoder_type=encoder_type,
+                   context_type=context_type, share_dicl=share_dicl, arguments=args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 share_dicl=False, arguments={}):
+                 encoder_type='raft', context_type='raft', share_dicl=False, arguments={}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -185,12 +186,15 @@ class RaftPlusDicl(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
+        self.encoder_type = encoder_type
+        self.context_type = context_type
         self.share_dicl = share_dicl
 
         super().__init__(RaftPlusDiclModule(corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm, share_dicl=share_dicl),
+                                            mnet_norm=mnet_norm, encoder_type=encoder_type, context_type=context_type,
+                                            share_dicl=share_dicl),
                          arguments)
 
         self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
@@ -208,6 +212,8 @@ class RaftPlusDicl(Model):
                 'dap-init': self.dap_init,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
+                'encoder-type': self.encoder_type,
+                'context-type': self.context_type,
                 'mnet-norm': self.mnet_norm,
                 'share-dicl': self.share_dicl,
             },
