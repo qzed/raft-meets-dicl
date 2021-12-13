@@ -14,7 +14,8 @@ class RaftModule(nn.Module):
     """RAFT flow estimation network"""
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
-                 recurrent_channels=128, encoder_norm='instance', context_norm='batch'):
+                 recurrent_channels=128, encoder_norm='instance', context_norm='batch',
+                 encoder_type='raft', context_type='raft'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -23,8 +24,8 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
 
-        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
+        self.fnet = common.encoders.make_encoder_p36(encoder_type, corr_channels, norm_type=encoder_norm, dropout=dropout)
+        self.cnet = common.encoders.make_encoder_p36(context_type, hdim + cdim, norm_type=context_norm, dropout=dropout)
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
@@ -193,15 +194,19 @@ class Raft(Model):
         recurrent_channels = param_cfg.get('recurrent-channels', 128)
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
+        encoder_type = param_cfg.get('encoder-type', 'raft')
+        context_type = param_cfg.get('context-type', 'raft')
 
         args = cfg.get('arguments', {})
 
         return cls(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
-                   encoder_norm=encoder_norm, context_norm=context_norm, arguments=args)
+                   encoder_norm=encoder_norm, context_norm=context_norm,
+                   encoder_type=encoder_type, context_type=context_type, arguments=args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
-                 recurrent_channels=128, encoder_norm='instance', context_norm='batch', arguments={}):
+                 recurrent_channels=128, encoder_norm='instance', context_norm='batch',
+                 encoder_type='raft', context_type='raft', arguments={}):
         self.dropout = dropout
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -209,10 +214,13 @@ class Raft(Model):
         self.recurrent_channels = recurrent_channels
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
+        self.encoder_type = encoder_type
+        self.context_type = context_type
 
         super().__init__(RaftModule(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
-                                    encoder_norm=encoder_norm, context_norm=context_norm), arguments)
+                                    encoder_norm=encoder_norm, context_norm=context_norm,
+                                    encoder_type=encoder_type, context_type=context_type), arguments)
 
         self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
 
@@ -229,6 +237,8 @@ class Raft(Model):
                 'recurrent-channels': self.recurrent_channels,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
+                'encoder-type': self.encoder_type,
+                'context-type': self.context_type,
             },
             'arguments': default_args | self.arguments,
         }
