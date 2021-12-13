@@ -1,19 +1,8 @@
-# Implementation of "Displacement-Invariant Matching Cost Learning for Accurate
-# Optical Flow Estimation" (DICL) by Wang et. al., based on the original
-# implementation for this paper.
-#
-# Link: https://github.com/jytime/DICL-Flow
-
-import itertools
-
-import numpy as np
-
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from .. import Model, ModelAdapter, Result
-from .. import common
+from .. import Model, ModelAdapter
+
+from . import dicl
 
 
 _default_context_scale = {
@@ -24,84 +13,6 @@ _default_context_scale = {
 }
 
 
-class ConvBlock(nn.Sequential):
-    """Basic convolution block"""
-
-    def __init__(self, c_in, c_out, **kwargs):
-        super().__init__(
-            nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
-            nn.ReLU(inplace=True),
-        )
-
-
-class ConvBlockTransposed(nn.Sequential):
-    """Basic transposed convolution block"""
-
-    def __init__(self, c_in, c_out, **kwargs):
-        super().__init__(
-            nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
-            nn.ReLU(inplace=True),
-        )
-
-
-class GaConv2xBlock(nn.Module):
-    """2x convolution block for GA-Net based feature encoder"""
-
-    def __init__(self, c_in, c_out):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(c_out)
-        self.relu2 = nn.ReLU(inplace=True)
-
-    def forward(self, x, res):
-        x = self.conv1(x)
-        x = self.relu1(x)
-
-        assert x.shape == res.shape
-
-        x = torch.cat((x, res), dim=1)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-
-        return x
-
-
-class GaConv2xBlockTransposed(nn.Module):
-    """Transposed convolution + convolution block for GA-Net based feature encoder"""
-
-    def __init__(self, c_in, c_out):
-        super().__init__()
-
-        self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(c_out)
-        self.relu2 = nn.ReLU(inplace=True)
-
-    def forward(self, x, res):
-        x = self.conv1(x)
-        x = self.relu1(x)
-
-        assert x.shape == res.shape
-
-        x = torch.cat((x, res), dim=1)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-
-        return x
-
-
 class FeatureNet(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
@@ -109,43 +20,43 @@ class FeatureNet(nn.Module):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            ConvBlock(3, 32, kernel_size=3, padding=1),
-            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
-            ConvBlock(32, 32, kernel_size=3, padding=1),
+            dicl.ConvBlock(3, 32, kernel_size=3, padding=1),
+            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
+            dicl.ConvBlock(32, 32, kernel_size=3, padding=1),
         )
 
-        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
-        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
-        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
-        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
-        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
-        self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
+        self.conv1a = dicl.ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
+        self.conv2a = dicl.ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
+        self.conv3a = dicl.ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
+        self.conv4a = dicl.ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
+        self.conv5a = dicl.ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
+        self.conv6a = dicl.ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
 
-        self.deconv6a = GaConv2xBlockTransposed(192, 160)
-        self.deconv5a = GaConv2xBlockTransposed(160, 128)
-        self.deconv4a = GaConv2xBlockTransposed(128, 96)
-        self.deconv3a = GaConv2xBlockTransposed(96, 64)
-        self.deconv2a = GaConv2xBlockTransposed(64, 48)
-        self.deconv1a = GaConv2xBlockTransposed(48, 32)
+        self.deconv6a = dicl.GaConv2xBlockTransposed(192, 160)
+        self.deconv5a = dicl.GaConv2xBlockTransposed(160, 128)
+        self.deconv4a = dicl.GaConv2xBlockTransposed(128, 96)
+        self.deconv3a = dicl.GaConv2xBlockTransposed(96, 64)
+        self.deconv2a = dicl.GaConv2xBlockTransposed(64, 48)
+        self.deconv1a = dicl.GaConv2xBlockTransposed(48, 32)
 
-        self.conv1b = GaConv2xBlock(32, 48)
-        self.conv2b = GaConv2xBlock(48, 64)
-        self.conv3b = GaConv2xBlock(64, 96)
-        self.conv4b = GaConv2xBlock(96, 128)
-        self.conv5b = GaConv2xBlock(128, 160)
-        self.conv6b = GaConv2xBlock(160, 192)
+        self.conv1b = dicl.GaConv2xBlock(32, 48)
+        self.conv2b = dicl.GaConv2xBlock(48, 64)
+        self.conv3b = dicl.GaConv2xBlock(64, 96)
+        self.conv4b = dicl.GaConv2xBlock(96, 128)
+        self.conv5b = dicl.GaConv2xBlock(128, 160)
+        self.conv6b = dicl.GaConv2xBlock(160, 192)
 
-        self.deconv6b = GaConv2xBlockTransposed(192, 160)
-        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.deconv6b = dicl.GaConv2xBlockTransposed(192, 160)
+        self.outconv6 = dicl.ConvBlock(160, output_channels, kernel_size=3, padding=1)
 
-        self.deconv5b = GaConv2xBlockTransposed(160, 128)
-        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.deconv5b = dicl.GaConv2xBlockTransposed(160, 128)
+        self.outconv5 = dicl.ConvBlock(128, output_channels, kernel_size=3, padding=1)
 
-        self.deconv4b = GaConv2xBlockTransposed(128, 96)
-        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.deconv4b = dicl.GaConv2xBlockTransposed(128, 96)
+        self.outconv4 = dicl.ConvBlock(96, output_channels, kernel_size=3, padding=1)
 
-        self.deconv3b = GaConv2xBlockTransposed(96, 64)
-        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
+        self.deconv3b = dicl.GaConv2xBlockTransposed(96, 64)
+        self.outconv3 = dicl.ConvBlock(64, output_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -186,266 +97,6 @@ class FeatureNet(nn.Module):
         return x3, x4, x5, x6
 
 
-class MatchingNet(nn.Sequential):
-    """Matching network to compute cost from stacked features"""
-
-    def __init__(self, feature_channels):
-        super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
-            ConvBlock(128, 128, kernel_size=3, padding=1),
-            ConvBlock(128, 64, kernel_size=3, padding=1),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2),
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
-        )
-
-    def forward(self, mvol):
-        b, du, dv, c2, h, w = mvol.shape
-
-        mvol = mvol.view(b * du * dv, c2, h, w)             # reshape for convolutional networks
-        cost = super().forward(mvol)                        # compute cost -> (b, du, dv, 1, h, w)
-        cost = cost.view(b, du, dv, h, w)                   # reshape back to reduced volume
-
-        return cost
-
-
-class DisplacementAwareProjection(nn.Module):
-    """Displacement aware projection layer"""
-
-    def __init__(self, disp_range):
-        super().__init__()
-
-        disp_range = np.asarray(disp_range)
-        assert disp_range.shape == (2,)     # displacement range for u and v
-
-        # compute number of channels aka. displacement possibilities
-        n_channels = np.prod(2 * disp_range + 1)
-
-        # output channels are weighted sums over input channels (i.e. displacement possibilities)
-        self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
-
-    def forward(self, x):
-        batch, du, dv, h, w = x.shape
-
-        x = x.view(batch, du * dv, h, w)    # combine displacement ranges to channels
-        x = self.conv1(x)                   # apply 1x1 convolution to combine channels
-        x = x.view(batch, du, dv, h, w)     # separate displacement ranges again
-
-        return x
-
-
-class FlowEntropy(nn.Module):
-    """Flow entropy for context networks"""
-
-    def __init__(self, eps=1e-9):
-        super().__init__()
-
-        self.eps = eps
-
-    def forward(self, x):
-        batch, du, dv, h, w = x.shape
-
-        # compute probability of displacement hypotheses
-        x = x.view(batch, du * dv, h, w)    # reshape to compute softmax along disp. hypothesis spc.
-        x = F.softmax(x, dim=1)             # softmax along displacement hypothesis space (du/dv)
-        x = x.view(batch, du, dv, h, w)     # reshape back
-
-        # compute entropy (batch, h, w)
-        entropy = (-x * torch.clamp(x, self.eps, 1.0 - self.eps).log()).sum(dim=(1, 2))
-
-        return entropy / np.log(du * dv)    # normalize, shape (batch, h, w)
-
-
-class FlowRegression(nn.Module):
-    """Soft-argmin flow regression"""
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, cost):
-        batch, du, dv, h, w = cost.shape
-        ru, rv = (du - 1) // 2, (dv - 1) // 2           # displacement range
-
-        # displacement offsets along u
-        disp_u = torch.arange(-ru, ru + 1, device=cost.device, dtype=torch.float32)
-        disp_u = disp_u.view(du, 1)
-        disp_u = disp_u.expand(-1, dv)                  # expand for stacking
-
-        # displacement offsets along v
-        disp_v = torch.arange(-rv, rv + 1, device=cost.device, dtype=torch.float32)
-        disp_v = disp_v.view(1, dv)
-        disp_v = disp_v.expand(du, -1)                  # expand for stacking
-
-        # combined displacement vector
-        disp = torch.stack((disp_u, disp_v), dim=0)     # stack coordinates to (2, du, dv)
-        disp = disp.view(1, 2, du, dv, 1, 1)            # create view for broadcasting
-
-        # compute displacement probability
-        cost = cost.view(batch, du * dv, h, w)          # combine disp. dimensions for softmax
-        prob = F.softmax(cost, dim=1)                   # softmax along displacement dimensions
-        prob = prob.view(batch, 1, du, dv, h, w)        # reshape for broadcasting
-
-        # compute flow as weighted sum over displacement vectors
-        flow = (prob * disp).sum(dim=(2, 3))            # weighted sum over displacements (du/dv)
-
-        return flow                                     # shape (batch, 2, h, w)
-
-
-class CtfContextNet(nn.Sequential):
-    """Context network"""
-
-    def __init__(self, feature_channels):
-        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
-
-        super().__init__(
-            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
-            ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
-            ConvBlock(128, 128, kernel_size=3, padding=4, dilation=4),
-            ConvBlock(128, 96, kernel_size=3, padding=8, dilation=8),
-            ConvBlock(96, 64, kernel_size=3, padding=16, dilation=16),
-            ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
-            nn.Conv2d(32, 2, kernel_size=3, padding=1),     # note: with bias
-        )
-
-
-class CtfContextNet4(nn.Sequential):
-    """Context network for level 4 with reduced layers"""
-
-    def __init__(self, feature_channels):
-        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
-
-        super().__init__(
-            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
-            ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
-            ConvBlock(128, 128, kernel_size=3, padding=4, dilation=4),
-            ConvBlock(128, 64, kernel_size=3, padding=8, dilation=8),
-            ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
-            nn.Conv2d(32, 2, kernel_size=3, padding=1),     # note: with bias
-        )
-
-
-class CtfContextNet5(nn.Sequential):
-    """Context network for level 5 with reduced layers"""
-
-    def __init__(self, feature_channels):
-        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
-
-        super().__init__(
-            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
-            ConvBlock(64, 128, kernel_size=3, padding=2, dilation=2),
-            ConvBlock(128, 64, kernel_size=3, padding=4, dilation=4),
-            ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
-            nn.Conv2d(32, 2, kernel_size=3, padding=1),     # note: with bias
-        )
-
-
-class CtfContextNet6(nn.Sequential):
-    """Context network for level 6 with reduced layers"""
-
-    def __init__(self, feature_channels):
-        input_channels = feature_channels + 3 + 2 + 1       # features + img1 + flow + entropy
-
-        super().__init__(
-            ConvBlock(input_channels, 64, kernel_size=3, padding=1, dilation=1),
-            ConvBlock(64, 64, kernel_size=3, padding=2, dilation=2),
-            ConvBlock(64, 32, kernel_size=3, padding=1, dilation=1),
-            nn.Conv2d(32, 2, kernel_size=3, padding=1),     # note: with bias
-        )
-
-
-class FlowLevel(nn.Module):
-    def __init__(self, feature_channels, level, maxdisp):
-        super().__init__()
-
-        ctxnets_by_level = {
-            6: CtfContextNet6,
-            5: CtfContextNet5,
-            4: CtfContextNet4,
-            3: CtfContextNet,
-        }
-
-        self.level = level
-        self.maxdisp = maxdisp
-
-        self.mnet = MatchingNet(feature_channels)
-        self.dap = DisplacementAwareProjection(maxdisp)
-        self.flow = FlowRegression()
-        self.entropy = FlowEntropy()
-        self.ctxnet = ctxnets_by_level[level](feature_channels)
-
-    def forward(self, img1, feat1, feat2, flow_coarse, raw=False, dap=True, ctx=True, scale=1.0):
-        _b, _c, h, w = feat1.shape
-
-        flow_up = None
-        if flow_coarse is not None:
-            # upscale flow from next coarser level
-            flow_up = 2.0 * F.interpolate(flow_coarse, (h, w), mode='bilinear', align_corners=True)
-            flow_up = flow_up.detach()
-
-            # warp features back based on flow estimate so far
-            feat2, _mask = common.warp.warp_backwards(feat2, flow_up)
-
-        # compute flow for this level
-        return self.compute_flow(img1, feat1, feat2, flow_up, raw, dap, ctx, scale)
-
-    def compute_flow(self, img1, feat1, feat2, flow_coarse, raw, dap, ctx, scale):
-        batch, _c, h, w = feat1.shape                   # shape of this level
-
-        # compute matching cost
-        cost = self.compute_cost(feat1, feat2)          # compute cost volume
-        cost = self.dap(cost) if dap else cost          # apply displacement-aware projection
-
-        # compute raw flow via soft-argmin
-        flow = self.flow(cost)
-        flow = flow + flow_coarse if flow_coarse is not None else flow
-        flow_raw = flow if raw else None
-
-        # context network
-        if ctx:
-            # parts for context network features
-            img1 = F.interpolate(img1, (h, w), mode='bilinear', align_corners=True)  # itp. to level
-            entr = self.entropy(cost).view(batch, 1, h, w)  # compute flow entropy, reshape for cat
-
-            # build context network input: channels = 2 + 1 + 32 + 3 = 38
-            ctxf = torch.cat((flow.detach(), entr.detach(), feat1, img1), dim=1)
-
-            # run context network to get refined flow
-            flow = flow + self.ctxnet(ctxf) * scale
-
-        return flow, flow_raw
-
-    def compute_cost(self, feat1, feat2):               # compute matching cost between features
-        batch, c, h, w = feat1.shape
-
-        ru, rv = self.maxdisp
-        du, dv = 2 * np.asarray(self.maxdisp) + 1
-
-        # initialize full 5d matching volume to zero
-        mvol = torch.zeros(batch, du, dv, 2 * c, h, w, device=feat1.device)
-
-        # copy feature vectors to 5d matching volume
-        for i, j in itertools.product(range(du), range(dv)):
-            di, dj = i - ru, j - rv                     # disp. associated with indices i, j
-
-            # copy only areas where displacement doesn't go over bounds, rest remains zero
-            w0, w1 = max(0, -di), min(w, w - di)        # valid displacement source ranges
-            h0, h1 = max(0, -dj), min(h, h - dj)
-
-            dw0, dw1 = max(0, di), min(w, w + di)       # valid displacement target ranges
-            dh0, dh1 = max(0, dj), min(h, h + dj)
-
-            mvol[:, i, j, :c, h0:h1, w0:w1] = feat1[:, :, h0:h1, w0:w1]
-            mvol[:, i, j, c:, h0:h1, w0:w1] = feat2[:, :, dh0:dh1, dw0:dw1]
-
-        # mitigate effect of holes (caused e.g. by occlusions)
-        valid = mvol[:, :, :, c:, :, :].detach()        # sum over displaced features
-        valid = valid.sum(dim=-3) != 0                  # if zero, assume occlusion / invalid
-        mvol = mvol * valid.unsqueeze(3)                # filter out invalid / occluded hypotheses
-
-        # run matching network to compute reduced 4d cost volume
-        return self.mnet(mvol)                          # (b, du, dv, 2c, h, w) -> (b, du ,dv, h, w)
-
-
 class DiclModule(nn.Module):
     def __init__(self, disp_ranges, dap_init='identity', feature_channels=32):
         super().__init__()
@@ -457,10 +108,10 @@ class DiclModule(nn.Module):
         self.feature = FeatureNet(feature_channels)
 
         # coarse-to-fine flow levels
-        self.lvl6 = FlowLevel(feature_channels, 6, disp_ranges['level-6'])
-        self.lvl5 = FlowLevel(feature_channels, 5, disp_ranges['level-5'])
-        self.lvl4 = FlowLevel(feature_channels, 4, disp_ranges['level-4'])
-        self.lvl3 = FlowLevel(feature_channels, 3, disp_ranges['level-3'])
+        self.lvl6 = dicl.FlowLevel(feature_channels, 6, disp_ranges['level-6'])
+        self.lvl5 = dicl.FlowLevel(feature_channels, 5, disp_ranges['level-5'])
+        self.lvl4 = dicl.FlowLevel(feature_channels, 4, disp_ranges['level-4'])
+        self.lvl3 = dicl.FlowLevel(feature_channels, 3, disp_ranges['level-3'])
 
         # initialize weights
         for m in self.modules():
@@ -473,7 +124,7 @@ class DiclModule(nn.Module):
         # initialize DAP layers via identity matrices if specified
         if dap_init == 'identity':
             for m in self.modules():
-                if isinstance(m, DisplacementAwareProjection):
+                if isinstance(m, dicl.DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):
@@ -521,7 +172,7 @@ class Dicl(Model):
 
         super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
 
-        self.adapter = DiclAdapter()
+        self.adapter = dicl.DiclAdapter()
 
     def get_config(self):
         default_args = {
@@ -545,41 +196,3 @@ class Dicl(Model):
 
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):
         return self.module(img1, img2, raw, dap, ctx, context_scale)
-
-
-class DiclAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
-
-    def wrap_result(self, result, original_shape) -> Result:
-        return DiclResult(result, original_shape)
-
-
-class DiclResult(Result):
-    def __init__(self, output, target_shape):
-        super().__init__()
-
-        self.result = output
-        self.shape = target_shape
-        self.mode = 'bilinear'
-
-    def output(self, batch_index=None):
-        if batch_index is None:
-            return self.result
-
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
-
-    def final(self):
-        flow = self.result[0]
-
-        _b, _c, fh, fw = flow.shape
-        _b, _c, th, tw = self.shape
-
-        flow = F.interpolate(flow.detach(), (th, tw), mode=self.mode, align_corners=True)
-        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
-        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
-
-        return flow
-
-    def intermediate_flow(self):
-        return self.result

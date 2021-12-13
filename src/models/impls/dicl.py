@@ -28,10 +28,10 @@ _default_context_scale = {
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -39,10 +39,10 @@ class ConvBlock(nn.Sequential):
 class ConvBlockTransposed(nn.Sequential):
     """Basic transposed convolution block"""
 
-    def __init__(self, c_in, c_out, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            nn.BatchNorm2d(c_out),
+            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
             nn.ReLU(inplace=True),
         )
 
@@ -50,14 +50,14 @@ class ConvBlockTransposed(nn.Sequential):
 class GaConv2xBlock(nn.Module):
     """2x convolution block for GA-Net based feature encoder"""
 
-    def __init__(self, c_in, c_out):
+    def __init__(self, c_in, c_out, norm_type='batch'):
         super().__init__()
 
         self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
         self.relu1 = nn.ReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(c_out)
+        self.bn2 = common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
         self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x, res):
@@ -78,14 +78,14 @@ class GaConv2xBlock(nn.Module):
 class GaConv2xBlockTransposed(nn.Module):
     """Transposed convolution + convolution block for GA-Net based feature encoder"""
 
-    def __init__(self, c_in, c_out):
+    def __init__(self, c_in, c_out, norm_type='batch'):
         super().__init__()
 
         self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
         self.relu1 = nn.ReLU(inplace=True)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(c_out)
+        self.bn2 = common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
         self.relu2 = nn.ReLU(inplace=True)
 
     def forward(self, x, res):
@@ -196,13 +196,13 @@ class FeatureNet(nn.Module):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self, feature_channels):
+    def __init__(self, input_channels, norm_type='batch'):
         super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2),
-            ConvBlock(128, 128, kernel_size=3, padding=1),
-            ConvBlock(128, 64, kernel_size=3, padding=1),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2),
+            ConvBlock(input_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
@@ -219,8 +219,11 @@ class MatchingNet(nn.Sequential):
 class DisplacementAwareProjection(nn.Module):
     """Displacement aware projection layer"""
 
-    def __init__(self, disp_range):
+    def __init__(self, disp_range, init='identity'):
         super().__init__()
+
+        if init not in ['identity', 'standard']:
+            raise ValueError(f"unknown init value '{init}'")
 
         disp_range = np.asarray(disp_range)
         assert disp_range.shape == (2,)     # displacement range for u and v
@@ -230,6 +233,10 @@ class DisplacementAwareProjection(nn.Module):
 
         # output channels are weighted sums over input channels (i.e. displacement possibilities)
         self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
+
+        # initialize DAP layers via identity matrices if specified
+        if init == 'identity':
+            nn.init.eye_(self.conv1.weight[:, :, 0, 0])
 
     def forward(self, x):
         batch, du, dv, h, w = x.shape
@@ -375,7 +382,7 @@ class FlowLevel(nn.Module):
         self.level = level
         self.maxdisp = maxdisp
 
-        self.mnet = MatchingNet(feature_channels)
+        self.mnet = MatchingNet(2 * feature_channels)
         self.dap = DisplacementAwareProjection(maxdisp)
         self.flow = FlowRegression()
         self.entropy = FlowEntropy()

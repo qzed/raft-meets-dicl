@@ -9,13 +9,13 @@
 import numpy as np
 
 import torch
-from torch.functional import norm
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import Loss, Model, ModelAdapter, Result
 from .. import common
 
+from . import dicl
 from . import raft
 
 
@@ -180,84 +180,6 @@ class RaftPoolFeatureEncoder(nn.Module):
 
 # -- DICL-based feature encoder --------------------------------------------------------------------
 
-class ConvBlock(nn.Sequential):
-    """Basic convolution block"""
-
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
-        super().__init__(
-            nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
-        )
-
-
-class ConvBlockTransposed(nn.Sequential):
-    """Basic transposed convolution block"""
-
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
-        super().__init__(
-            nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
-        )
-
-
-class GaConv2xBlock(nn.Module):
-    """2x convolution block for GA-Net based feature encoder"""
-
-    def __init__(self, c_in, c_out, norm_type='batch'):
-        super().__init__()
-
-        self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU(inplace=True)
-
-    def forward(self, x, res):
-        x = self.conv1(x)
-        x = self.relu1(x)
-
-        assert x.shape == res.shape
-
-        x = torch.cat((x, res), dim=1)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-
-        return x
-
-
-class GaConv2xBlockTransposed(nn.Module):
-    """Transposed convolution + convolution block for GA-Net based feature encoder"""
-
-    def __init__(self, c_in, c_out, norm_type='batch'):
-        super().__init__()
-
-        self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
-
-        self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
-        self.bn2 = common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU(inplace=True)
-
-    def forward(self, x, res):
-        x = self.conv1(x)
-        x = self.relu1(x)
-
-        assert x.shape == res.shape
-
-        x = torch.cat((x, res), dim=1)
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.relu2(x)
-
-        return x
-
-
 class DiclFeatureEncoder(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
@@ -265,31 +187,31 @@ class DiclFeatureEncoder(nn.Module):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            dicl.ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
+            dicl.ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
         )
 
-        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv1a = dicl.ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv2a = dicl.ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv3a = dicl.ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv4a = dicl.ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
 
-        self.deconv4a = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3a = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
-        self.deconv2a = GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
-        self.deconv1a = GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
+        self.deconv4a = dicl.GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3a = dicl.GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv2a = dicl.GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
+        self.deconv1a = dicl.GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
 
-        self.conv1b = GaConv2xBlock(32, 48, norm_type=norm_type)
-        self.conv2b = GaConv2xBlock(48, 64, norm_type=norm_type)
-        self.conv3b = GaConv2xBlock(64, 96, norm_type=norm_type)
-        self.conv4b = GaConv2xBlock(96, 128, norm_type=norm_type)
+        self.conv1b = dicl.GaConv2xBlock(32, 48, norm_type=norm_type)
+        self.conv2b = dicl.GaConv2xBlock(48, 64, norm_type=norm_type)
+        self.conv3b = dicl.GaConv2xBlock(64, 96, norm_type=norm_type)
+        self.conv4b = dicl.GaConv2xBlock(96, 128, norm_type=norm_type)
 
-        self.deconv4b = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3b = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv4b = dicl.GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
+        self.deconv3b = dicl.GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
 
-        self.outconv4 = ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
-        self.outconv3 = ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv4 = dicl.ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv3 = dicl.ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
 
         # initialize weights
         for m in self.modules():
@@ -540,63 +462,6 @@ class RfpmFeatureEncoder(nn.Module):
         return x3, x4
 
 
-# -- DICL matching net -----------------------------------------------------------------------------
-
-class MatchingNet(nn.Sequential):
-    """Matching network to compute cost from stacked features"""
-
-    def __init__(self, feature_channels, norm_type='batch'):
-        super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
-        )
-
-    def forward(self, mvol):
-        b, du, dv, c2, h, w = mvol.shape
-
-        mvol = mvol.view(b * du * dv, c2, h, w)             # reshape for convolutional networks
-        cost = super().forward(mvol)                        # compute cost -> (b, du, dv, 1, h, w)
-        cost = cost.view(b, du, dv, h, w)                   # reshape back to reduced volume
-
-        return cost
-
-
-class DisplacementAwareProjection(nn.Module):
-    """Displacement aware projection layer"""
-
-    def __init__(self, disp_range, init='identity'):
-        super().__init__()
-
-        if init not in ['identity', 'standard']:
-            raise ValueError(f"unknown init value '{init}'")
-
-        disp_range = np.asarray(disp_range)
-        assert disp_range.shape == (2,)     # displacement range for u and v
-
-        # compute number of channels aka. displacement possibilities
-        n_channels = np.prod(2 * disp_range + 1)
-
-        # output channels are weighted sums over input channels (i.e. displacement possibilities)
-        self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
-
-        # initialize DAP layers via identity matrices if specified
-        if init == 'identity':
-            nn.init.eye_(self.conv1.weight[:, :, 0, 0])
-
-    def forward(self, x):
-        batch, du, dv, h, w = x.shape
-
-        x = x.view(batch, du * dv, h, w)    # combine displacement ranges to channels
-        x = self.conv1(x)                   # apply 1x1 convolution to combine channels
-        x = x.view(batch, du, dv, h, w)     # separate displacement ranges again
-
-        return x
-
-
 # -- Correlation module ----------------------------------------------------------------------------
 
 class CorrelationModule(nn.Module):
@@ -604,8 +469,8 @@ class CorrelationModule(nn.Module):
         super().__init__()
 
         self.radius = radius
-        self.mnet = MatchingNet(feature_dim, norm_type=norm_type)
-        self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
+        self.mnet = dicl.MatchingNet(2 * feature_dim, norm_type=norm_type)
+        self.dap = dicl.DisplacementAwareProjection((radius, radius), init=dap_init)
 
     def forward(self, f1, f2, coords, dap=True):
         batch, c, h, w = f1.shape

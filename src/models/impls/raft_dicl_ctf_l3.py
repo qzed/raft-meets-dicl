@@ -6,16 +6,14 @@
 # - RAFT flow upsampling on finest level
 # - gradient stopping between levels and refinement iterations
 
-import numpy as np
-
 import torch
-from torch.functional import norm
 import torch.nn as nn
 import torch.nn.functional as F
 
 from .. import Model, ModelAdapter, Result
 from .. import common
 
+from . import dicl
 from . import raft
 
 
@@ -112,85 +110,6 @@ class BasicEncoder(nn.Module):
         return x3, x4, x5
 
 
-# -- DICL matching net -----------------------------------------------------------------------------
-
-class ConvBlock(nn.Sequential):
-    """Basic convolution block"""
-
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
-        super().__init__(
-            nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
-        )
-
-
-class ConvBlockTransposed(nn.Sequential):
-    """Basic transposed convolution block"""
-
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
-        super().__init__(
-            nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            common.norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
-        )
-
-
-class MatchingNet(nn.Sequential):
-    """Matching network to compute cost from stacked features"""
-
-    def __init__(self, feature_channels, norm_type='batch'):
-        super().__init__(
-            ConvBlock(2 * feature_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
-        )
-
-    def forward(self, mvol):
-        b, du, dv, c2, h, w = mvol.shape
-
-        mvol = mvol.view(b * du * dv, c2, h, w)             # reshape for convolutional networks
-        cost = super().forward(mvol)                        # compute cost -> (b, du, dv, 1, h, w)
-        cost = cost.view(b, du, dv, h, w)                   # reshape back to reduced volume
-
-        return cost
-
-
-class DisplacementAwareProjection(nn.Module):
-    """Displacement aware projection layer"""
-
-    def __init__(self, disp_range, init='identity'):
-        super().__init__()
-
-        if init not in ['identity', 'standard']:
-            raise ValueError(f"unknown init value '{init}'")
-
-        disp_range = np.asarray(disp_range)
-        assert disp_range.shape == (2,)     # displacement range for u and v
-
-        # compute number of channels aka. displacement possibilities
-        n_channels = np.prod(2 * disp_range + 1)
-
-        # output channels are weighted sums over input channels (i.e. displacement possibilities)
-        self.conv1 = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
-
-        # initialize DAP layers via identity matrices if specified
-        if init == 'identity':
-            nn.init.eye_(self.conv1.weight[:, :, 0, 0])
-
-    def forward(self, x):
-        batch, du, dv, h, w = x.shape
-
-        x = x.view(batch, du * dv, h, w)    # combine displacement ranges to channels
-        x = self.conv1(x)                   # apply 1x1 convolution to combine channels
-        x = x.view(batch, du, dv, h, w)     # separate displacement ranges again
-
-        return x
-
-
 # -- Correlation module ----------------------------------------------------------------------------
 
 class CorrelationModule(nn.Module):
@@ -198,8 +117,8 @@ class CorrelationModule(nn.Module):
         super().__init__()
 
         self.radius = radius
-        self.mnet = MatchingNet(feature_dim, norm_type=norm_type)
-        self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
+        self.mnet = dicl.MatchingNet(2 * feature_dim, norm_type=norm_type)
+        self.dap = dicl.DisplacementAwareProjection((radius, radius), init=dap_init)
 
     def forward(self, f1, f2, coords, dap=True):
         batch, c, h, w = f1.shape
