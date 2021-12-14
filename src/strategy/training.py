@@ -215,7 +215,15 @@ class TrainingContext:
         loss = self.loss(self.model, result.output(), flow, valid, **stage.loss_args)
 
         # backprop
-        self.scaler.scale(loss).backward()
+        # Divide loss by accumulation steps to make non-accumulating runs
+        # comparable to accumulating runs of equal total batch size. This
+        # should allow us to use the same optimizer parameters accross both
+        # types of runs, whereas we would have to adapt them if we did not
+        # scale the loss accordingly. Note that we only do this locally for the
+        # .scale() and .backward() as, for simplicity, we log each "real" batch
+        # below, which in turn helps simplify the generic metrics system
+        # implementation.
+        self.scaler.scale(loss / stage.gradient.accumulate).backward()
 
         # inspection (metrics, validation, ...)
         self.inspector.on_batch(log, self, stage, epoch, i, img1, img2, flow, valid, meta, result, loss)
