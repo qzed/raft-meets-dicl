@@ -232,6 +232,9 @@ class GradientSpec:
         self.clip = clip
         self.scaler = scaler
 
+        if accumulate < 1:
+            raise ValueError(f"invalid value for GradientSpec.accumulate: {accumulate}")
+
     def get_config(self):
         return {
             'accumulate': self.accumulate,
