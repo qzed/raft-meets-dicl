@@ -218,34 +218,43 @@ def make_encoder(encoder_type, output_dim, levels=4, norm_type='batch'):
 
 class CorrelationModule(nn.Module):
     def __init__(self, feature_dim, levels, radius, dap_init='identity', dap_type='separate',
-                 norm_type='batch'):
+                 norm_type='batch', share=False):
         super().__init__()
 
         self.radius = radius
         self.dap_type = dap_type
+        self.share = share
 
-        self.mnet = nn.ModuleList([
-            MatchingNet(2 * feature_dim, norm_type=norm_type)
-            for _ in range(levels)
-        ])
+        if self.dap_type not in ['full', 'separate']:
+            raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
-        # DAP separated by layers
-        if self.dap_type == 'separate':
-            self.dap = nn.ModuleList([
-                DisplacementAwareProjection((radius, radius), init=dap_init)
+        if self.share:
+            self.mnet = MatchingNet(2 * feature_dim, norm_type=norm_type)
+
+            # DAP separated by layers
+            if self.dap_type == 'separate':
+                self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
+
+        else:
+            self.mnet = nn.ModuleList([
+                MatchingNet(2 * feature_dim, norm_type=norm_type)
                 for _ in range(levels)
             ])
 
+            # DAP separated by layers
+            if self.dap_type == 'separate':
+                self.dap = nn.ModuleList([
+                    DisplacementAwareProjection((radius, radius), init=dap_init)
+                    for _ in range(levels)
+                ])
+
         # DAP over all costs
-        elif self.dap_type == 'full':
+        if self.dap_type == 'full':
             n_channels = levels * (2 * radius + 1)**2
             self.dap = nn.Conv2d(n_channels, n_channels, bias=False, kernel_size=1)
 
             if dap_init == 'identity':
                 nn.init.eye_(self.dap.weight[:, :, 0, 0])
-
-        else:
-            raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
         # build lookup kernel
         dx = torch.linspace(-radius, radius, 2 * radius + 1)
@@ -291,14 +300,20 @@ class CorrelationModule(nn.Module):
             corr = torch.cat((f1, f2), dim=-3)                  # (batch, 2r+1, 2r+1, 2c, h, w)
 
             # build cost volume for this level
-            cost = self.mnet[i](corr)                           # (batch, 2r+1, 2r+1, h, w)
+            if self.share:
+                cost = self.mnet(corr)                          # (batch, 2r+1, 2r+1, h, w)
+            else:
+                cost = self.mnet[i](corr)                       # (batch, 2r+1, 2r+1, h, w)
 
             # mask costs if specified
             if i + 3 in mask_costs:
                 cost = torch.zeros_like(cost)
 
             if dap and self.dap_type == 'separate':
-                cost = self.dap[i](cost)                        # (batch, 2r+1, 2r+1, h, w)
+                if self.share:
+                    cost = self.dap(cost)                       # (batch, 2r+1, 2r+1, h, w)
+                else:
+                    cost = self.dap[i](cost)                    # (batch, 2r+1, 2r+1, h, w)
 
             cost = cost.reshape(batch, -1, h, w)                # (batch, (2r+1)^2, h, w)
             out.append(cost)
@@ -320,7 +335,7 @@ class RaftPlusDiclModule(nn.Module):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft-cnn'):
+                 encoder_type='raft-cnn', share_dicl=False):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -340,7 +355,7 @@ class RaftPlusDiclModule(nn.Module):
 
         self.cvol = CorrelationModule(feature_dim=corr_channels, levels=self.corr_levels,
                                       radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type,
-                                      norm_type=mnet_norm)
+                                      norm_type=mnet_norm, share=share_dicl)
 
     def freeze_batchnorm(self):
         for m in self.modules():
@@ -424,6 +439,7 @@ class RaftPlusDicl(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         encoder_type = param_cfg.get('encoder-type', 'raft-cnn')
+        share_dicl = param_cfg.get('share-dicl', False)
 
         args = cfg.get('arguments', {})
 
@@ -431,12 +447,12 @@ class RaftPlusDicl(Model):
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    dap_init=dap_init, dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
-                   mnet_norm=mnet_norm, encoder_type=encoder_type, arguments=args)
+                   mnet_norm=mnet_norm, encoder_type=encoder_type, share_dicl=share_dicl, arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft-cnn', arguments={}):
+                 encoder_type='raft-cnn', share_dicl=False, arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -450,13 +466,14 @@ class RaftPlusDicl(Model):
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
         self.encoder_type = encoder_type
+        self.share_dicl = share_dicl
 
         super().__init__(RaftPlusDiclModule(
             dropout=dropout, mixed_precision=mixed_precision, corr_levels=corr_levels,
             corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
             recurrent_channels=recurrent_channels, dap_init=dap_init, dap_type=dap_type,
             encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm,
-            encoder_type=encoder_type), arguments)
+            encoder_type=encoder_type, share_dicl=share_dicl), arguments)
 
         self.adapter = raft.RaftAdapter()
 
@@ -479,6 +496,7 @@ class RaftPlusDicl(Model):
                 'context-norm': self.context_norm,
                 'mnet-norm': self.mnet_norm,
                 'encoder-type': self.encoder_type,
+                'share-dicl': self.share_dicl,
             },
             'arguments': default_args | self.arguments,
         }
