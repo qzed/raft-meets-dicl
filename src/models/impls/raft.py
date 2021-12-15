@@ -274,7 +274,8 @@ class RaftModule(nn.Module):
 
         # run feature network
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-            fmap1, fmap2 = self.fnet((img1, img2))
+            fmap1 = self.fnet(img1)
+            fmap2 = self.fnet(img2)
 
         fmap1, fmap2 = fmap1.float(), fmap2.float()
 

@@ -52,5 +52,7 @@ def make_encoder_p36(encoder_type, output_dim, norm_type, dropout):
 def make_encoder_s3(encoder_type, output_dim, norm_type, dropout, **kwargs):
     if encoder_type == 'raft':
         return raft.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, **kwargs)
+    if encoder_type == 'rfpm-raft':
+        return rfpm.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, **kwargs)
     else:
         raise ValueError(f"unsupported feature encoder type: '{encoder_type}'")
