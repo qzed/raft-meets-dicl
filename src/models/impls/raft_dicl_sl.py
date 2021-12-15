@@ -5,8 +5,6 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
-from ..common.encoders.raft.s3 import FeatureEncoder
-
 from . import raft
 
 
@@ -16,7 +14,8 @@ class RaftPlusDiclModule(nn.Module):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch',
-                 corr_type='dicl', corr_args={}, mnet_norm='batch'):
+                 mnet_norm='batch', corr_type='dicl', corr_args={},
+                 encoder_type='raft', context_type='raft'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -26,8 +25,10 @@ class RaftPlusDiclModule(nn.Module):
 
         self.corr_radius = corr_radius
 
-        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
+        self.fnet = common.encoders.make_encoder_s3(encoder_type, output_dim=corr_channels,
+                                                    norm_type=encoder_norm, dropout=dropout)
+        self.cnet = common.encoders.make_encoder_s3(context_type, output_dim=hdim+cdim,
+                                                    norm_type=context_norm, dropout=dropout)
         self.cvol = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
                                           norm_type=mnet_norm, **corr_args)
         self.update_block = raft.BasicUpdateBlock(self.cvol.output_dim, input_dim=cdim, hidden_dim=hdim)
@@ -114,6 +115,8 @@ class RaftPlusDicl(Model):
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         corr_type = param_cfg.get('corr-type', 'dicl')
         corr_args = param_cfg.get('corr-args', {})
+        encoder_type = param_cfg.get('encoder-type', 'raft')
+        context_type = param_cfg.get('context-type', 'raft')
 
         args = cfg.get('arguments', {})
 
@@ -121,12 +124,13 @@ class RaftPlusDicl(Model):
                    corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, corr_type=corr_type, corr_args=corr_args,
-                   arguments=args)
+                   encoder_type=encoder_type, context_type=context_type, arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch',
-                 mnet_norm='batch', corr_type='dicl', corr_args={}, arguments={}):
+                 mnet_norm='batch', corr_type='dicl', corr_args={},
+                 encoder_type='raft', context_type='raft', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_radius = corr_radius
@@ -139,12 +143,15 @@ class RaftPlusDicl(Model):
         self.mnet_norm = mnet_norm
         self.corr_type = corr_type
         self.corr_args = corr_args
+        self.encoder_type = encoder_type
+        self.context_type = context_type
 
         super().__init__(RaftPlusDiclModule(dropout=dropout, mixed_precision=mixed_precision,
                                             corr_radius=corr_radius, corr_channels=corr_channels,
                                             context_channels=context_channels, recurrent_channels=recurrent_channels,
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
-                                            mnet_norm=mnet_norm, corr_type=corr_type, corr_args=corr_args), arguments)
+                                            mnet_norm=mnet_norm, corr_type=corr_type, corr_args=corr_args,
+                                            encoder_type=encoder_type, context_type=context_type), arguments)
 
         self.adapter = raft.RaftAdapter()
 
@@ -166,6 +173,8 @@ class RaftPlusDicl(Model):
                 'mnet-norm': self.mnet_norm,
                 'corr-type': self.corr_type,
                 'corr-args': self.corr_args,
+                'encoder-type': self.encoder_type,
+                'context-type': self.context_type,
             },
             'arguments': default_args | self.arguments,
         }
