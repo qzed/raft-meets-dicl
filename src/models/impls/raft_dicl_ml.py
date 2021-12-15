@@ -154,6 +154,66 @@ class PyramidEncoder(nn.Module):
         return x3, x4, x5, x6
 
 
+class RaftEncoder(nn.Module):
+    def __init__(self, output_dim, levels=4, norm_type='batch'):
+        super().__init__()
+
+        self.fnet = FeatureEncoder(output_dim=256, norm_type=norm_type, init_mode='fan_in')
+        self.fnet_1 = StackEncoder(input_dim=256, output_dim=output_dim, levels=levels, norm_type=norm_type)
+        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=output_dim, levels=levels, norm_type=norm_type)
+
+    def forward(self, img1, img2):
+        fmap1 = self.fnet(img1)
+        fmap2 = self.fnet(img2)
+
+        # assymetric stack/pyramid
+        fmap1 = self.fnet_1(fmap1)
+        fmap2 = self.fnet_2(fmap2)
+
+        return fmap1, fmap2
+
+
+class PoolEncoder(nn.Module):
+    def __init__(self, output_dim, levels=4, norm_type='batch', pool_type='max'):
+        super().__init__()
+
+        self.levels = levels
+        self.fnet = FeatureEncoder(output_dim=output_dim, norm_type=norm_type, init_mode='fan_in')
+
+        if pool_type == 'avg':
+            self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
+        elif pool_type == 'max':
+            self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        else:
+            raise ValueError(f"unknown pooling type: '{pool_type}'")
+
+    def forward(self, img1, img2):
+        fmap1 = self.fnet(img1)
+        fmap2 = self.fnet(img2)
+
+        # keep features in F1 domain
+        fmap1_stack = [fmap1] * self.levels
+
+        # pool features in F2 domain
+        fmap2_pyramid = [fmap2]
+        for _ in range(1, self.levels):
+            fmap2 = self.pool(fmap2)
+            fmap2_pyramid.append(fmap2)
+
+        return fmap1_stack, fmap2_pyramid
+
+
+def make_encoder(encoder_type, output_dim, levels=4, norm_type='batch'):
+    if encoder_type == 'raft-cnn':
+        return RaftEncoder(output_dim, levels=levels, norm_type=norm_type)
+    elif encoder_type == 'raft-avgpool':
+        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='avg')
+    elif encoder_type == 'raft-maxpool':
+        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='max')
+    else:
+        raise ValueError(f"unknown encoder type: '{encoder_type}'")
+
+
 # -- Correlation module combining DICL with RAFT lookup/sampling -----------------------------------
 
 class CorrelationModule(nn.Module):
@@ -259,7 +319,8 @@ class RaftPlusDiclModule(nn.Module):
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
-                 dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch'):
+                 dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
+                 encoder_type='raft-cnn'):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -271,10 +332,7 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
-        self.fnet = FeatureEncoder(output_dim=256, norm_type=encoder_norm, dropout=dropout, init_mode='fan_in')
-        self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_channels, levels=corr_levels, norm_type=encoder_norm)
-        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_channels, levels=corr_levels, norm_type=encoder_norm)
-
+        self.fnet = make_encoder(encoder_type, corr_channels, levels=corr_levels, norm_type=encoder_norm)
         self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout, init_mode='fan_in')
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
@@ -301,11 +359,7 @@ class RaftPlusDiclModule(nn.Module):
 
         # run feature network
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-            fmap1, fmap2 = self.fnet((img1, img2))
-
-            # assymetric stack/pyramid
-            fmap1 = self.fnet_1(fmap1)
-            fmap2 = self.fnet_2(fmap2)
+            fmap1, fmap2 = self.fnet(img1, img2)
 
         fmap1, fmap2 = [f1.float() for f1 in fmap1], [f2.float() for f2 in fmap2]
 
@@ -369,6 +423,7 @@ class RaftPlusDicl(Model):
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
+        encoder_type = param_cfg.get('encoder-type', 'raft-cnn')
 
         args = cfg.get('arguments', {})
 
@@ -376,12 +431,12 @@ class RaftPlusDicl(Model):
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    dap_init=dap_init, dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
-                   mnet_norm=mnet_norm, arguments=args)
+                   mnet_norm=mnet_norm, encoder_type=encoder_type, arguments=args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 arguments={}):
+                 encoder_type='raft-cnn', arguments={}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -394,12 +449,14 @@ class RaftPlusDicl(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
         self.mnet_norm = mnet_norm
+        self.encoder_type = encoder_type
 
         super().__init__(RaftPlusDiclModule(
             dropout=dropout, mixed_precision=mixed_precision, corr_levels=corr_levels,
             corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
             recurrent_channels=recurrent_channels, dap_init=dap_init, dap_type=dap_type,
-            encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm), arguments)
+            encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm,
+            encoder_type=encoder_type), arguments)
 
         self.adapter = raft.RaftAdapter()
 
@@ -421,6 +478,7 @@ class RaftPlusDicl(Model):
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
                 'mnet-norm': self.mnet_norm,
+                'encoder-type': self.encoder_type,
             },
             'arguments': default_args | self.arguments,
         }
