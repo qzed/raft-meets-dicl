@@ -6,6 +6,7 @@ from ... import Loss, Model, ModelAdapter, Result
 from ... import common
 
 from ...common.blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed, MatchingNet, DisplacementAwareProjection
+from ...common.encoders.raft.s3 import FeatureEncoder
 
 from .. import raft
 
@@ -264,7 +265,7 @@ class RaftModule(nn.Module):
         self.fnet_u = FeatureNetUp(self.feature_dim)
         self.fnet_d = FeatureNetDown(self.feature_dim)
 
-        self.cnet = raft.BasicEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0.0)
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type='batch', dropout=0.0)
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.cvol = CorrelationModule(self.feature_dim, corr_radius)

@@ -8,6 +8,8 @@ from .. import common
 from ..common.blocks.dicl import MatchingNet, DisplacementAwareProjection
 from ..common.blocks.raft import ResidualBlock
 
+from ..common.encoders.raft.s3 import FeatureEncoder
+
 from . import raft
 
 
@@ -269,11 +271,11 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
-        self.fnet = raft.BasicEncoder(output_dim=256, norm_type=encoder_norm, dropout=dropout, init_mode='fan_in')
+        self.fnet = FeatureEncoder(output_dim=256, norm_type=encoder_norm, dropout=dropout, init_mode='fan_in')
         self.fnet_1 = StackEncoder(input_dim=256, output_dim=corr_channels, levels=corr_levels, norm_type=encoder_norm)
         self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=corr_channels, levels=corr_levels, norm_type=encoder_norm)
 
-        self.cnet = raft.BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout, init_mode='fan_in')
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout, init_mode='fan_in')
 
         self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)

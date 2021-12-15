@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from .. import Model, ModelAdapter
 from .. import common
 
+from ..common.encoders.raft.s3 import FeatureEncoder
+
 from . import raft
 
 
@@ -24,8 +26,8 @@ class RaftPlusDiclModule(nn.Module):
 
         self.corr_radius = corr_radius
 
-        self.fnet = raft.BasicEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = raft.BasicEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
+        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
         self.cvol = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
                                           norm_type=mnet_norm, **corr_args)
         self.update_block = raft.BasicUpdateBlock(self.cvol.output_dim, input_dim=cdim, hidden_dim=hdim)
