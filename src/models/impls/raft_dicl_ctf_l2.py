@@ -27,19 +27,26 @@ class RaftPlusDiclModule(nn.Module):
         self.context_dim = cdim = context_channels
 
         self.corr_radius = corr_radius
+        self.corr_share = share_dicl
 
         self.fnet = common.encoders.make_encoder_p34(encoder_type, corr_channels, encoder_norm, dropout=0)
         self.cnet = common.encoders.make_encoder_p34(context_type, hdim + cdim, context_norm, dropout=0)
 
-        self.corr_3 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
-                                            norm_type=mnet_norm, **corr_args)
         if share_dicl:
-            self.corr_4 = self.corr_3
+            self.corr = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                              norm_type=mnet_norm, **corr_args)
+
+            corr_out_dim = self.corr.output_dim
+
         else:
+            self.corr_3 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
+                                                norm_type=mnet_norm, **corr_args)
             self.corr_4 = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
                                                 norm_type=mnet_norm, **corr_args)
 
-        self.update_block = raft.BasicUpdateBlock(self.corr_3.output_dim, input_dim=cdim, hidden_dim=hdim)
+            corr_out_dim = self.corr_3.output_dim
+
+        self.update_block = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
@@ -51,6 +58,13 @@ class RaftPlusDiclModule(nn.Module):
     def forward(self, img1, img2, iterations=(4, 3), dap=True, upnet=True):
         hdim, cdim = self.hidden_dim, self.context_dim
         b, _, h, w = img1.shape
+
+        if self.corr_share:
+            corr_3 = self.corr
+            corr_4 = self.corr
+        else:
+            corr_3 = self.corr_3
+            corr_4 = self.corr_4
 
         # run feature encoder
         f1_3, f1_4 = self.fnet(img1)
@@ -77,7 +91,7 @@ class RaftPlusDiclModule(nn.Module):
             coords1 = coords1.detach()
 
             # correlation/cost volume lookup
-            corr = self.corr_4(f1_4, f2_4, coords1, dap=dap)
+            corr = corr_4(f1_4, f2_4, coords1, dap=dap)
 
             # estimate delta for flow update
             h_4, d = self.update_block(h_4, ctx_4, corr, flow)
@@ -102,7 +116,7 @@ class RaftPlusDiclModule(nn.Module):
             coords1 = coords1.detach()
 
             # correlation/cost volume lookup
-            corr = self.corr_3(f1_3, f2_3, coords1, dap=dap)
+            corr = corr_3(f1_3, f2_3, coords1, dap=dap)
 
             # estimate delta for flow update
             h_3, d = self.update_block(h_3, ctx_3, corr, flow)
