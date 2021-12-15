@@ -25,6 +25,7 @@ class TrainingContext:
     loader_args: Dict
 
     step: int
+    step_limit: Optional[int]
 
     data: Optional[td.DataLoader]
     optimizer: Optional[torch.optim.Optimizer]
@@ -33,7 +34,7 @@ class TrainingContext:
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
     def __init__(self, log, strategy, model, model_adapter, loss, input, inspector, checkpoints,
-                 device, loader_args={}):
+                 device, step_limit=None, loader_args={}):
         self.log = log
         self.strategy = strategy
         self.model = model
@@ -46,6 +47,7 @@ class TrainingContext:
         self.loader_args = loader_args
 
         self.step = 0
+        self.step_limit = step_limit
 
         self.data = None
         self.optimizer = None
@@ -95,6 +97,9 @@ class TrainingContext:
 
             start_epoch = 0
             checkpoint = None
+
+            if self.step_limit is not None and self.step == self.step_limit:
+                break
 
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
@@ -170,6 +175,9 @@ class TrainingContext:
 
             self.run_epoch(log_, stage, epoch)
 
+            if self.step_limit is not None and self.step == self.step_limit:
+                break
+
         # inspection and validation
         self.inspector.on_stage(log, self, stage)
 
@@ -183,6 +191,9 @@ class TrainingContext:
         # actual trainng loop
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):
             self.run_instance(log, stage, epoch, i, img1, img2, flow, valid, meta)
+
+            if self.step_limit is not None and self.step == self.step_limit:
+                break
 
         # run per-epoch learning-rate schedulers
         for s in self.lr_sched_epoch:

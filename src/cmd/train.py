@@ -204,7 +204,7 @@ def _train(args):
     # training loop
     log = utils.logging.Logger()
     tctx = TrainingContext(log, strat, model, model_adapter, loss, input, inspc, chkptm, device,
-                           env.loader_args)
+                           step_limit=args.steps, loader_args=env.loader_args)
 
     if args.detect_anomaly:
         log.warn('anomaly detection enabled')

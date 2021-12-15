@@ -58,6 +58,7 @@ def main():
     train.add_argument('--detect-anomaly', action='store_true', help='enable pytorch anomaly detection')
     train.add_argument('--suffix', '--sfx', dest='suffix', help='suffix for output directory')
     train.add_argument('--comment', dest='comment', help='comment to add to config file')
+    train.add_argument('--limit-steps', type=int, dest='steps', help='limit to a fixed number of steps')
 
     # subcommand: eval[uate]
     eval = subp.add_parser('evaluate', aliases=['e', 'eval'], formatter_class=fmtcls, help='evaluate model')
