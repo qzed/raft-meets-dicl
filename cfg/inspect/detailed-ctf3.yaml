@@ -1,0 +1,100 @@
+metrics:
+  - prefix: 'Train:S{n_stage}:{id_stage}/'
+    frequency: 1
+    metrics:
+      - type: epe
+      - type: fl-all
+      - type: loss
+      - type: learning-rate
+      - type: flow-magnitude
+
+      - type: grad-norm
+        parameters:
+          total:
+            - total
+          fnet:
+            - module.fnet.
+          cnet:
+            - module.cnet.
+          corr3-mnet:
+            - module.corr_3.mnet.
+          corr3-dap:
+            - module.corr_3.dap.
+          corr4-mnet:
+            - module.corr_4.mnet.
+          corr4-dap:
+            - module.corr_4.dap.
+          corr5-mnet:
+            - module.corr_5.mnet.
+          corr5-dap:
+            - module.corr_5.dap.
+          rnn:
+            - module.update_block.enc.
+            - module.update_block.gru.
+          flowhead:
+            - module.update_block.flow.
+          upnet:
+            - module.update_block.upnet.
+
+      - type: param-norm
+        parameters:
+          total:
+            - total
+          fnet:
+            - module.fnet.
+          cnet:
+            - module.cnet.
+          corr3-mnet:
+            - module.corr_3.mnet.
+          corr3-dap:
+            - module.corr_3.dap.
+          corr4-mnet:
+            - module.corr_4.mnet.
+          corr4-dap:
+            - module.corr_4.dap.
+          corr5-mnet:
+            - module.corr_5.mnet.
+          corr5-dap:
+            - module.corr_5.dap.
+          rnn:
+            - module.update_block.enc.
+            - module.update_block.gru.
+          flowhead:
+            - module.update_block.flow.
+          upnet:
+            - module.update_block.upnet.
+
+images:
+  frequency: 100
+  prefix: 'Train:S{n_stage}:{id_stage}/'
+
+checkpoints:
+  path: checkpoints/
+  name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
+  compare: ['{m_EndPointError_mean}']
+  keep:
+    latest: 100
+    best: 100
+
+validation:
+  - type: strategy
+    frequency: 250
+    checkpoint: true
+
+    tb-metrics-prefix: Validation:S{n_stage}:{id_stage}:{id_val}/
+
+    metrics:
+      - reduce: mean
+        metric:
+          type: epe
+
+      - reduce: mean
+        metric:
+          type: fl-all
+
+      - reduce: mean
+        metric:
+          type: loss
+
+    images:
+      prefix: 'Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/'
