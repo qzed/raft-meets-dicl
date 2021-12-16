@@ -204,8 +204,10 @@ class BasicUpdateBlock(nn.Module):
 class Up8Network(nn.Module):
     """RAFT 8x flow upsampling module for finest level"""
 
-    def __init__(self, hidden_dim=128):
+    def __init__(self, hidden_dim=128, mixed_precision=False):
         super().__init__()
+
+        self.mixed_precision = mixed_precision
 
         self.conv1 = nn.Conv2d(hidden_dim, 256, 3, padding=1)
         self.relu1 = nn.ReLU(inplace=True)
@@ -215,9 +217,10 @@ class Up8Network(nn.Module):
         batch, c, h, w = flow.shape
 
         # prepare mask
-        mask = self.conv2(self.relu1(self.conv1(hidden)))
-        mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-        mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
+        with torch.cuda.amp.autocast(enabled=self.mixed_precision):
+            mask = self.conv2(self.relu1(self.conv1(hidden)))
+            mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
+            mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
 
         # prepare flow
         up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
@@ -255,7 +258,7 @@ class RaftModule(nn.Module):
                                                     norm_type=context_norm, dropout=dropout)
 
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = Up8Network(hidden_dim=hdim)
+        self.upnet = Up8Network(hidden_dim=hdim, mixed_precision=mixed_precision)
 
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
