@@ -1,12 +1,12 @@
 {
-    "timestamp": "2021-12-16T15:02:39.957566",
-    "commit": "~71bf4f0bb11c726ab2b3607282a6e08113b9289e",
+    "timestamp": "2021-12-16T15:12:10.868868",
+    "commit": "~15e3ac3b20000008714489f2c35be4e4bf04a790",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
-        "output": "cfg/full/dev/raft+dicl-ctf2l-c64.flyingchairs2-prep00005.json",
+        "output": "cfg/full/dev/raft+dicl-ctf2l-c64.flyingchairs2-prep0001.json",
         "config": null,
-        "data": "cfg/strategy/dev/train-ufreiburg-flyingchairs2.prepstage-lr00005.yaml",
+        "data": "cfg/strategy/dev/train-ufreiburg-flyingchairs2.prepstage-lr0001.yaml",
         "model": "cfg/model/raft+dicl-ctf2l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
         "inspect": "cfg/inspect/default-1k.yaml",
@@ -366,7 +366,7 @@
                 "optimizer": {
                     "type": "adam-w",
                     "parameters": {
-                        "lr": 5e-05,
+                        "lr": 0.0001,
                         "weight_decay": 0.0001,
                         "eps": 1e-08
                     }
@@ -397,7 +397,7 @@
                         {
                             "type": "one-cycle",
                             "parameters": {
-                                "max_lr": 5e-05,
+                                "max_lr": 0.0001,
                                 "total_steps": "({n_epochs} * {n_batches}) // {n_accum} + 100",
                                 "pct_start": 0.05,
                                 "cycle_momentum": false,
