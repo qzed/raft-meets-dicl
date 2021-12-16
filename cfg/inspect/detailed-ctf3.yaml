@@ -34,7 +34,7 @@ metrics:
           flowhead:
             - module.update_block.flow.
           upnet:
-            - module.update_block.upnet.
+            - module.upnet.
 
       - type: param-norm
         parameters:
@@ -62,7 +62,7 @@ metrics:
           flowhead:
             - module.update_block.flow.
           upnet:
-            - module.update_block.upnet.
+            - module.upnet.
 
 images:
   frequency: 100
