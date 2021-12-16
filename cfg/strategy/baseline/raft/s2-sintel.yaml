@@ -89,12 +89,12 @@ data:
 
 validation:
   - name: sintel-clean
-    source: ../../data/mpi-sintel-clean.train-full.yaml
+    source: ../../../data/mpi-sintel-clean.train-full.yaml
     batch-size: 2
     images: [0, 512, 1024]
 
   - name: sintel-final
-    source: ../../data/mpi-sintel-final.train-full.yaml
+    source: ../../../data/mpi-sintel-final.train-full.yaml
     batch-size: 2
     images: [0, 512, 1024]
 
