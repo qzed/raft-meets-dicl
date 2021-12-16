@@ -1,10 +1,10 @@
 {
-    "timestamp": "2021-12-08T12:46:58.531775",
-    "commit": "~e097f7e094e8a5690788154e83c6772beb621a0e",
+    "timestamp": "2021-12-16T15:29:31.590176",
+    "commit": "~de9e79886b397053c5e1d743f89da9f19a49b7d3",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
-        "output": "cfg/full/dev/raft+dicl-ctf2l-diclshared.singel.json",
+        "output": "cfg/full/dev/raft+dicl-ctf2l-diclshared.sintel.json",
         "config": null,
         "data": "cfg/strategy/dev/train-sintel.aug-full.yaml",
         "model": "cfg/model/raft+dicl-ctf2l.yaml",
@@ -32,7 +32,12 @@
                 "encoder-norm": "instance",
                 "context-norm": "batch",
                 "mnet-norm": "batch",
-                "share-dicl": true
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "share-dicl": true,
+                "corr-type": "dicl",
+                "corr-args": {},
+                "upsample-hidden": "none"
             },
             "arguments": {
                 "iterations": [

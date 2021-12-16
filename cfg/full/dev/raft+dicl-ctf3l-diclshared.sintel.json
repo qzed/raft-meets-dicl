@@ -1,15 +1,15 @@
 {
-    "timestamp": "2021-12-16T15:28:12.948169",
+    "timestamp": "2021-12-16T15:29:52.246206",
     "commit": "~de9e79886b397053c5e1d743f89da9f19a49b7d3",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
-        "output": "cfg/full/dev/raft+dicl-ctf2l-diclshared.flyingthings3d.json",
+        "output": "cfg/full/dev/raft+dicl-ctf3l-diclshared.sintel.json",
         "config": null,
-        "data": "cfg/strategy/dev/train-ufreiburg-flyingthings3d.aug-full.yaml",
-        "model": "cfg/model/raft+dicl-ctf2l.yaml",
+        "data": "cfg/strategy/dev/train-sintel.aug-full.yaml",
+        "model": "cfg/model/raft+dicl-ctf3l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
-        "inspect": "cfg/inspect/default-1k.yaml",
+        "inspect": null,
         "env": null
     },
     "seeds": {
@@ -19,10 +19,10 @@
         "cuda": -1021252639206788731
     },
     "model": {
-        "name": "RAFT+DICL coarse-to-fine two-level",
-        "id": "raft+dicl/ctf-l2",
+        "name": "RAFT+DICL coarse-to-fine three-level",
+        "id": "raft+dicl/ctf-l3",
         "model": {
-            "type": "raft+dicl/ctf-l2",
+            "type": "raft+dicl/ctf-l3",
             "parameters": {
                 "corr-radius": 4,
                 "corr-channels": 32,
@@ -31,9 +31,9 @@
                 "dap-init": "identity",
                 "encoder-norm": "instance",
                 "context-norm": "batch",
-                "mnet-norm": "batch",
                 "encoder-type": "raft",
                 "context-type": "raft",
+                "mnet-norm": "batch",
                 "share-dicl": true,
                 "corr-type": "dicl",
                 "corr-args": {},
@@ -42,6 +42,7 @@
             "arguments": {
                 "iterations": [
                     4,
+                    3,
                     3
                 ],
                 "dap": true,
@@ -54,6 +55,7 @@
                 "ord": 1,
                 "gamma": 0.85,
                 "alpha": [
+                    0.38,
                     0.6,
                     1.0
                 ]
@@ -72,8 +74,8 @@
                 "type": "modulo",
                 "mode": "zeros",
                 "size": [
-                    32,
-                    32
+                    64,
+                    64
                 ]
             }
         }
@@ -82,8 +84,8 @@
         "mode": "continuous",
         "stages": [
             {
-                "name": "FlyingThings3d",
-                "id": "train/things3d-0",
+                "name": "MPI Sintel (clean + final)",
+                "id": "train/sintel-0",
                 "data": {
                     "source": {
                         "type": "augment",
@@ -91,8 +93,8 @@
                             {
                                 "type": "translate",
                                 "min-size": [
-                                    720,
-                                    400
+                                    768,
+                                    368
                                 ],
                                 "delta": [
                                     10,
@@ -102,11 +104,11 @@
                             {
                                 "type": "scale",
                                 "min-size": [
-                                    720,
-                                    400
+                                    768,
+                                    368
                                 ],
-                                "min-scale": 0.75,
-                                "max-scale": 1.75,
+                                "min-scale": 0.87,
+                                "max-scale": 1.52,
                                 "max-stretch": 0.2,
                                 "prob-stretch": 0.8,
                                 "mode": "linear",
@@ -115,8 +117,8 @@
                             {
                                 "type": "crop",
                                 "size": [
-                                    720,
-                                    400
+                                    768,
+                                    368
                                 ]
                             },
                             {
@@ -161,42 +163,28 @@
                                 {
                                     "type": "dataset",
                                     "spec": {
-                                        "id": "ufreiburg-flyingthings3d",
-                                        "name": "Uni Freiburg FlyingThings3d",
-                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingthings3d/data",
+                                        "id": "mpi-sintel",
+                                        "name": "MPI Sintel",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                         "layout": {
-                                            "type": "multi",
-                                            "parameter": "direction",
-                                            "instances": {
-                                                "forwards": {
-                                                    "type": "generic",
-                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
-                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm",
-                                                    "key": "{type}/{abc}/{seq:04d}/into_future/{camera}/{idx:04d}"
-                                                },
-                                                "backwards": {
-                                                    "type": "generic-backwards",
-                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
-                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm",
-                                                    "key": "{type}/{abc}/{seq:04d}/into_past/{camera}/{idx:04d}"
-                                                }
-                                            }
+                                            "type": "generic",
+                                            "images": "{type}/{pass}/{scene}/frame_{idx:04d}.png",
+                                            "flows": "{type}/flow/{scene}/frame_{idx:04d}.flo",
+                                            "key": "{type}/{scene}/frame_{idx:04d}"
                                         },
                                         "split": null,
                                         "parameters": {
-                                            "camera": {
+                                            "type": {
                                                 "values": [
-                                                    "left",
-                                                    "right"
+                                                    "train",
+                                                    "test"
                                                 ],
                                                 "sub": {
-                                                    "left": {
-                                                        "camera": "left",
-                                                        "camera_short": "L"
+                                                    "test": {
+                                                        "type": "test"
                                                     },
-                                                    "right": {
-                                                        "camera": "right",
-                                                        "camera_short": "R"
+                                                    "train": {
+                                                        "type": "training"
                                                     }
                                                 }
                                             },
@@ -206,20 +194,6 @@
                                                     "final"
                                                 ],
                                                 "sub": "pass"
-                                            },
-                                            "type": {
-                                                "values": [
-                                                    "train",
-                                                    "test"
-                                                ],
-                                                "sub": {
-                                                    "test": {
-                                                        "type": "TEST"
-                                                    },
-                                                    "train": {
-                                                        "type": "TRAIN"
-                                                    }
-                                                }
                                             }
                                         },
                                         "loader": {
@@ -235,51 +209,39 @@
                                     },
                                     "parameters": {
                                         "type": "train",
-                                        "pass": "clean",
-                                        "direction": "forwards",
-                                        "camera": "left"
+                                        "pass": "clean"
                                     },
-                                    "filter": null
+                                    "filter": {
+                                        "type": "file",
+                                        "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                        "value": "0"
+                                    }
                                 },
                                 {
                                     "type": "dataset",
                                     "spec": {
-                                        "id": "ufreiburg-flyingthings3d",
-                                        "name": "Uni Freiburg FlyingThings3d",
-                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingthings3d/data",
+                                        "id": "mpi-sintel",
+                                        "name": "MPI Sintel",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                         "layout": {
-                                            "type": "multi",
-                                            "parameter": "direction",
-                                            "instances": {
-                                                "forwards": {
-                                                    "type": "generic",
-                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
-                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm",
-                                                    "key": "{type}/{abc}/{seq:04d}/into_future/{camera}/{idx:04d}"
-                                                },
-                                                "backwards": {
-                                                    "type": "generic-backwards",
-                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
-                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm",
-                                                    "key": "{type}/{abc}/{seq:04d}/into_past/{camera}/{idx:04d}"
-                                                }
-                                            }
+                                            "type": "generic",
+                                            "images": "{type}/{pass}/{scene}/frame_{idx:04d}.png",
+                                            "flows": "{type}/flow/{scene}/frame_{idx:04d}.flo",
+                                            "key": "{type}/{scene}/frame_{idx:04d}"
                                         },
                                         "split": null,
                                         "parameters": {
-                                            "camera": {
+                                            "type": {
                                                 "values": [
-                                                    "left",
-                                                    "right"
+                                                    "train",
+                                                    "test"
                                                 ],
                                                 "sub": {
-                                                    "left": {
-                                                        "camera": "left",
-                                                        "camera_short": "L"
+                                                    "test": {
+                                                        "type": "test"
                                                     },
-                                                    "right": {
-                                                        "camera": "right",
-                                                        "camera_short": "R"
+                                                    "train": {
+                                                        "type": "training"
                                                     }
                                                 }
                                             },
@@ -289,20 +251,6 @@
                                                     "final"
                                                 ],
                                                 "sub": "pass"
-                                            },
-                                            "type": {
-                                                "values": [
-                                                    "train",
-                                                    "test"
-                                                ],
-                                                "sub": {
-                                                    "test": {
-                                                        "type": "TEST"
-                                                    },
-                                                    "train": {
-                                                        "type": "TRAIN"
-                                                    }
-                                                }
                                             }
                                         },
                                         "loader": {
@@ -318,17 +266,19 @@
                                     },
                                     "parameters": {
                                         "type": "train",
-                                        "pass": "final",
-                                        "direction": "forwards",
-                                        "camera": "left"
+                                        "pass": "final"
                                     },
-                                    "filter": null
+                                    "filter": {
+                                        "type": "file",
+                                        "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                        "value": "0"
+                                    }
                                 }
                             ]
                         },
                         "sync": true
                     },
-                    "epochs": 10,
+                    "epochs": 250,
                     "batch-size": 4,
                     "drop-last": true,
                     "shuffle": true
@@ -387,7 +337,11 @@
                                 "type": "train",
                                 "pass": "clean"
                             },
-                            "filter": null
+                            "filter": {
+                                "type": "file",
+                                "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                "value": "1"
+                            }
                         },
                         "batch_size": 4,
                         "images": [
@@ -451,7 +405,11 @@
                                 "type": "train",
                                 "pass": "final"
                             },
-                            "filter": null
+                            "filter": {
+                                "type": "file",
+                                "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                "value": "1"
+                            }
                         },
                         "batch_size": 4,
                         "images": [
@@ -467,7 +425,7 @@
                     "type": "adam-w",
                     "parameters": {
                         "lr": 0.000125,
-                        "weight_decay": 0.0001,
+                        "weight_decay": 1e-05,
                         "eps": 1e-08
                     }
                 },
@@ -571,48 +529,7 @@
         "validation": [
             {
                 "type": "strategy",
-                "frequency": 1000,
-                "checkpoint": true,
-                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
-                "metrics": [
-                    {
-                        "reduce": "mean",
-                        "log": true,
-                        "metric": {
-                            "type": "epe",
-                            "key": "EndPointError/",
-                            "distances": [
-                                1,
-                                3,
-                                5
-                            ]
-                        }
-                    },
-                    {
-                        "reduce": "mean",
-                        "log": true,
-                        "metric": {
-                            "type": "fl-all",
-                            "key": "Fl-all"
-                        }
-                    },
-                    {
-                        "reduce": "mean",
-                        "log": true,
-                        "metric": {
-                            "type": "loss",
-                            "key": "Loss"
-                        }
-                    }
-                ],
-                "images": {
-                    "enabled": true,
-                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
-                }
-            },
-            {
-                "type": "strategy",
-                "frequency": "stage",
+                "frequency": "epoch",
                 "checkpoint": true,
                 "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
                 "metrics": [
