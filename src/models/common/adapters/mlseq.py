@@ -2,8 +2,8 @@ from ... import ModelAdapter, Result
 
 
 class MultiLevelSequenceAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, model):
+        super().__init__(model)
 
     def wrap_result(self, result, original_shape) -> Result:
         return MultiLevelSequenceResult(result, original_shape)

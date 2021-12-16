@@ -328,6 +328,8 @@ class Stage:
     validation: Optional[ValidationSpec]
     optimizer: OptimizerSpec
     model_args: dict
+    model_on_epoch_args: dict
+    model_on_stage_args: dict
     loss_args: dict
     gradient: GradientSpec
     scheduler: MultiSchedulerSpec
@@ -348,6 +350,9 @@ class Stage:
         valid = [ValidationSpec.from_config(path, v) for v in valid]
 
         model_args = cfg.get('model', {}).get('arguments', {})
+        model_on_epoch_args = cfg.get('model', {}).get('on-epoch', {})
+        model_on_stage_args = cfg.get('model', {}).get('on-stage', {})
+
         loss_args = cfg.get('loss', {}).get('arguments', {})
 
         gradient = GradientSpec.from_config(cfg.get('gradient', {}))
@@ -355,17 +360,20 @@ class Stage:
 
         loader_args = cfg.get('loader', {})
 
-        return cls(name, id, data, valid, optimizer, model_args, loss_args, gradient, scheduler,
-                   loader_args)
+        return cls(name, id, data, valid, optimizer, model_args, model_on_epoch_args,
+                   model_on_stage_args, loss_args, gradient, scheduler, loader_args)
 
-    def __init__(self, name, id, data, validation, optimizer, model_args={}, loss_args={},
-                 gradient=None, scheduler=MultiSchedulerSpec(), loader_args={}):
+    def __init__(self, name, id, data, validation, optimizer, model_args={}, model_on_epoch_args={},
+                 model_on_stage_args={}, loss_args={}, gradient=None, scheduler=MultiSchedulerSpec(),
+                 loader_args={}):
         self.name = name
         self.id = id
         self.data = data
         self.validation = validation
         self.optimizer = optimizer
         self.model_args = model_args
+        self.model_on_epoch_args = model_on_epoch_args
+        self.model_on_stage_args = model_on_stage_args
         self.loss_args = loss_args
         self.gradient = gradient
         self.scheduler = scheduler
@@ -379,7 +387,11 @@ class Stage:
             'data': self.data.get_config(),
             'validation': [v.get_config() for v in self.validation],
             'optimizer': self.optimizer.get_config(),
-            'model': {'arguments': self.model_args},
+            'model': {
+                'arguments': self.model_args,
+                'on-epoch:': self.model_on_epoch_args,
+                'on-stage:': self.model_on_stage_args,
+            },
             'loss': {'arguments': self.loss_args},
             'gradient': self.gradient.get_config() if self.gradient is not None else None,
             'lr-scheduler': self.scheduler.get_config(),

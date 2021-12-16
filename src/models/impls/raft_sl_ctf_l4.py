@@ -29,11 +29,6 @@ class RaftModule(nn.Module):
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
-    def freeze_batchnorm(self):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
-
     def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True):
         batch, _c, h, w = img1.shape
         hdim, cdim = self.hidden_dim, self.context_dim
@@ -204,16 +199,20 @@ class Raft(Model):
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
+        on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
+        on_epoch_args = cfg.get('on-epoch', {})
 
         return cls(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm,
                    encoder_type=encoder_type, context_type=context_type,
-                   upsample_hidden=upsample_hidden, arguments=args)
+                   upsample_hidden=upsample_hidden, arguments=args,
+                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft', upsample_hidden='none', arguments={}):
+                 encoder_type='raft', context_type='raft', upsample_hidden='none', arguments={},
+                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -225,16 +224,21 @@ class Raft(Model):
         self.context_type = context_type
         self.upsample_hidden = upsample_hidden
 
+        self.freeze_batchnorm = True
+
         super().__init__(RaftModule(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm,
                                     encoder_type=encoder_type, context_type=context_type,
-                                    upsample_hidden=upsample_hidden), arguments)
-
-        self.adapter = common.adapters.mlseq.MultiLevelSequenceAdapter()
+                                    upsample_hidden=upsample_hidden),
+                         arguments=arguments,
+                         on_epoch_arguments=on_epoch_args,
+                         on_stage_arguments=on_stage_args)
 
     def get_config(self):
         default_args = {'iterations': (4, 3, 3, 3), 'upnet': True}
+        default_stage_args = {'freeze_batchnorm': True}
+        default_epoch_args = {}
 
         return {
             'type': self.type,
@@ -251,16 +255,24 @@ class Raft(Model):
                 'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
+            'on-stage': default_stage_args | self.on_stage_arguments,
+            'on-epoch': default_epoch_args | self.on_epoch_arguments,
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return common.adapters.mlseq.MultiLevelSequenceAdapter(self)
 
     def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True):
         return self.module(img1, img2, iterations=iterations, upnet=upnet)
+
+    def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
+        self.freeze_batchnorm = freeze_batchnorm
+
+        if self.training:
+            common.norm.freeze_batchnorm(self.module, freeze_batchnorm)
 
     def train(self, mode: bool = True):
         super().train(mode)
 
         if mode:
-            self.module.freeze_batchnorm()
+            common.norm.freeze_batchnorm(self.module, self.freeze_batchnorm)

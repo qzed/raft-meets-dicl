@@ -287,11 +287,6 @@ class RaftModule(nn.Module):
                 if isinstance(m, DisplacementAwareProjection):
                     nn.init.eye_(m.conv1.weight[:, :, 0, 0])
 
-    def freeze_batchnorm(self):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
-
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
         batch, _c, h, w = img.shape
@@ -364,8 +359,6 @@ class Raft(Model):
 
         super().__init__(RaftModule(dap_init, corr_radius), arguments)
 
-        self.adapter = RaftAdapter()
-
     def get_config(self):
         default_args = {'iterations': 12, 'upnet': True}
 
@@ -379,15 +372,15 @@ class Raft(Model):
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return RaftAdapter(self)
 
     def forward(self, img1, img2, iterations=12, upnet=True, flow_init=None):
         return self.module(img1, img2, iterations, upnet, flow_init)
 
 
 class RaftAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, model):
+        super().__init__(model)
 
     def wrap_result(self, result, original_shape) -> Result:
         return RaftResult(result)

@@ -12,3 +12,21 @@ def make_norm2d(ty, num_channels, num_groups):
         return nn.Sequential()
     else:
         raise ValueError(f"unknown norm type '{ty}'")
+
+
+def freeze_batchnorm(module: nn.Module, do_freeze: bool = True):
+    if do_freeze:
+        if isinstance(module, nn.BatchNorm2d):
+            module.eval()
+
+        for m in module.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+
+    else:
+        if isinstance(module, nn.BatchNorm2d):
+            module.train()
+
+        for m in module.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.train()

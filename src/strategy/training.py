@@ -169,6 +169,8 @@ class TrainingContext:
         # run training
         log.info(f"running {stage.data.epochs} epochs")
 
+        self.model_adapter.on_stage(stage, **stage.model_on_stage_args)
+
         for epoch in range(start_epoch, stage.data.epochs):
             log_ = log.new(f"epoch {epoch + 1}/{stage.data.epochs}", sep=', ')
             log_.info(f"starting new epoch at step {self.step}")
@@ -187,6 +189,8 @@ class TrainingContext:
         desc += f"epoch {epoch + 1}/{stage.data.epochs}"
         samples = utils.logging.progress(self.data, unit='batch', leave=False)
         samples.set_description(desc)
+
+        self.model_adapter.on_epoch(stage, epoch, **stage.model_on_epoch_args)
 
         # actual trainng loop
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):

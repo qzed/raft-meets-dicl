@@ -357,11 +357,6 @@ class RaftPlusDiclModule(nn.Module):
                                       radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type,
                                       norm_type=mnet_norm, share=share_dicl)
 
-    def freeze_batchnorm(self):
-        for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
-                m.eval()
-
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
         batch, _c, h, w = img.shape
@@ -442,17 +437,21 @@ class RaftPlusDicl(Model):
         share_dicl = param_cfg.get('share-dicl', False)
 
         args = cfg.get('arguments', {})
+        on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
+        on_epoch_args = cfg.get('on-epoch', {})
 
         return cls(dropout=dropout, mixed_precision=mixed_precision,
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    dap_init=dap_init, dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
-                   mnet_norm=mnet_norm, encoder_type=encoder_type, share_dicl=share_dicl, arguments=args)
+                   mnet_norm=mnet_norm, encoder_type=encoder_type, share_dicl=share_dicl, arguments=args,
+                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft-cnn', share_dicl=False, arguments={}):
+                 encoder_type='raft-cnn', share_dicl=False, arguments={},
+                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -468,17 +467,23 @@ class RaftPlusDicl(Model):
         self.encoder_type = encoder_type
         self.share_dicl = share_dicl
 
-        super().__init__(RaftPlusDiclModule(
-            dropout=dropout, mixed_precision=mixed_precision, corr_levels=corr_levels,
-            corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
-            recurrent_channels=recurrent_channels, dap_init=dap_init, dap_type=dap_type,
-            encoder_norm=encoder_norm, context_norm=context_norm, mnet_norm=mnet_norm,
-            encoder_type=encoder_type, share_dicl=share_dicl), arguments)
+        self.freeze_batchnorm = True
 
-        self.adapter = raft.RaftAdapter()
+        super().__init__(RaftPlusDiclModule(dropout=dropout, mixed_precision=mixed_precision,
+                                            corr_levels=corr_levels, corr_radius=corr_radius,
+                                            corr_channels=corr_channels, context_channels=context_channels,
+                                            recurrent_channels=recurrent_channels, dap_init=dap_init,
+                                            dap_type=dap_type, encoder_norm=encoder_norm,
+                                            context_norm=context_norm, mnet_norm=mnet_norm,
+                                            encoder_type=encoder_type, share_dicl=share_dicl),
+                         arguments=arguments,
+                         on_epoch_arguments=on_epoch_args,
+                         on_stage_arguments=on_stage_args)
 
     def get_config(self):
         default_args = {'iterations': 12, 'dap': True, 'upnet': True, 'mask_costs': []}
+        default_stage_args = {'freeze_batchnorm': True}
+        default_epoch_args = {}
 
         return {
             'type': self.type,
@@ -499,17 +504,25 @@ class RaftPlusDicl(Model):
                 'share-dicl': self.share_dicl,
             },
             'arguments': default_args | self.arguments,
+            'on-stage': default_stage_args | self.on_stage_arguments,
+            'on-epoch': default_epoch_args | self.on_epoch_arguments,
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return raft.RaftAdapter(self)
 
     def forward(self, img1, img2, iterations=12, dap=True, upnet=True, flow_init=None, mask_costs=[]):
         return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet, flow_init=flow_init,
                            mask_costs=mask_costs)
 
+    def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
+        self.freeze_batchnorm = freeze_batchnorm
+
+        if self.training:
+            common.norm.freeze_batchnorm(self.module, freeze_batchnorm)
+
     def train(self, mode: bool = True):
         super().train(mode)
 
         if mode:
-            self.module.freeze_batchnorm()
+            common.norm.freeze_batchnorm(self.module, self.freeze_batchnorm)

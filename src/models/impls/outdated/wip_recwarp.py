@@ -257,8 +257,6 @@ class Wip(Model):
         self.disp = disp
         self.dap_init = dap_init
 
-        self.adapter = WipAdapter()
-
     def get_config(self):
         default_args = {'iterations': [1]*5, 'dap': True}
 
@@ -273,15 +271,15 @@ class Wip(Model):
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return WipAdapter(self)
 
     def forward(self, img1, img2, iterations=[1]*5, dap=True):
         return self.module(img1, img2, iterations, dap)
 
 
 class WipAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, model):
+        super().__init__(model)
 
     def wrap_result(self, result, original_shape) -> Result:
         return WipResult(result, original_shape)

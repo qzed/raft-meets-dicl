@@ -1,4 +1,6 @@
 from .. import Model, ModelAdapter
+from .. import common
+
 from . import raft
 
 
@@ -20,15 +22,19 @@ class Raft(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
 
         args = cfg.get('arguments', {})
+        on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
+        on_epoch_args = cfg.get('on-epoch', {})
 
         return cls(dropout=dropout, mixed_precision=mixed_precision,
                    corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, encoder_norm=encoder_norm,
-                   context_norm=context_norm, arguments=args)
+                   context_norm=context_norm, arguments=args,
+                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
-                 encoder_norm='instance', context_norm='batch', arguments={}):
+                 encoder_norm='instance', context_norm='batch', arguments={},
+                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_radius = corr_radius
@@ -38,15 +44,20 @@ class Raft(Model):
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
 
+        self.freeze_batchnorm = True
+
         super().__init__(raft.RaftModule(dropout=dropout, mixed_precision=mixed_precision,
                                          corr_levels=1, corr_radius=corr_radius, corr_channels=corr_channels,
                                          context_channels=context_channels, recurrent_channels=recurrent_channels,
-                                         encoder_norm=encoder_norm, context_norm=context_norm), arguments)
-
-        self.adapter = raft.RaftAdapter()
+                                         encoder_norm=encoder_norm, context_norm=context_norm),
+                         arguments=arguments,
+                         on_epoch_arguments=on_epoch_args,
+                         on_stage_arguments=on_stage_args)
 
     def get_config(self):
         default_args = {'iterations': 12, 'upnet': True}
+        default_stage_args = {'freeze_batchnorm': True}
+        default_epoch_args = {}
 
         return {
             'type': self.type,
@@ -61,16 +72,24 @@ class Raft(Model):
                 'context-norm': self.context_norm,
             },
             'arguments': default_args | self.arguments,
+            'on-stage': default_stage_args | self.on_stage_arguments,
+            'on-epoch': default_epoch_args | self.on_epoch_arguments,
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return raft.RaftAdapter(self)
 
     def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True):
         return self.module(img1, img2, iterations, flow_init, upnet)
+
+    def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
+        self.freeze_batchnorm = freeze_batchnorm
+
+        if self.training:
+            common.norm.freeze_batchnorm(self.module, freeze_batchnorm)
 
     def train(self, mode: bool = True):
         super().train(mode)
 
         if mode:
-            self.module.freeze_batchnorm()
+            common.norm.freeze_batchnorm(self.module, self.freeze_batchnorm)

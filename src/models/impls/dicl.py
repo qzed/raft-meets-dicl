@@ -319,8 +319,6 @@ class Dicl(Model):
 
         super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
 
-        self.adapter = DiclAdapter()
-
     def get_config(self):
         default_args = {
             'raw': False,
@@ -339,15 +337,15 @@ class Dicl(Model):
         }
 
     def get_adapter(self) -> ModelAdapter:
-        return self.adapter
+        return DiclAdapter(self)
 
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):
         return self.module(img1, img2, raw, dap, ctx, context_scale)
 
 
 class DiclAdapter(ModelAdapter):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, model):
+        super().__init__(model)
 
     def wrap_result(self, result, original_shape) -> Result:
         return DiclResult(result, original_shape)
