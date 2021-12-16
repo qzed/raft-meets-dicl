@@ -1,0 +1,67 @@
+metrics:
+  - prefix: 'Train:S{n_stage}:{id_stage}/'
+    frequency: 1
+    metrics:
+      - type: epe
+      - type: fl-all
+      - type: loss
+      - type: learning-rate
+      - type: grad-norm
+      - type: flow-magnitude
+
+images:
+  frequency: 100
+  prefix: 'Train:S{n_stage}:{id_stage}/'
+
+checkpoints:
+  path: checkpoints/
+  name: '{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth'
+  compare: ['{m_EndPointError_mean}']
+  keep:
+    latest: 2
+    best: 2
+
+validation:
+  - type: strategy
+    frequency: 1000
+    checkpoint: true
+
+    tb-metrics-prefix: Validation:S{n_stage}:{id_stage}:{id_val}/
+
+    metrics:
+      - reduce: mean
+        metric:
+          type: epe
+
+      - reduce: mean
+        metric:
+          type: fl-all
+
+      - reduce: mean
+        metric:
+          type: loss
+
+    images:
+      prefix: 'Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/'
+
+  - type: strategy
+    frequency: stage
+    checkpoint: true
+
+    tb-metrics-prefix: Validation:S{n_stage}:{id_stage}:{id_val}/
+
+    metrics:
+      - reduce: mean
+        metric:
+          type: epe
+
+      - reduce: mean
+        metric:
+          type: fl-all
+
+      - reduce: mean
+        metric:
+          type: loss
+
+    images:
+      prefix: 'Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/'
