@@ -26,8 +26,9 @@ class TqdmLogWrapper(io.StringIO):
         self.buf += self.re_ansi_esc.sub('', buf).strip('\r\n\t ')
 
     def flush(self):
-        self.logger.log(self.level, self.buf)
-        self.buf = ''
+        if self.buf:
+            self.logger.log(self.level, self.buf)
+            self.buf = ''
 
 
 def setup(file=None, console=True, capture_warnings=True, tqdm_to_log=not sys.stderr.isatty()):
