@@ -20,7 +20,7 @@ class TqdmLogWrapper(io.StringIO):
         self.level = level
         self.buf = ''
 
-        self.re_ansi_esc = re.compile(r'''(?:\x1B[@-Z\\-_])''', re.VERBOSE)
+        self.re_ansi_esc = re.compile(r'(?:\x1B\[[@-Z\\-_])')
 
     def write(self, buf):
         self.buf += self.re_ansi_esc.sub('', buf).strip('\r\n\t ')
