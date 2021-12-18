@@ -347,8 +347,7 @@ class StrategyValidation(Validation):
         if epoch is not None:
             desc += f", epoch {epoch + 1}/{stage.data.epochs}"
         desc += f", step {ctx.step}"
-        samples = utils.logging.progress(data, unit='batch', leave=False)
-        samples.set_description(desc)
+        samples = utils.logging.progress(data, unit='batch', leave=False, desc=desc)
 
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):
             # move data to device

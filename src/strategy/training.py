@@ -187,8 +187,7 @@ class TrainingContext:
         # set up progress bar
         desc = f"stage {stage.index + 1}/{len(self.strategy.stages)}, "
         desc += f"epoch {epoch + 1}/{stage.data.epochs}"
-        samples = utils.logging.progress(self.data, unit='batch', leave=False)
-        samples.set_description(desc)
+        samples = utils.logging.progress(self.data, unit='batch', leave=False, desc=desc)
 
         self.model_adapter.on_epoch(stage, epoch, **stage.model_on_epoch_args)
 
