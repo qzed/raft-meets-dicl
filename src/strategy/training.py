@@ -81,6 +81,8 @@ class TrainingContext:
         self.model.to(self.device)
         self.model.train()
 
+        self.inspector.setup(self.log, self)
+
         # run (remaining) training-stages
         stages = [*enumerate(self.strategy.stages)][start_stage:]
         for i, stage in stages:

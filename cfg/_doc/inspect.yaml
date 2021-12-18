@@ -39,6 +39,16 @@ metrics:
         key: LearningRate
         # Unique identifier for this metric (default: LearningRate).
 
+hooks:
+  # Model hooks for inspection. Intended for debugging.
+
+  - type: activation-mean
+    prefix: 'Train:S{n_stage}:{id_stage}/ActivationMean/'
+    modules:
+      - some.submodule
+      - some.other.submodule
+
+
 images:
   # Save training images and flow estimation on regular interval.
   #

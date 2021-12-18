@@ -9,6 +9,9 @@ import numpy as np
 import torch
 import torch.utils.tensorboard as tb
 
+from .hooks import Hook
+from .hooks import Handle as HookHandle
+
 from .. import metrics
 from .. import strategy
 from .. import utils
@@ -422,6 +425,7 @@ class StrategyValidation(Validation):
 
 class InspectorSpec:
     metrics: MetricsGroup
+    hooks: List[Hook]
     images: ImagesSpec
     checkpoints: CheckpointSpec
     validation: List[Validation]
@@ -432,6 +436,9 @@ class InspectorSpec:
         metrics = cfg.get('metrics', [])
         metrics = [MetricsGroup.from_config(m) for m in metrics]
 
+        hooks = cfg.get('hooks', [])
+        hooks = [Hook.from_config(h) for h in hooks]
+
         images = ImagesSpec.from_config(cfg.get('images'))
         checkpoints = CheckpointSpec.from_config(cfg.get('checkpoints', {}))
 
@@ -440,10 +447,11 @@ class InspectorSpec:
 
         tb_path = cfg.get('tensorboard', {}).get('path', 'tb.{id_model}')
 
-        return cls(metrics, images, checkpoints, validation, tb_path)
+        return cls(metrics, hooks, images, checkpoints, validation, tb_path)
 
-    def __init__(self, metrics, images, checkpoints, validation, tb_path):
+    def __init__(self, metrics, hooks, images, checkpoints, validation, tb_path):
         self.metrics = metrics
+        self.hooks = hooks
         self.images = images
         self.checkpoints = checkpoints
         self.validation = validation
@@ -452,6 +460,7 @@ class InspectorSpec:
     def get_config(self):
         return {
             'metrics': [g.get_config() for g in self.metrics],
+            'hooks': [h.get_config() for h in self.hooks],
             'images': self.images.get_config() if self.images is not None else None,
             'checkpoints': self.checkpoints.get_config(),
             'validation': [v.get_config() for v in self.validation],
@@ -469,14 +478,24 @@ class InspectorSpec:
         logging.info(f"writing tensorboard summary to '{path}'")
         writer = SummaryWriter(path)
 
-        insp = SummaryInspector(writer, self.metrics, self.images, chkpts, self.validation)
+        insp = SummaryInspector(writer, self.metrics, self.hooks, self.images, chkpts, self.validation)
 
         return insp, chkpts
 
 
+class HookStub:
+    hook: Hook
+    handle: HookHandle
+
+    def __init__(self, hook, handle=None):
+        self.hook = hook
+        self.handle = handle
+
+
 class SummaryInspector(strategy.Inspector):
     writer: SummaryWriter
-    metrics: MetricsGroup
+    metrics: List[MetricsGroup]
+    hooks: List[HookStub]
     images: ImagesSpec
     checkpoints: strategy.CheckpointManager
 
@@ -484,11 +503,12 @@ class SummaryInspector(strategy.Inspector):
     val_epoch: List[Validation]
     val_stage: List[Validation]
 
-    def __init__(self, writer, metrics, images, checkpoints, validation):
+    def __init__(self, writer, metrics, hooks, images, checkpoints, validation):
         super().__init__()
 
         self.writer = writer
         self.metrics = metrics
+        self.hooks = [HookStub(hook) for hook in hooks]
         self.images = images
         self.checkpoints = checkpoints
 
@@ -497,13 +517,38 @@ class SummaryInspector(strategy.Inspector):
         self.val_stage = [v for v in validation if v.frequency == 'stage']
 
     def setup(self, log, ctx):
-        pass
+        for stub in self.hooks:
+            if stub.handle is not None:
+                stub.handle.remove()
+                stub.handle = None
 
-    def _pre_validation(self):
-        pass
+        for stub in self.hooks:
+            if stub.hook.when in ['training', 'all']:
+                stub.handle = stub.hook.register(ctx, self.writer)
 
-    def _post_validation(self):
-        pass
+    def _pre_validation(self, log, ctx):
+        # unregister any training hooks
+        for stub in self.hooks:
+            if stub.hook.when == 'training' and stub.handle is not None:
+                stub.handle.remove()
+                stub.handle = None
+
+        # register all validation hooks
+        for stub in self.hooks:
+            if stub.hook.when in ['validation', 'all'] and stub.handle is None:
+                stub.handle = stub.hook.register(ctx, self.writer)
+
+    def _post_validation(self, log, ctx):
+        # unregister any validation hooks
+        for stub in self.hooks:
+            if stub.hook.when == 'validation' and stub.handle is not None:
+                stub.handle.remove()
+                stub.handle = None
+
+        # register all training hooks
+        for stub in self.hooks:
+            if stub.hook.when in ['training', 'all'] and stub.handle is None:
+                stub.handle = stub.hook.register(ctx, self.writer)
 
     @torch.no_grad()
     def on_batch_start(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta):
@@ -513,6 +558,9 @@ class SummaryInspector(strategy.Inspector):
             n_epoch=epoch,
             n_step=ctx.step
         ))
+
+        for stub in self.hooks:
+            stub.handle.on_batch_start()
 
     @torch.no_grad()
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta, result, loss):
@@ -541,13 +589,13 @@ class SummaryInspector(strategy.Inspector):
                 have_validation = True
 
         if have_validation:
-            self._pre_validation()
+            self._pre_validation(log, ctx)
 
             for val in self.val_step:
                 if ctx.step > 0 and ctx.step % val.frequency == 0:
                     val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
-            self._post_validation()
+            self._post_validation(log, ctx)
 
     @torch.no_grad()
     def on_epoch_start(self, log, ctx, stage, epoch):
@@ -561,12 +609,12 @@ class SummaryInspector(strategy.Inspector):
     @torch.no_grad()
     def on_epoch(self, log, ctx, stage, epoch):
         if self.val_epoch:
-            self._pre_validation()
+            self._pre_validation(log, ctx)
 
             for val in self.val_epoch:
                 val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
 
-            self._post_validation()
+            self._post_validation(log, ctx)
 
     @torch.no_grad()
     def on_stage_start(self, log, ctx, stage):
@@ -579,12 +627,12 @@ class SummaryInspector(strategy.Inspector):
     @torch.no_grad()
     def on_stage(self, log, ctx, stage):
         if self.val_stage:
-            self._pre_validation()
+            self._pre_validation(log, ctx)
 
             for val in self.val_stage:
                 val.run(log, ctx, self.writer, self.checkpoints, stage, None)
 
-            self._post_validation()
+            self._post_validation(log, ctx)
 
 
 def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step):

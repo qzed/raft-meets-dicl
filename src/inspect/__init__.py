@@ -1,5 +1,6 @@
 from . import config
-from .config import load
-
+from . import hooks
 from . import summary
+
+from .config import load
 from .summary import SummaryInspector
