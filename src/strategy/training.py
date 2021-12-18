@@ -170,6 +170,7 @@ class TrainingContext:
         log.info(f"running {stage.data.epochs} epochs")
 
         self.model_adapter.on_stage(stage, **stage.model_on_stage_args)
+        self.inspector.on_stage_start(log, self, stage)
 
         for epoch in range(start_epoch, stage.data.epochs):
             log_ = log.new(f"epoch {epoch + 1}/{stage.data.epochs}", sep=', ')
@@ -190,6 +191,7 @@ class TrainingContext:
         samples = utils.logging.progress(self.data, unit='batch', leave=False, desc=desc)
 
         self.model_adapter.on_epoch(stage, epoch, **stage.model_on_epoch_args)
+        self.inspector.on_epoch_start(log, self, stage, epoch)
 
         # actual trainng loop
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):
@@ -220,6 +222,8 @@ class TrainingContext:
         if not all(m.valid for m in meta):
             log.new(f"step {self.step}", sep=', ').warn("skipping batch due to invalid data")
             return
+
+        self.inspector.on_batch_start(log, self, stage, epoch, i, img1, img2, flow, valid, meta)
 
         # run model
         result = self.model(img1, img2, **stage.model_args)

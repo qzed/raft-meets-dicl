@@ -7,13 +7,39 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 
 import torch
-
-from torch.utils.tensorboard import SummaryWriter
+import torch.utils.tensorboard as tb
 
 from .. import metrics
 from .. import strategy
 from .. import utils
 from .. import visual
+
+
+class KvFormatter:
+    def __init__(self, fmtargs={}):
+        self.fmtargs = fmtargs
+
+    def set_fmtargs(self, fmtargs):
+        self.fmtargs = fmtargs
+
+    def __call__(self, string):
+        return string.format_map(self.fmtargs)
+
+
+class SummaryWriter(tb.SummaryWriter):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.fmt = KvFormatter()
+
+    def set_fmtargs(self, fmtargs):
+        self.fmt.set_fmtargs(fmtargs)
+
+    def add_scalar(self, key, *args, **kwargs):
+        super().add_scalar(self.fmt(key), *args, **kwargs)
+
+    def add_image(self, key, *args, **kwargs):
+        super().add_image(self.fmt(key), *args, **kwargs)
 
 
 class MetricsGroup:
@@ -41,14 +67,14 @@ class MetricsGroup:
             'metrics': [m.get_config() for m in self.metrics],
         }
 
-    def compute(self, model, optimizer, estimate, target, valid, loss, fmtargs):
+    def compute(self, model, optimizer, estimate, target, valid, loss):
         result = OrderedDict()
 
         for metric in self.metrics:
             partial = metric(model, optimizer, estimate, target, valid, loss)
 
             for k, v in partial.items():
-                result[f'{self.prefix}{k}'.format_map(fmtargs)] = v
+                result[f'{self.prefix}{k}'] = v
 
         return result
 
@@ -291,10 +317,13 @@ class StrategyValidation(Validation):
             kvmetrics = {}
 
             # format prefix
-            stage_id = stage.id.replace('/', '.')
-            fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step,
-                           id_val=val.name)
-            pfx = self.tb_metrics_pfx.format_map(fmtargs)
+            writer.set_fmtargs(dict(
+                n_stage=stage.index,
+                id_stage=stage.id.replace('/', '.'),
+                n_epoch=epoch,
+                n_step=ctx.step,
+                id_val=val.name
+            ))
 
             entries = []
 
@@ -306,7 +335,7 @@ class StrategyValidation(Validation):
 
                 # write to tensorboard
                 for k, v in res:
-                    writer.add_scalar(pfx + k, v, ctx.step)
+                    writer.add_scalar(self.tb_metrics_pfx + k, v, ctx.step)
 
                 # append to log line
                 if m.do_log:
@@ -377,11 +406,16 @@ class StrategyValidation(Validation):
                 if not (j_min <= j < j_max):
                     continue
 
-                fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch,
-                               n_step=ctx.step, img_idx=j, id_val=val.name)
+                writer.set_fmtargs(dict(
+                    n_stage=stage.index,
+                    id_stage=stage_id,
+                    n_epoch=epoch,
+                    n_step=ctx.step,
+                    img_idx=j,
+                    id_val=val.name
+                ))
 
-                p = self.images.prefix.format_map(fmtargs)
-                write_images(writer, p, j - j_min, img1, img2, flow, est, valid, meta, ctx.step)
+                write_images(writer, self.images.prefix, j - j_min, img1, img2, flow, est, valid, meta, ctx.step)
 
         return metrics
 
@@ -462,6 +496,24 @@ class SummaryInspector(strategy.Inspector):
         self.val_epoch = [v for v in validation if v.frequency == 'epoch']
         self.val_stage = [v for v in validation if v.frequency == 'stage']
 
+    def setup(self, log, ctx):
+        pass
+
+    def _pre_validation(self):
+        pass
+
+    def _post_validation(self):
+        pass
+
+    @torch.no_grad()
+    def on_batch_start(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta):
+        self.writer.set_fmtargs(dict(
+            n_stage=stage.index,
+            id_stage=stage.id.replace('/', '.'),
+            n_epoch=epoch,
+            n_step=ctx.step
+        ))
+
     @torch.no_grad()
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta, result, loss):
         # get final result (performs upsampling if necessary)
@@ -469,44 +521,70 @@ class SummaryInspector(strategy.Inspector):
 
         # compute metrics
         if self.metrics:
-            stage_id = stage.id.replace('/', '.')
-            fmtargs = dict(n_stage=stage.index, id_stage=stage_id, n_epoch=epoch, n_step=ctx.step)
-
             for m in self.metrics:
                 if ctx.step % m.frequency != 0:
                     continue
 
-                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid, loss.detach(),
-                                    fmtargs)
+                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid, loss.detach())
 
                 for k, v in metrics.items():
                     self.writer.add_scalar(k, v, ctx.step)
 
         # dump images
         if self.images is not None and ctx.step % self.images.frequency == 0:
-            # compute prefix
-            p = ''
-            if self.images.prefix:
-                id_s = stage.id.replace('/', '.')
-                fmtargs = dict(n_stage=stage.index, id_stage=id_s, n_epoch=epoch, n_step=ctx.step)
-                p = self.images.prefix.format_map(fmtargs)
-
-            write_images(self.writer, p, 0, img1, img2, target, final, valid, meta, ctx.step)
+            write_images(self.writer, self.images.prefix, 0, img1, img2, target, final, valid, meta, ctx.step)
 
         # run validations
+        have_validation = False
         for val in self.val_step:
             if ctx.step > 0 and ctx.step % val.frequency == 0:
-                val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
+                have_validation = True
+
+        if have_validation:
+            self._pre_validation()
+
+            for val in self.val_step:
+                if ctx.step > 0 and ctx.step % val.frequency == 0:
+                    val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
+
+            self._post_validation()
+
+    @torch.no_grad()
+    def on_epoch_start(self, log, ctx, stage, epoch):
+        self.writer.set_fmtargs(dict(
+            n_stage=stage.index,
+            id_stage=stage.id.replace('/', '.'),
+            n_epoch=epoch,
+            n_step=ctx.step
+        ))
 
     @torch.no_grad()
     def on_epoch(self, log, ctx, stage, epoch):
-        for val in self.val_epoch:
-            val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
+        if self.val_epoch:
+            self._pre_validation()
+
+            for val in self.val_epoch:
+                val.run(log, ctx, self.writer, self.checkpoints, stage, epoch)
+
+            self._post_validation()
+
+    @torch.no_grad()
+    def on_stage_start(self, log, ctx, stage):
+        self.writer.set_fmtargs(dict(
+            n_stage=stage.index,
+            id_stage=stage.id.replace('/', '.'),
+            n_step=ctx.step
+        ))
 
     @torch.no_grad()
     def on_stage(self, log, ctx, stage):
-        for val in self.val_stage:
-            val.run(log, ctx, self.writer, self.checkpoints, stage, None)
+        if self.val_stage:
+            self._pre_validation()
+
+            for val in self.val_stage:
+                val.run(log, ctx, self.writer, self.checkpoints, stage, None)
+
+            self._post_validation()
 
 
 def write_images(writer, pfx, i, img1, img2, target, estimate, valid, meta, step):
