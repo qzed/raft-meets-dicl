@@ -20,7 +20,7 @@ class RaftPlusDiclModule(nn.Module):
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
                  encoder_type='raft', context_type='raft', corr_type='dicl', corr_args={},
-                 share_dicl=False, upsample_hidden='none'):
+                 share_dicl=False, share_rnn=True, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -28,6 +28,7 @@ class RaftPlusDiclModule(nn.Module):
 
         self.corr_radius = corr_radius
         self.corr_share = share_dicl
+        self.rnn_share = share_rnn
 
         self.fnet = common.encoders.make_encoder_p36(encoder_type, corr_channels, norm_type=encoder_norm, dropout=0)
         self.cnet = common.encoders.make_encoder_p36(context_type, hdim + cdim, norm_type=context_norm, dropout=0)
@@ -50,9 +51,21 @@ class RaftPlusDiclModule(nn.Module):
 
             corr_out_dim = self.corr_3.output_dim
 
-        self.update_block = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+        if share_rnn:
+            self.update_block = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+            self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+
+        else:
+            self.update_block_3 = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_4 = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_5 = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_6 = raft.BasicUpdateBlock(corr_out_dim, input_dim=cdim, hidden_dim=hdim)
+
+            self.upnet_h_3 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+            self.upnet_h_4 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+            self.upnet_h_5 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+
         self.upnet = raft.Up8Network(hidden_dim=hdim)
-        self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
     def forward(self, img1, img2, iterations=(3, 4, 4, 3), dap=True, upnet=True):
         hdim, cdim = self.hidden_dim, self.context_dim
@@ -68,6 +81,25 @@ class RaftPlusDiclModule(nn.Module):
             corr_4 = self.corr_4
             corr_5 = self.corr_5
             corr_6 = self.corr_6
+
+        if self.rnn_share:
+            update_3 = self.update_block
+            update_4 = self.update_block
+            update_5 = self.update_block
+            update_6 = self.update_block
+
+            upnet_h_3 = self.upnet_h
+            upnet_h_4 = self.upnet_h
+            upnet_h_5 = self.upnet_h
+        else:
+            update_3 = self.update_block_3
+            update_4 = self.update_block_4
+            update_5 = self.update_block_5
+            update_6 = self.update_block_6
+
+            upnet_h_3 = self.upnet_h_3
+            upnet_h_4 = self.upnet_h_4
+            upnet_h_5 = self.upnet_h_5
 
         # run feature encoder
         f1_3, f1_4, f1_5, f1_6 = self.fnet(img1)
@@ -103,7 +135,7 @@ class RaftPlusDiclModule(nn.Module):
             corr = corr_6(f1_6, f2_6, coords1, dap=dap)
 
             # estimate delta for flow update
-            h_6, d = self.update_block(h_6, ctx_6, corr, flow)
+            h_6, d = update_6(h_6, ctx_6, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -117,7 +149,7 @@ class RaftPlusDiclModule(nn.Module):
         coords0 = common.grid.coordinate_grid(b, h // 32, w // 32, device=img1.device)
         coords1 = coords0 + flow
 
-        h_5 = self.upnet_h(h_6, h_5)
+        h_5 = upnet_h_5(h_6, h_5)
 
         # iterations at /32
         out_5 = []
@@ -128,7 +160,7 @@ class RaftPlusDiclModule(nn.Module):
             corr = corr_5(f1_5, f2_5, coords1, dap=dap)
 
             # estimate delta for flow update
-            h_5, d = self.update_block(h_5, ctx_5, corr, flow)
+            h_5, d = update_5(h_5, ctx_5, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -142,7 +174,7 @@ class RaftPlusDiclModule(nn.Module):
         coords0 = common.grid.coordinate_grid(b, h // 16, w // 16, device=img1.device)
         coords1 = coords0 + flow
 
-        h_4 = self.upnet_h(h_5, h_4)
+        h_4 = upnet_h_4(h_5, h_4)
 
         # iterations at /16
         out_4 = []
@@ -153,7 +185,7 @@ class RaftPlusDiclModule(nn.Module):
             corr = corr_4(f1_4, f2_4, coords1, dap=dap)
 
             # estimate delta for flow update
-            h_4, d = self.update_block(h_4, ctx_4, corr, flow)
+            h_4, d = update_4(h_4, ctx_4, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -167,7 +199,7 @@ class RaftPlusDiclModule(nn.Module):
         coords0 = common.grid.coordinate_grid(b, h // 8, w // 8, device=img1.device)
         coords1 = coords0 + flow
 
-        h_3 = self.upnet_h(h_4, h_3)
+        h_3 = upnet_h_3(h_4, h_3)
 
         # fine iterations with flow upsampling (at /8)
         out_3 = []
@@ -178,7 +210,7 @@ class RaftPlusDiclModule(nn.Module):
             corr = corr_3(f1_3, f2_3, coords1, dap=dap)
 
             # estimate delta for flow update
-            h_3, d = self.update_block(h_3, ctx_3, corr, flow)
+            h_3, d = update_3(h_3, ctx_3, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -214,6 +246,7 @@ class RaftPlusDicl(Model):
         context_type = param_cfg.get('context-type', 'raft')
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         share_dicl = param_cfg.get('share-dicl', False)
+        share_rnn = param_cfg.get('share-rnn', True)
         corr_type = param_cfg.get('corr-type', 'dicl')
         corr_args = param_cfg.get('corr-args', {})
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
@@ -225,14 +258,15 @@ class RaftPlusDicl(Model):
         return cls(corr_radius=corr_radius, corr_channels=corr_channels, context_channels=context_channels,
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, encoder_type=encoder_type,
-                   context_type=context_type, share_dicl=share_dicl, corr_type=corr_type, corr_args=corr_args,
-                   upsample_hidden=upsample_hidden, arguments=args,
-                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
+                   context_type=context_type, share_dicl=share_dicl, share_rnn=share_rnn,
+                   corr_type=corr_type, corr_args=corr_args, upsample_hidden=upsample_hidden,
+                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, corr_radius=4, corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft', context_type='raft', share_dicl=False, corr_type='dicl', corr_args={},
-                 upsample_hidden='none', arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 encoder_type='raft', context_type='raft', share_dicl=False, share_rnn=True, corr_type='dicl',
+                 corr_args={}, upsample_hidden='none', arguments={}, on_epoch_args={},
+                 on_stage_args={'freeze_batchnorm': True}):
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
         self.context_channels = context_channels
@@ -244,6 +278,7 @@ class RaftPlusDicl(Model):
         self.context_type = context_type
         self.mnet_norm = mnet_norm
         self.share_dicl = share_dicl
+        self.share_rnn = share_rnn
         self.corr_type = corr_type
         self.corr_args = corr_args
         self.upsample_hidden = upsample_hidden
@@ -255,7 +290,7 @@ class RaftPlusDicl(Model):
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
                                             mnet_norm=mnet_norm, encoder_type=encoder_type, context_type=context_type,
                                             corr_type=corr_type, corr_args=corr_args, share_dicl=share_dicl,
-                                            upsample_hidden=upsample_hidden),
+                                            share_rnn=share_rnn, upsample_hidden=upsample_hidden),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -279,6 +314,7 @@ class RaftPlusDicl(Model):
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
                 'share-dicl': self.share_dicl,
+                'share-rnn': self.share_rnn,
                 'corr-type': self.corr_type,
                 'corr-args': self.corr_args,
                 'upsample-hidden': self.upsample_hidden,

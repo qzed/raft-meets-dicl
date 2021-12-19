@@ -13,11 +13,12 @@ class RaftModule(nn.Module):
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft', upsample_hidden='none'):
+                 encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none'):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
         self.context_dim = cdim = context_channels
+        self.share_rnn = share_rnn
 
         self.corr_radius = corr_radius
         corr_planes = (2 * self.corr_radius + 1)**2
@@ -25,13 +26,43 @@ class RaftModule(nn.Module):
         self.fnet = common.encoders.make_encoder_p36(encoder_type, corr_channels, norm_type=encoder_norm, dropout=dropout)
         self.cnet = common.encoders.make_encoder_p36(context_type, hdim + cdim, norm_type=context_norm, dropout=dropout)
 
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+        if share_rnn:
+            self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+        else:
+            self.update_block_3 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_4 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_5 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_6 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+
+            self.upnet_h_3 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+            self.upnet_h_4 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+            self.upnet_h_5 = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
+
         self.upnet = raft.Up8Network(hidden_dim=hdim)
-        self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
     def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True):
         batch, _c, h, w = img1.shape
         hdim, cdim = self.hidden_dim, self.context_dim
+
+        if self.share_rnn:
+            update_3 = self.update_block
+            update_4 = self.update_block
+            update_5 = self.update_block
+            update_6 = self.update_block
+
+            upnet_h_3 = self.upnet_h
+            upnet_h_4 = self.upnet_h
+            upnet_h_5 = self.upnet_h
+        else:
+            update_3 = self.update_block_3
+            update_4 = self.update_block_4
+            update_5 = self.update_block_5
+            update_6 = self.update_block_6
+
+            upnet_h_3 = self.upnet_h_3
+            upnet_h_4 = self.upnet_h_4
+            upnet_h_5 = self.upnet_h_5
 
         # run feature network
         f3_1, f4_1, f5_1, f6_1 = self.fnet(img1)
@@ -72,7 +103,7 @@ class RaftModule(nn.Module):
             corr = corr_vol(coords1)
 
             # estimate delta for flow update
-            h_6, d = self.update_block(h_6, ctx_6, corr, flow)
+            h_6, d = update_6(h_6, ctx_6, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -88,7 +119,7 @@ class RaftModule(nn.Module):
         coords0 = common.grid.coordinate_grid(batch, h // 32, w // 32, device=img1.device)
         coords1 = coords0 + flow
 
-        h_5 = self.upnet_h(h_6, h_5)
+        h_5 = upnet_h_5(h_6, h_5)
 
         # build correlation volume
         corr_vol = raft.CorrBlock(f5_1, f5_2, num_levels=1, radius=self.corr_radius)
@@ -102,7 +133,7 @@ class RaftModule(nn.Module):
             corr = corr_vol(coords1)
 
             # estimate delta for flow update
-            h_5, d = self.update_block(h_5, ctx_5, corr, flow)
+            h_5, d = update_5(h_5, ctx_5, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -118,7 +149,7 @@ class RaftModule(nn.Module):
         coords0 = common.grid.coordinate_grid(batch, h // 16, w // 16, device=img1.device)
         coords1 = coords0 + flow
 
-        h_4 = self.upnet_h(h_5, h_4)
+        h_4 = upnet_h_4(h_5, h_4)
 
         # build correlation volume
         corr_vol = raft.CorrBlock(f4_1, f4_2, num_levels=1, radius=self.corr_radius)
@@ -132,7 +163,7 @@ class RaftModule(nn.Module):
             corr = corr_vol(coords1)
 
             # estimate delta for flow update
-            h_4, d = self.update_block(h_4, ctx_4, corr, flow)
+            h_4, d = update_4(h_4, ctx_4, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -148,7 +179,7 @@ class RaftModule(nn.Module):
         coords0 = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img1.device)
         coords1 = coords0 + flow
 
-        h_3 = self.upnet_h(h_4, h_3)
+        h_3 = upnet_h_3(h_4, h_3)
 
         # build correlation volume
         corr_vol = raft.CorrBlock(f3_1, f3_2, num_levels=1, radius=self.corr_radius)
@@ -162,7 +193,7 @@ class RaftModule(nn.Module):
             corr = corr_vol(coords1)
 
             # estimate delta for flow update
-            h_3, d = self.update_block(h_3, ctx_3, corr, flow)
+            h_3, d = update_3(h_3, ctx_3, corr, flow)
 
             # update flow estimate
             coords1 = coords1 + d
@@ -196,6 +227,7 @@ class Raft(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
         encoder_type = param_cfg.get('encoder-type', 'raft')
         context_type = param_cfg.get('context-type', 'raft')
+        share_rnn = param_cfg.get('share-rnn', True)
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
 
         args = cfg.get('arguments', {})
@@ -205,14 +237,14 @@ class Raft(Model):
         return cls(dropout=dropout, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm,
-                   encoder_type=encoder_type, context_type=context_type,
+                   encoder_type=encoder_type, context_type=context_type, share_rnn=share_rnn,
                    upsample_hidden=upsample_hidden, arguments=args,
                    on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft', upsample_hidden='none', arguments={},
-                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none',
+                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.corr_radius = corr_radius
         self.corr_channels = corr_channels
@@ -222,6 +254,7 @@ class Raft(Model):
         self.context_norm = context_norm
         self.encoder_type = encoder_type
         self.context_type = context_type
+        self.share_rnn = share_rnn
         self.upsample_hidden = upsample_hidden
 
         self.freeze_batchnorm = True
@@ -230,7 +263,7 @@ class Raft(Model):
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm,
                                     encoder_type=encoder_type, context_type=context_type,
-                                    upsample_hidden=upsample_hidden),
+                                    share_rnn=share_rnn, upsample_hidden=upsample_hidden),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -252,6 +285,7 @@ class Raft(Model):
                 'context-norm': self.context_norm,
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
+                'share-rnn': self.share_rnn,
                 'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
