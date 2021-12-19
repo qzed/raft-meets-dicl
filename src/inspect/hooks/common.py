@@ -37,8 +37,7 @@ class Hook:
         from . import activation
 
         types = [
-            activation.ActivationMean,
-            activation.ActivationVariance,
+            activation.ActivationStats,
         ]
         types = {cls.type: cls for cls in types}
 

@@ -42,8 +42,8 @@ metrics:
 hooks:
   # Model hooks for inspection. Intended for debugging.
 
-  - type: activation-mean
-    prefix: 'Train:S{n_stage}:{id_stage}/ActivationMean/'
+  - type: activation-stats
+    prefix: 'Train:S{n_stage}:{id_stage}/ActivationStats/'
     modules:
       - some.submodule
       - some.other.submodule
