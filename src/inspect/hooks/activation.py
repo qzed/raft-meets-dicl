@@ -20,7 +20,7 @@ class MeanHook:
 
         self.i += 1
 
-    def on_batch_start(self):
+    def on_batch_start(self, module, input):
         self.i = 0
 
 
@@ -51,11 +51,15 @@ class ActivationStats(Hook):
 
     def _register_hook(self, model, target, ctx, writer):
         hook = MeanHook(ctx, writer, self.prefix + target)
-        return hook, model.get_submodule(target).register_forward_hook(hook)
+        handle_1 = model.get_submodule(target).register_forward_hook(hook)
+        handle_2 = model.register_forward_pre_hook(hook.on_batch_start)
+
+        return handle_1, handle_2
 
     def register(self, ctx, writer) -> Handle:
         model = ctx.model_adapter.model
 
         handles = [self._register_hook(model, tgt, ctx, writer) for tgt in self.modules]
+        handles = [h for hs in handles for h in hs]
 
         return MultiHandle(self, handles)

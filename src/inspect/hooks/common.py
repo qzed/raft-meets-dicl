@@ -5,9 +5,6 @@ class Handle:
     def remove(self):
         raise NotImplementedError
 
-    def on_batch_start(self):
-        pass
-
 
 class MultiHandle(Handle):
     def __init__(self, hook, handles):
@@ -18,10 +15,6 @@ class MultiHandle(Handle):
     def remove(self):
         for hook, handle in self.handles:
             handle.remove()
-
-    def on_batch_start(self):
-        for hook, handle in self.handles:
-            hook.on_batch_start()
 
 
 class Hook:

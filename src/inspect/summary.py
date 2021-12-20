@@ -559,9 +559,6 @@ class SummaryInspector(strategy.Inspector):
             n_step=ctx.step
         ))
 
-        for stub in self.hooks:
-            stub.handle.on_batch_start()
-
     @torch.no_grad()
     def on_batch(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta, result, loss):
         # get final result (performs upsampling if necessary)
