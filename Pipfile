@@ -22,6 +22,7 @@ ipykernel = "*"
 ipympl = "*"
 pycodestyle = "*"
 torch-tb-profiler = "*"
+jupyterlab = "*"
 
 [requires]
 python_version = "3.9"
