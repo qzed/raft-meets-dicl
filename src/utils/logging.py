@@ -7,6 +7,24 @@ import warnings
 from tqdm import tqdm
 
 
+def _is_interactive():
+    """Checks if we're running in a REPL or notebook"""
+    import __main__ as main
+    return not hasattr(main, '__file__')
+
+
+def _tqdm_to_log():
+    """Get default TQDM logging mode"""
+
+    # If we're running interactively, don't log and use standard TQDM output
+    if _is_interactive():
+        return False
+
+    # If we're not running interactively and stderr is not a TTY (e.g.
+    # redirected or sub-command as e.g. in SLURM) redirect TQDM output to logs.
+    return not sys.stderr.isatty()
+
+
 class TqdmStream:
     def write(self, msg):
         tqdm.write(msg, end='')
@@ -31,7 +49,7 @@ class TqdmLogWrapper(io.StringIO):
             self.buf = ''
 
 
-def setup(file=None, console=True, capture_warnings=True, tqdm_to_log=not sys.stderr.isatty()):
+def setup(file=None, console=True, capture_warnings=True, tqdm_to_log=_tqdm_to_log()):
     console_handler = logging.StreamHandler()
 
     # If we output tqdm progress to stderr, add handler for logging. In the
