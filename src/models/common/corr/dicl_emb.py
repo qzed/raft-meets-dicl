@@ -102,3 +102,33 @@ class CorrelationModule(nn.Module):
         out = torch.cat((cost, emb), dim=1)                     # (batch, (2r+1)^2 + c_emb, h, w)
 
         return out
+
+
+class SoftArgMaxFlowRegression(nn.Module):
+    def __init__(self, radius, temperature=1.0):
+        super().__init__()
+
+        self.radius = radius
+        self.temperature = temperature
+
+        # build displacement buffer
+        dx = torch.linspace(-radius, radius, 2 * radius + 1)
+        dy = torch.linspace(-radius, radius, 2 * radius + 1)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+
+        self.register_buffer('delta', delta, persistent=False)
+
+    def forward(self, emb):
+        batch, c_emb, h, w = emb.shape
+        r = self.radius
+        c_cost = (2*r+1)**2
+
+        # get cost part of rmbedding
+        cost = torch.split(emb, (c_cost, c_emb - c_cost), dim=1)
+
+        # regression
+        cost = cost.view(batch, (2*r+1)**2, 1, h, w)        # (batch, (2r+1)^2, 1, h, w)
+        score = F.softmax(cost / self.temperature, dim=1)   # (batch, (2r+1)^2, 1, h, w)
+        delta = self.delta.view(1, (2*r+1)**2, 2, 1, 1)     # (    1, (2r+1)^2, 2, 1, 1)
+
+        return torch.sum(delta * score, dim=1)              # (batch, 2, h, w)
