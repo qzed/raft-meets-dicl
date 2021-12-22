@@ -95,6 +95,101 @@ class CorrBlock:
         return out.contiguous().float()
 
 
+class SoftArgMaxFlowRegression(nn.Module):
+    def __init__(self, num_levels, radius, temperature=1.0):
+        super().__init__()
+
+        self.num_levels = num_levels
+        self.radius = radius
+        self.temperature = temperature
+
+        # build displacement buffer
+        dx = torch.linspace(-radius, radius, 2 * radius + 1)
+        dy = torch.linspace(-radius, radius, 2 * radius + 1)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+
+        self.register_buffer('delta', delta, persistent=False)
+
+    def forward(self, corr):
+        batch, _, h, w = corr.shape
+        r = self.radius
+
+        corr = torch.split(corr, (2*r+1)**2, dim=1)     # (batch, (2r+1)^2, h, w) * num_levels
+
+        out = []
+        for lvl in range(self.num_levels):
+            # compute score for displacements
+            score = corr[lvl].view(batch, 2*r+1, 2*r+1, h, w)       # (batch, 2r+1, 2r+1, h, w)
+            score = score.view(batch, (2*r+1)**2, 1, h, w)          # (batch, (2r+1)^2, 1, h, w)
+            score = F.softmax(score / self.temperature, dim=1)      # softmax score
+
+            # compute displacement deltas for current level
+            delta = self.delta.view(1, (2*r+1)**2, 2, 1, 1)         # (batch, (2r+1)^2, 2, 1, 1)
+            delta = delta * 2**lvl                                  # adjust flow range to level
+
+            # compute flow delta
+            flow = torch.sum(delta * score, dim=1)                  # (batch, 2, h, w)
+
+            out.append(flow)
+
+        return out
+
+
+class SoftArgMaxFlowRegressionWithDap(nn.Module):
+    def __init__(self, num_levels, radius, temperature=1.0):
+        super().__init__()
+
+        self.num_levels = num_levels
+        self.radius = radius
+        self.temperature = temperature
+
+        self.dap = nn.ModuleList([
+            common.blocks.dicl.DisplacementAwareProjection((radius, radius), init='identity')
+            for _ in range(num_levels)
+        ])
+
+        # build displacement buffer
+        dx = torch.linspace(-radius, radius, 2 * radius + 1)
+        dy = torch.linspace(-radius, radius, 2 * radius + 1)
+        delta = torch.stack(torch.meshgrid(dx, dy, indexing='ij'), axis=-1)    # change dims to (2r+1, 2r+1, 2)
+
+        self.register_buffer('delta', delta, persistent=False)
+
+    def forward(self, corr):
+        batch, _, h, w = corr.shape
+        r = self.radius
+
+        corr = torch.split(corr, (2*r+1)**2, dim=1)     # (batch, (2r+1)^2, h, w) * num_levels
+
+        out = []
+        for lvl in range(self.num_levels):
+            # compute score for displacements
+            score = corr[lvl].view(batch, 2*r+1, 2*r+1, h, w)       # (batch, 2r+1, 2r+1, h, w)
+            score = self.dap[lvl](score)                            # (batch, 2r+1, 2r+1, h, w)
+            score = score.view(batch, (2*r+1)**2, 1, h, w)          # (batch, (2r+1)^2, 1, h, w)
+            score = F.softmax(score / self.temperature, dim=1)      # softmax score
+
+            # compute displacement deltas for current level
+            delta = self.delta.view(1, (2*r+1)**2, 2, 1, 1)         # (batch, (2r+1)^2, 2, 1, 1)
+            delta = delta * 2**lvl                                  # adjust flow range to level
+
+            # compute flow delta
+            flow = torch.sum(delta * score, dim=1)                  # (batch, 2, h, w)
+
+            out.append(flow)
+
+        return out
+
+
+def make_flow_regression(type, num_levels, radius, **kwargs):
+    if type == 'softargmax':
+        return SoftArgMaxFlowRegression(num_levels, radius, **kwargs)
+    elif type == 'softargmax+dap':
+        return SoftArgMaxFlowRegressionWithDap(num_levels, radius, **kwargs)
+
+    raise ValueError(f"unknown correlation module type '{type}'")
+
+
 class BasicMotionEncoder(nn.Module):
     """Encoder to combine correlation and flow for GRU input"""
 
@@ -240,7 +335,7 @@ class RaftModule(nn.Module):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch', encoder_type='raft',
-                 context_type='raft'):
+                 context_type='raft', corr_reg_type='softargmax+dap', corr_reg_args={}):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -257,6 +352,8 @@ class RaftModule(nn.Module):
         self.cnet = common.encoders.make_encoder_s3(context_type, output_dim=hdim+cdim,
                                                     norm_type=context_norm, dropout=dropout)
 
+        self.flow_reg = make_flow_regression(corr_reg_type, corr_levels, corr_radius, **corr_reg_args)
+
         self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
         self.upnet = Up8Network(hidden_dim=hdim, mixed_precision=mixed_precision)
 
@@ -267,7 +364,7 @@ class RaftModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -294,11 +391,16 @@ class RaftModule(nn.Module):
 
         # iteratively predict flow
         out = []
+        out_corr = [list() for _ in range(self.corr_levels)]
         for _ in range(iterations):
             coords1 = coords1.detach()
 
             # indes correlation volume
             corr = corr_vol(coords1, mask_costs)
+
+            if corr_flow:
+                for i, delta in enumerate(self.flow_reg(corr)):
+                    out_corr[i].append(flow + delta)
 
             # estimate delta for flow update
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
@@ -316,7 +418,10 @@ class RaftModule(nn.Module):
 
             out.append(flow_up)
 
-        return out
+        if corr_flow:
+            return *reversed(out_corr), out         # coarse to fine corr-flow, then final output
+        else:
+            return out
 
 
 class Raft(Model):
@@ -338,6 +443,8 @@ class Raft(Model):
         context_norm = param_cfg.get('context-norm', 'batch')
         encoder_type = param_cfg.get('encoder-type', 'raft')
         context_type = param_cfg.get('context-type', 'raft')
+        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax+dap')
+        corr_reg_args = param_cfg.get('corr-reg-args', {})
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -347,13 +454,15 @@ class Raft(Model):
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm,
-                   encoder_type=encoder_type, context_type=context_type, arguments=args,
-                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
+                   encoder_type=encoder_type, context_type=context_type,
+                   corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
+                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch', encoder_type='raft',
-                 context_type='raft', arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 context_type='raft', corr_reg_type='softargmax+dap', corr_reg_args={},
+                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -365,6 +474,8 @@ class Raft(Model):
         self.context_norm = context_norm
         self.encoder_type = encoder_type
         self.context_type = context_type
+        self.corr_reg_type = corr_reg_type
+        self.corr_reg_args = corr_reg_args
 
         self.freeze_batchnorm = True
 
@@ -373,13 +484,14 @@ class Raft(Model):
                                     corr_channels=corr_channels, context_channels=context_channels,
                                     recurrent_channels=recurrent_channels, encoder_norm=encoder_norm,
                                     context_norm=context_norm, encoder_type=encoder_type,
-                                    context_type=context_type),
+                                    context_type=context_type, corr_reg_type=corr_reg_type,
+                                    corr_reg_args=corr_reg_args),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': 12, 'upnet': True, 'mask_costs': []}
+        default_args = {'iterations': 12, 'upnet': True, 'corr_flow': False, 'mask_costs': []}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
 
@@ -397,6 +509,8 @@ class Raft(Model):
                 'context-norm': self.context_norm,
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
+                'corr-reg-type': self.corr_reg_type,
+                'corr-reg-args': self.corr_reg_args,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,
@@ -406,8 +520,9 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return RaftAdapter(self)
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, mask_costs=[]):
-        return self.module(img1, img2, iterations, flow_init, upnet, mask_costs)
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False, mask_costs=[]):
+        return self.module(img1, img2, iterations=iterations, flow_init=flow_init, upnet=upnet,
+                           corr_flow=corr_flow, mask_costs=mask_costs)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm
@@ -435,15 +550,22 @@ class RaftResult(Result):
         super().__init__()
 
         self.result = output
+        self.has_corr_flow = any(isinstance(x, (list, tuple)) for x in output)
 
     def output(self, batch_index=None):
         if batch_index is None:
             return self.result
 
-        return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
+        if not self.has_corr_flow:
+            return [x[batch_index].view(1, *x.shape[1:]) for x in self.result]
+        else:
+            return [[x[batch_index].view(1, *x.shape[1:]) for x in level] for level in self.result]
 
     def final(self):
-        return self.result[-1]
+        if not self.has_corr_flow:
+            return self.result[-1]
+        else:
+            return self.result[-1][-1]
 
     def intermediate_flow(self):
         return self.result
