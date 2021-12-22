@@ -13,15 +13,17 @@ class RaftModule(nn.Module):
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
-                 encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none'):
+                 encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none',
+                 corr_reg_type='softargmax+dap', corr_reg_args={}):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
         self.context_dim = cdim = context_channels
         self.share_rnn = share_rnn
 
+        self.corr_levels = 1
         self.corr_radius = corr_radius
-        corr_planes = (2 * self.corr_radius + 1)**2
+        corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
         self.fnet = common.encoders.make_encoder_p34(encoder_type, corr_channels, encoder_norm, dropout=dropout)
         self.cnet = common.encoders.make_encoder_p34(context_type, hdim + cdim, context_norm, dropout=dropout)
@@ -32,10 +34,13 @@ class RaftModule(nn.Module):
             self.update_block_3 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
             self.update_block_4 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
 
+        self.flow_reg_3 = raft.make_flow_regression(corr_reg_type, self.corr_levels, corr_radius, **corr_reg_args)
+        self.flow_reg_4 = raft.make_flow_regression(corr_reg_type, self.corr_levels, corr_radius, **corr_reg_args)
+
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
-    def forward(self, img1, img2, iterations=(4, 3), upnet=True):
+    def forward(self, img1, img2, iterations=(4, 3), upnet=True, corr_flow=False):
         batch, _c, h, w = img1.shape
         hdim, cdim = self.hidden_dim, self.context_dim
 
@@ -68,15 +73,20 @@ class RaftModule(nn.Module):
         flow = coords1 - coords0
 
         # build correlation volume
-        corr_vol = raft.CorrBlock(f4_1, f4_2, num_levels=1, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f4_1, f4_2, num_levels=self.corr_levels, radius=self.corr_radius)
 
         # iteratively predict flow
         out_4 = []
+        out_4_corr = [list() for _ in range(self.corr_levels)]
         for _ in range(iterations[0]):
             coords1 = coords1.detach()
 
             # index correlation volume
             corr = corr_vol(coords1)
+
+            if corr_flow:
+                for i, delta in enumerate(self.flow_reg_4(corr)):
+                    out_4_corr[i].append(flow + delta)
 
             # estimate delta for flow update
             h_4, d = update_4(h_4, ctx_4, corr, flow)
@@ -98,15 +108,20 @@ class RaftModule(nn.Module):
         h_3 = self.upnet_h(h_4, h_3)
 
         # build correlation volume
-        corr_vol = raft.CorrBlock(f3_1, f3_2, num_levels=1, radius=self.corr_radius)
+        corr_vol = raft.CorrBlock(f3_1, f3_2, num_levels=self.corr_levels, radius=self.corr_radius)
 
         # iteratively predict flow
         out_3 = []
+        out_3_corr = [list() for _ in range(self.corr_levels)]
         for _ in range(iterations[1]):
             coords1 = coords1.detach()
 
             # index correlation volume
             corr = corr_vol(coords1)
+
+            if corr_flow:
+                for i, delta in enumerate(self.flow_reg_3(corr)):
+                    out_3_corr[i].append(flow + delta)
 
             # estimate delta for flow update
             h_3, d = update_3(h_3, ctx_3, corr, flow)
@@ -123,7 +138,10 @@ class RaftModule(nn.Module):
 
             out_3.append(flow_up)
 
-        return out_4, out_3
+        if corr_flow:
+            return *reversed(out_4_corr), out_4, *reversed(out_3_corr), out_3
+        else:
+            return out_4, out_3
 
 
 class Raft(Model):
@@ -145,6 +163,8 @@ class Raft(Model):
         context_type = param_cfg.get('context-type', 'raft')
         share_rnn = param_cfg.get('share-rnn', True)
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
+        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax+dap')
+        corr_reg_args = param_cfg.get('corr-reg-args', {})
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -154,12 +174,14 @@ class Raft(Model):
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    encoder_norm=encoder_norm, context_norm=context_norm,
                    encoder_type=encoder_type, context_type=context_type, share_rnn=share_rnn,
-                   upsample_hidden=upsample_hidden, arguments=args,
-                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
+                   upsample_hidden=upsample_hidden, corr_reg_type=corr_reg_type,
+                   corr_reg_args=corr_reg_args, arguments=args, on_epoch_args=on_epoch_args,
+                   on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
                  encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none',
+                 corr_reg_type='softargmax+dap', corr_reg_args={},
                  arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.corr_radius = corr_radius
@@ -171,6 +193,8 @@ class Raft(Model):
         self.encoder_type = encoder_type
         self.context_type = context_type
         self.share_rnn = share_rnn
+        self.corr_reg_type = corr_reg_type
+        self.corr_reg_args = corr_reg_args
         self.upsample_hidden = upsample_hidden
 
         self.freeze_batchnorm = True
@@ -179,13 +203,14 @@ class Raft(Model):
                                     context_channels=context_channels, recurrent_channels=recurrent_channels,
                                     encoder_norm=encoder_norm, context_norm=context_norm,
                                     encoder_type=encoder_type, context_type=context_type,
-                                    share_rnn=share_rnn, upsample_hidden=upsample_hidden),
+                                    share_rnn=share_rnn, upsample_hidden=upsample_hidden,
+                                    corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': (4, 3), 'upnet': True}
+        default_args = {'iterations': (4, 3), 'upnet': True, 'corr_flow': False}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
 
@@ -202,6 +227,8 @@ class Raft(Model):
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
                 'share-rnn': self.share_rnn,
+                'corr-reg-type': self.corr_reg_type,
+                'corr-reg-args': self.corr_reg_args,
                 'upsample-hidden': self.upsample_hidden,
             },
             'arguments': default_args | self.arguments,
@@ -212,8 +239,8 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return common.adapters.mlseq.MultiLevelSequenceAdapter(self)
 
-    def forward(self, img1, img2, iterations=(4, 3), upnet=True):
-        return self.module(img1, img2, iterations=iterations, upnet=upnet)
+    def forward(self, img1, img2, iterations=(4, 3), upnet=True, corr_flow=False):
+        return self.module(img1, img2, iterations=iterations, upnet=upnet, corr_flow=corr_flow)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm
