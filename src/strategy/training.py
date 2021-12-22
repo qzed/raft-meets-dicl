@@ -1,10 +1,13 @@
+from pathlib import Path
 from typing import Dict, List, Optional
+
+import datetime
 
 import torch
 import torch.nn as nn
 import torch.utils.data as td
 
-from .checkpoint import CheckpointManager
+from .checkpoint import CheckpointManager, Checkpoint, Iteration, State
 from .inspector import Inspector
 from .spec import Stage, Strategy
 
@@ -14,6 +17,7 @@ from .. import utils
 
 class TrainingContext:
     log: utils.logging.Logger
+    path: Path
     strategy: Strategy
     model: nn.Module
     model_adapter: models.ModelAdapter
@@ -33,9 +37,10 @@ class TrainingContext:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, strategy, model, model_adapter, loss, input, inspector, checkpoints,
+    def __init__(self, log, path, strategy, model, model_adapter, loss, input, inspector, checkpoints,
                  device, step_limit=None, loader_args={}):
         self.log = log
+        self.path = Path(path)
         self.strategy = strategy
         self.model = model
         self.model_adapter = model_adapter
@@ -45,6 +50,8 @@ class TrainingContext:
         self.checkpoints = checkpoints
         self.device = torch.device(device)
         self.loader_args = loader_args
+
+        self.validate = True
 
         self.step = 0
         self.step_limit = step_limit
@@ -231,6 +238,10 @@ class TrainingContext:
         result = self.model(img1, img2, **stage.model_args)
         result = self.model_adapter.wrap_result(result, img1.shape)
 
+        # validate output, check for non-finite numbers
+        if self.validate:
+            self._validate_result(stage, epoch, result)
+
         # compute loss
         loss = self.loss(self.model, result.output(), flow, valid, **stage.loss_args)
 
@@ -265,3 +276,35 @@ class TrainingContext:
 
         # next step
         self.step += 1
+
+    @torch.no_grad()
+    def _validate_result(self, stage, epoch, result):
+        # validate
+        if torch.all(torch.isfinite(result.final().detach())):
+            return
+
+        # log error, dump all parameters to log
+        self.log.error("detected non-finite values in final flow field")
+        self.log.error(self.model.named_parameters())
+
+        # dump checkpoint
+        chkpt = Checkpoint(
+            model=self.model_id,
+            iteration=Iteration(stage.index, epoch, self.step),
+            metrics=None,
+            state=State(
+                model=self.module.state_dict(),
+                optimizer=self.optimizer.state_dict(),
+                scaler=self.scaler.state_dict(),
+                lr_sched_inst=[s.state_dict() for s in self.lr_sched_inst],
+                lr_sched_epoch=[s.state_dict() for s in self.lr_sched_epoch],
+            ),
+            metadata={
+                'timestamp': datetime.now().isoformat(),
+                'source': 'training',
+            },
+        )
+        chkpt.save(self.path / 'failed.pth')
+
+        # abort
+        raise RuntimeError("non-finite flow values detected")
