@@ -20,13 +20,19 @@ def make_flow_regression(cmod_type, type, radius, **kwargs):
     if cmod_type == 'dicl':
         if type == 'softargmax':
             return dicl.SoftArgMaxFlowRegression(radius, **kwargs)
+        elif type == 'softargmax+dap':
+            return dicl.SoftArgMaxFlowRegressionWithDap(radius, **kwargs)
 
     elif cmod_type == 'dicl-emb':
         if type == 'softargmax':
             return dicl_emb.SoftArgMaxFlowRegression(radius, **kwargs)
+        elif type == 'softargmax+dap':
+            return dicl_emb.SoftArgMaxFlowRegressionWithDap(radius, **kwargs)
 
     elif cmod_type == 'opt':
         if type == 'softargmax':
             return dot.SoftArgMaxFlowRegression(radius, **kwargs)
+        elif type == 'softargmax+dap':
+            return dot.SoftArgMaxFlowRegressionWithDap(radius, **kwargs)
 
     raise ValueError(f"unknown correlation module type '{type}' for correlation module '{cmod_type}'")
