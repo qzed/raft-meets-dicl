@@ -23,6 +23,7 @@ class MultiLevelSequenceLoss(Loss):
             'ord': 1,
             'gamma': 0.8,
             'alpha': (1.0, 0.5),
+            'scale': 1.0,
         }
 
         return {
@@ -30,7 +31,7 @@ class MultiLevelSequenceLoss(Loss):
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=(0.4, 1.0)):
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=(0.4, 1.0), scale=1.0):
         loss = 0.0
 
         for i_level, level in enumerate(result):
@@ -53,7 +54,7 @@ class MultiLevelSequenceLoss(Loss):
                 # update loss
                 loss = loss + weight * dist.mean()
 
-        return loss
+        return loss * scale
 
     def upsample(self, flow, shape, mode='bilinear'):
         _b, _c, fh, fw = flow.shape
