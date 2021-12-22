@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-21T20:34:57.691040",
-    "commit": "~d1525d9e4d783e027afac20735cc6e8901c5e70f",
+    "timestamp": "2021-12-22T14:32:41.319810",
+    "commit": "~b1810e46d754572efcb1b0de65e8725bc42b11c6",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -69,7 +69,8 @@
                     0.6,
                     0.85,
                     1.0
-                ]
+                ],
+                "scale": 0.5
             }
         },
         "input": {
