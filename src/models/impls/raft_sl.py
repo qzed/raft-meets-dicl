@@ -20,7 +20,7 @@ class Raft(Model):
         recurrent_channels = param_cfg.get('recurrent-channels', 128)
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
-        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax+dap')
+        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
 
         args = cfg.get('arguments', {})
@@ -36,7 +36,7 @@ class Raft(Model):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch',
-                 corr_reg_type='softargmax+dap', corr_reg_args={}, arguments={},
+                 corr_reg_type='softargmax', corr_reg_args={}, arguments={},
                  on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision

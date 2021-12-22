@@ -335,7 +335,7 @@ class RaftPlusDiclModule(nn.Module):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax+dap',
+                 encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax',
                  corr_reg_args={}):
         super().__init__()
 
@@ -446,7 +446,7 @@ class RaftPlusDicl(Model):
         mnet_norm = param_cfg.get('mnet-norm', 'batch')
         encoder_type = param_cfg.get('encoder-type', 'raft-cnn')
         share_dicl = param_cfg.get('share-dicl', False)
-        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax+dap')
+        corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
 
         args = cfg.get('arguments', {})
@@ -464,7 +464,7 @@ class RaftPlusDicl(Model):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
-                 encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax+dap', corr_reg_args={},
+                 encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax', corr_reg_args={},
                  arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
