@@ -60,6 +60,6 @@ class ActivationStats(Hook):
         model = ctx.model_adapter.model
 
         handles = [self._register_hook(model, tgt, ctx, writer) for tgt in self.modules]
-        handles = [h for hs in handles for h in hs]
+        handles = [(self, h) for hs in handles for h in hs]
 
         return MultiHandle(self, handles)
