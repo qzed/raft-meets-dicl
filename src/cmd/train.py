@@ -169,7 +169,7 @@ def _train(args):
     inspc, chkptm = inspc.build(model.id, path_out)
 
     # prepare model
-    model, loss, input = model.model, model.loss, model.input
+    model_id, model, loss, input = model.id, model.model, model.loss, model.input
     model_adapter = model.get_adapter()
 
     if device == torch.device('cuda:0'):
@@ -203,8 +203,8 @@ def _train(args):
 
     # training loop
     log = utils.logging.Logger()
-    tctx = TrainingContext(log, path_out, strat, model, model_adapter, loss, input, inspc, chkptm,
-                           device, step_limit=args.steps, loader_args=env.loader_args)
+    tctx = TrainingContext(log, path_out, strat, model_id, model, model_adapter, loss, input, inspc,
+                           chkptm, device, step_limit=args.steps, loader_args=env.loader_args)
 
     if args.detect_anomaly:
         log.warn('anomaly detection enabled')

@@ -37,11 +37,12 @@ class TrainingContext:
     lr_sched_inst: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
     lr_sched_epoch: Optional[List[torch.optim.lr_scheduler._LRScheduler]]
 
-    def __init__(self, log, path, strategy, model, model_adapter, loss, input, inspector, checkpoints,
-                 device, step_limit=None, loader_args={}):
+    def __init__(self, log, path, strategy, model_id, model, model_adapter, loss, input, inspector,
+                 checkpoints, device, step_limit=None, loader_args={}):
         self.log = log
         self.path = Path(path)
         self.strategy = strategy
+        self.model_id = model_id
         self.model = model
         self.model_adapter = model_adapter
         self.loss = loss
@@ -292,7 +293,7 @@ class TrainingContext:
 
         # dump checkpoint
         chkpt = Checkpoint(
-            model=self.model_adapter.model.id,
+            model=self.model_id,
             iteration=Iteration(stage.index, epoch, self.step),
             metrics=None,
             state=State(
