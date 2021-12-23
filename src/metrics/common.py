@@ -27,9 +27,13 @@ class Metric:
             fl_all.FlAll,
             flow.FlowMagnitude,
             grad.GradientNorm,
+            grad.GradientMean,
+            grad.GradientMinMax,
             loss.Loss,
             lr.LearningRate,
             param.ParameterNorm,
+            param.ParameterMean,
+            param.ParameterMinMax,
         ]
         types = {cls.type: cls for cls in types}
 
