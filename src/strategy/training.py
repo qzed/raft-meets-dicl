@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional
-
-import datetime
+from datetime import datetime
 
 import torch
 import torch.nn as nn
