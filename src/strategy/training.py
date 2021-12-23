@@ -38,6 +38,7 @@ class TrainingContext:
 
     def __init__(self, log, path, strategy, model_id, model, model_adapter, loss, input, inspector,
                  checkpoints, device, step_limit=None, loader_args={}):
+        self.root_log = log
         self.log = log
         self.path = Path(path)
         self.strategy = strategy
@@ -98,11 +99,11 @@ class TrainingContext:
                 start_epoch = 0
                 continue
 
-            log = self.log.new(f"stage {i + 1}/{n_stages}")
-            log.info(f"starting new stage '{stage.name}' ({stage.id}) at step {self.step}")
+            self.log = self.root_log.new(f"stage {i + 1}/{n_stages}")
+            self.log.info(f"starting new stage '{stage.name}' ({stage.id}) at step {self.step}")
 
             stage.index = i
-            self.run_stage(log, stage, start_epoch, checkpoint)
+            self.run_stage(self.log, stage, start_epoch, checkpoint)
 
             start_epoch = 0
             checkpoint = None
@@ -110,6 +111,7 @@ class TrainingContext:
             if self.step_limit is not None and self.step == self.step_limit:
                 break
 
+        self.log = self.root_log
         self.log.info(f"training loop complete, ran {self.step:,} steps over {n_stages} stages")
 
     def prepare_stage(self, log, stage: Stage):
@@ -184,11 +186,14 @@ class TrainingContext:
         for epoch in range(start_epoch, stage.data.epochs):
             log_ = log.new(f"epoch {epoch + 1}/{stage.data.epochs}", sep=', ')
             log_.info(f"starting new epoch at step {self.step}")
+            self.log = log_
 
             self.run_epoch(log_, stage, epoch)
 
             if self.step_limit is not None and self.step == self.step_limit:
                 break
+
+        self.log = log
 
         # inspection and validation
         self.inspector.on_stage(log, self, stage)
@@ -204,10 +209,15 @@ class TrainingContext:
 
         # actual trainng loop
         for i, (img1, img2, flow, valid, meta) in enumerate(samples):
-            self.run_instance(log, stage, epoch, i, img1, img2, flow, valid, meta)
+            log_ = log.new(f"step {self.step}", sep=', ')
+            self.log = log_
+
+            self.run_instance(log_, stage, epoch, i, img1, img2, flow, valid, meta)
 
             if self.step_limit is not None and self.step == self.step_limit:
                 break
+
+        self.log = log
 
         # run per-epoch learning-rate schedulers
         for s in self.lr_sched_epoch:
@@ -229,7 +239,7 @@ class TrainingContext:
 
         # check for degeneracies in samples and warn/skip (e.g. all pixels invalid)
         if not all(m.valid for m in meta):
-            log.new(f"step {self.step}", sep=', ').warn("skipping batch due to invalid data")
+            log.warn("skipping batch due to invalid data")
             return
 
         self.inspector.on_batch_start(log, self, stage, epoch, i, img1, img2, flow, valid, meta)
