@@ -15,21 +15,21 @@ class Metric:
         from . import aae
         from . import epe
         from . import fl_all
-        from . import flow_mag
-        from . import grad_norm
+        from . import flow
+        from . import grad
         from . import loss
         from . import lr
-        from . import param_norm
+        from . import param
 
         types = [
             aae.AverageAngularError,
             epe.EndPointError,
             fl_all.FlAll,
-            flow_mag.FlowMagnitude,
-            grad_norm.GradientNorm,
+            flow.FlowMagnitude,
+            grad.GradientNorm,
             loss.Loss,
             lr.LearningRate,
-            param_norm.ParameterNorm,
+            param.ParameterNorm,
         ]
         types = {cls.type: cls for cls in types}
 
