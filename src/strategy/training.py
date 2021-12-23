@@ -297,7 +297,7 @@ class TrainingContext:
             iteration=Iteration(stage.index, epoch, self.step),
             metrics=None,
             state=State(
-                model=self.module.state_dict(),
+                model=self.model.state_dict(),
                 optimizer=self.optimizer.state_dict(),
                 scaler=self.scaler.state_dict(),
                 lr_sched_inst=[s.state_dict() for s in self.lr_sched_inst],
