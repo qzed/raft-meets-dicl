@@ -241,7 +241,7 @@ class TrainingContext:
 
         # validate output, check for non-finite numbers
         if self.validate:
-            self._validate_result(stage, epoch, result)
+            self._validate_result(log, stage, epoch, result)
 
         # compute loss
         loss = self.loss(self.model, result.output(), flow, valid, **stage.loss_args)
@@ -279,15 +279,15 @@ class TrainingContext:
         self.step += 1
 
     @torch.no_grad()
-    def _validate_result(self, stage, epoch, result):
+    def _validate_result(self, log, stage, epoch, result):
         # validate
         if torch.all(torch.isfinite(result.final().detach())):
             return
 
         # log error, dump all parameters to log
-        self.log.error("detected non-finite values in final flow field")
+        log.error("detected non-finite values in final flow field")
 
-        self.log.error("parameters:")
+        log.error("parameters:")
         for name, param in self.model.named_parameters():
             self.log.error(f"    {name}: {param}")
 
