@@ -19,6 +19,7 @@ class MultiHandle(Handle):
 
 class Hook:
     type = None
+    requires_backwards = False
 
     @classmethod
     def _typecheck(cls, cfg):

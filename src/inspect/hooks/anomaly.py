@@ -197,6 +197,7 @@ class ActivationAnomalyDetector(Hook):
 
 class GradientAnomalyDetector(Hook):
     type = 'anomalydetect-gradient'
+    requires_backwards = True
 
     @classmethod
     def from_config(cls, cfg):
