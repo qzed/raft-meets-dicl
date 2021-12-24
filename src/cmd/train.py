@@ -172,11 +172,6 @@ def _train(args):
     model_id, model, loss, input = model.id, model.model, model.loss, model.input
     model_adapter = model.get_adapter()
 
-    # backwards hooks don't work with inplace operations, replace them if necessary
-    if any(stub.hook.requires_backwards for stub in inspc.hooks):
-        logging.warning(f"replacing inplace operations in model due to hook requirement")
-        utils.model.replace_inplace_ops(model)
-
     if device == torch.device('cuda:0'):
         model = nn.DataParallel(model, device_ids)
 

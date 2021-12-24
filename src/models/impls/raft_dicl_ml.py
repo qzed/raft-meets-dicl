@@ -21,7 +21,7 @@ class EncoderOutputNet(nn.Module):
 
         self.conv1 = nn.Conv2d(input_dim, 128, kernel_size=3, padding=dilation, dilation=dilation)
         self.norm1 = common.norm.make_norm2d(norm_type, num_channels=128, num_groups=8)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
 
     def forward(self, x):

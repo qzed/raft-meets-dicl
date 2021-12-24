@@ -11,9 +11,9 @@ class PairEmbedding(nn.Sequential):
     def __init__(self, input_dim, output_dim):
         super().__init__(
             nn.Conv2d(input_dim, 48, kernel_size=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(48, 64, kernel_size=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(64, output_dim, kernel_size=1),
         )
 

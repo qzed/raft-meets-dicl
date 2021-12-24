@@ -116,19 +116,19 @@ class FeatureNetUp(nn.Module):
 
         self.mask5 = nn.Sequential(
             nn.Conv2d(128, 128, 3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(128, 9, 1, padding=0)
         )
 
         self.mask4 = nn.Sequential(
             nn.Conv2d(96, 96, 3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(96, 9, 1, padding=0)
         )
 
         self.mask3 = nn.Sequential(
             nn.Conv2d(64, 64, 3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.Conv2d(64, 9, 1, padding=0)
         )
 

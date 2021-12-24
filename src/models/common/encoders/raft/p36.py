@@ -15,7 +15,7 @@ class FeatureEncoder(nn.Module):
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=64, num_groups=8)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)

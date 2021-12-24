@@ -267,7 +267,7 @@ class FlowHead(nn.Module):
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
         self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x)))
@@ -305,7 +305,7 @@ class Up8Network(nn.Module):
         self.mixed_precision = mixed_precision
 
         self.conv1 = nn.Conv2d(hidden_dim, 256, 3, padding=1)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
 
     def forward(self, hidden, flow):

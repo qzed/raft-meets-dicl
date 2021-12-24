@@ -156,9 +156,9 @@ class MotionEncoder(nn.Sequential):
 
         super().__init__(
             nn.Conv2d(input_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3, padding=1),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(hidden_channels, output_channels, kernel_size=3, padding=1),
         )
 
@@ -186,9 +186,9 @@ class FlowHead(nn.Module):
         # network for displacement score/cost generation
         self.score = nn.Sequential(
             nn.Conv2d(input_dim, hidden_dim, kernel_size=1, padding=0),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(hidden_dim, disp_dim, kernel_size=1, padding=0),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
         )
 
     def forward(self, x):
@@ -236,11 +236,11 @@ class FlowHead2(nn.Sequential):
         # network for displacement score/cost generation
         super().__init__(
             nn.Conv2d(input_dim, hidden_dim, kernel_size=1, padding=0),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(hidden_dim, disp_dim, kernel_size=1, padding=0),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(disp_dim, 2 * disp_dim, kernel_size=1, padding=0),
-            nn.LeakyReLU(inplace=True),
+            nn.LeakyReLU(),
             nn.Conv2d(2 * disp_dim, 2, kernel_size=1, padding=0),
         )
 

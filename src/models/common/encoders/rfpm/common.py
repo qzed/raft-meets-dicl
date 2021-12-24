@@ -15,7 +15,7 @@ class RfpmRfdBlock(nn.Module):
 
         self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
         self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
 
         self.norm1 = norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
         self.norm2 = norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
@@ -69,7 +69,7 @@ class RfpmOutputNet(nn.Module):
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=1)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=hidden_dim, num_groups=8)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(hidden_dim, output_dim, kernel_size=1)
         self.dropout = nn.Dropout2d(p=dropout)
 

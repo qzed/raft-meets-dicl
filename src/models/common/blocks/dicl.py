@@ -19,7 +19,7 @@ class ConvBlock(nn.Sequential):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
             norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
         )
 
 
@@ -30,7 +30,7 @@ class ConvBlockTransposed(nn.Sequential):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
             norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
         )
 
 
@@ -41,11 +41,11 @@ class GaConv2xBlock(nn.Module):
         super().__init__()
 
         self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
         self.bn2 = norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU()
 
     def forward(self, x, res):
         x = self.conv1(x)
@@ -69,11 +69,11 @@ class GaConv2xBlockTransposed(nn.Module):
         super().__init__()
 
         self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
         self.bn2 = norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU()
 
     def forward(self, x, res):
         x = self.conv1(x)

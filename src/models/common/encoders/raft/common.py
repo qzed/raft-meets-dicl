@@ -9,7 +9,7 @@ class EncoderOutputNet(nn.Module):
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, kernel_size=3, padding=1)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=hidden_dim, num_groups=8)
-        self.relu1 = nn.ReLU(inplace=True)
+        self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(hidden_dim, output_dim, kernel_size=1)
         self.dropout = nn.Dropout2d(p=dropout)
 
