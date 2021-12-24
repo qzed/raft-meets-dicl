@@ -134,6 +134,7 @@ class TrainingContext:
     def run_stage(self, log, stage: Stage, start_epoch=0, checkpoint=None):
         assert 0 <= start_epoch < stage.data.epochs
 
+        self.current_stage = stage
         self.prepare_stage(log, stage)
 
         # load data
@@ -199,6 +200,8 @@ class TrainingContext:
         self.inspector.on_stage(log, self, stage)
 
     def run_epoch(self, log, stage, epoch):
+        self.current_epoch = epoch
+
         # set up progress bar
         desc = f"stage {stage.index + 1}/{len(self.strategy.stages)}, "
         desc += f"epoch {epoch + 1}/{stage.data.epochs}"

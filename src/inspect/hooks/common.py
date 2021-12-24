@@ -28,9 +28,12 @@ class Hook:
     @classmethod
     def from_config(cls, cfg):
         from . import activation
+        from . import anomaly
 
         types = [
             activation.ActivationStats,
+            anomaly.ActivationAnomalyDetector,
+            anomaly.GradientAnomalyDetector,
         ]
         types = {cls.type: cls for cls in types}
 
