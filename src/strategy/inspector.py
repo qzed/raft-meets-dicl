@@ -5,6 +5,9 @@ class Inspector:
     def setup(self, log, ctx):
         pass
 
+    def on_step_end(self, log, ctx, stage, epoch, i):
+        pass
+
     def on_batch_start(self, log, ctx, stage, epoch, i, img1, img2, target, valid, meta):
         pass
 

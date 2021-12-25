@@ -579,6 +579,8 @@ class SummaryInspector(strategy.Inspector):
         if self.images is not None and ctx.step % self.images.frequency == 0:
             write_images(self.writer, self.images.prefix, 0, img1, img2, target, final, valid, meta, ctx.step)
 
+    @torch.no_grad()
+    def on_step_end(self, log, ctx, stage, epoch, i):
         # run validations
         have_validation = False
         for val in self.val_step:

@@ -287,6 +287,8 @@ class TrainingContext:
             for s in self.lr_sched_inst:
                 s.step()
 
+        self.inspector.on_step_end(log, self, stage, epoch, i)
+
         # next step
         self.step += 1
 
