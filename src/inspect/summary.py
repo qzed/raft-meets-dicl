@@ -346,7 +346,7 @@ class StrategyValidation(Validation):
                         entries += [f"{k}: {v:.4f}"]
 
             if entries:
-                log.new(f"step {ctx.step}", sep=', ').info(f"validation ({val.name}): {', '.join(entries)}")
+                log.info(f"validation ({val.name}): {', '.join(entries)}")
 
             # first evaluation run stores main metrics
             if i == 0:
