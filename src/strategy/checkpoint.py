@@ -84,8 +84,11 @@ class Checkpoint:
         )
 
     @classmethod
-    def load(cls, path, **kwargs):
+    def load(cls, path, strip_prefix=None, **kwargs):
         chkpt = torch.load(path, **kwargs)
+
+        if strip_prefix:
+            chkpt['state']['model'] = {k.removeprefix(strip_prefix): v for k, v in chkpt['state']['model'].items()}
 
         return cls(
             model=chkpt['model'],
