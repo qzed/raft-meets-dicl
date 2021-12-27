@@ -301,10 +301,6 @@ class TrainingContext:
         # log error, dump all parameters to log
         log.error("detected non-finite values in final flow field")
 
-        log.error("parameters:")
-        for name, param in self.model.named_parameters():
-            self.log.error(f"    {name}: {param}")
-
         # dump checkpoint
         chkpt = Checkpoint(
             model=self.model_id,
