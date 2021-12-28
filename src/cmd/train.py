@@ -22,15 +22,23 @@ class Environment:
             cfg = utils.config.load(cfg)
 
         loader_args = cfg.get('loader', {})
+        cudnn_benchmark = cfg.get('cudnn', {}).get('benchmark', True)
+        cudnn_deterministic = cfg.get('cudnn', {}).get('deterministic', False)
 
-        return cls(loader_args)
+        return cls(loader_args, cudnn_benchmark, cudnn_deterministic)
 
-    def __init__(self, loader_args):
+    def __init__(self, loader_args, cudnn_benchmark, cudnn_deterministic):
         self.loader_args = loader_args
+        self.cudnn_benchmark = cudnn_benchmark
+        self.cudnn_deterministic = cudnn_deterministic
 
     def get_config(self):
         return {
             'loader': self.loader_args,
+            'cudnn': {
+                'benchmark': self.cudnn_benchmark,
+                'deterministic': self.cudnn_deterministic,
+            }
         }
 
 
@@ -197,9 +205,10 @@ def _train(args):
 
         chkpt = strategy.Checkpoint.load(args.resume, map_location='cpu')
 
-    # enable automatic per-device tuning
+    # set CUDNN options
     if device == torch.device('cuda:0'):
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = env.cudnn_benchmark
+        torch.backends.cudnn.deterministic = env.cudnn_deterministic
 
     # training loop
     log = utils.logging.Logger()
