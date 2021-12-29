@@ -1,4 +1,5 @@
 from .. import utils
+from ..data.dataset import Metadata, SampleArgs, SampleId
 
 import numpy as np
 import torch
@@ -131,6 +132,28 @@ class InputSpec:
 
     def apply(self, source):
         return Input(source, self.clip, self.range, self.padding)
+
+    def wrap_single(self, img1, img2, flow=None, valid=None, seq=0, dsid='custom'):
+        # extend batch dimension
+        img1 = img1[None, :, :, :]
+        img2 = img2[None, :, :, :]
+
+        if flow is not None:
+            flow = flow[None, :, :, :]
+            valid = valid[None, :, :]
+
+        meta = [Metadata(
+            valid=True,
+            dataset_id=dsid,
+            sample_id=SampleId(
+                format='{dsid}/{seq}/{id}',
+                img1=SampleArgs(args=[], kwargs={'dsid': dsid, 'seq': seq, 'id': 1}),
+                img2=SampleArgs(args=[], kwargs={'dsid': dsid, 'seq': seq, 'id': 2}),
+            ),
+            original_extents=((0, img1.shape[1]), (0, img1.shape[2])),
+        )]
+
+        return self.apply([(img1, img2, flow, valid, meta)])
 
 
 class Input:
