@@ -8,7 +8,8 @@ import numpy as np
 # al. (2018), based on implementation by Mehl at https://github.com/cv-stuttgart/flow_library.
 def end_point_error_abs(uv, uv_target, mask=None, mask_color=(0, 0, 0, 1), nan_color=(0, 0, 0, 1)):
     # Colors as defined by Mehl (they differ slightly from the "Object Scene
-    # Flow" paper).
+    # Flow" paper), but represent a logarithmic scale (i.e. the numbers in the
+    # paper are rounded).
     colors = [
         (0.1875, [49, 53, 148]),
         (0.375, [69, 116, 180]),
