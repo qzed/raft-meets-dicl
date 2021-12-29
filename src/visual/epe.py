@@ -4,10 +4,11 @@ import matplotlib.colors
 import numpy as np
 
 
-# End-point-error visualization based on implementation by Mehl
-# (https://github.com/cv-stuttgart/flow_library).
+# End-point-error visualization as described in "Object Scene Flow" by Menze et
+# al. (2018), based on implementation by Mehl at https://github.com/cv-stuttgart/flow_library.
 def end_point_error_abs(uv, uv_target, mask=None, mask_color=(0, 0, 0, 1), nan_color=(0, 0, 0, 1)):
-    # colors as defined by Mehl
+    # Colors as defined by Mehl (they differ slightly from the "Object Scene
+    # Flow" paper).
     colors = [
         (0.1875, [49, 53, 148]),
         (0.375, [69, 116, 180]),
