@@ -367,7 +367,8 @@ class RaftPlusDiclModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, corr_flow=False, flow_init=None, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, corr_flow=False,
+                corr_grad_stop=False, flow_init=None, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -400,6 +401,9 @@ class RaftPlusDiclModule(nn.Module):
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg(corr)):
                     out_corr[i].append(flow.detach() + delta)
+
+            if corr_grad_stop:
+                corr = corr.detach()
 
             # estimate delta for flow update
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
@@ -497,9 +501,17 @@ class RaftPlusDicl(Model):
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': 12, 'dap': True, 'upnet': True, 'corr_flow': False, 'mask_costs': []}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
+
+        default_args = {
+            'iterations': 12,
+            'dap': True,
+            'upnet': True,
+            'corr_flow': False,
+            'corr_grad_stop': False,
+            'mask_costs': [],
+        }
 
         return {
             'type': self.type,
@@ -529,9 +541,11 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return raft.RaftAdapter(self)
 
-    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, corr_flow=False, flow_init=None, mask_costs=[]):
-        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet, corr_flow=corr_flow,
-                           flow_init=flow_init, mask_costs=mask_costs)
+    def forward(self, img1, img2, iterations=12, dap=True, upnet=True, corr_flow=False,
+                corr_grad_stop=False, flow_init=None, mask_costs=[]):
+        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet,
+                           corr_flow=corr_flow, corr_grad_stop=corr_grad_stop, flow_init=flow_init,
+                           mask_costs=mask_costs)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm

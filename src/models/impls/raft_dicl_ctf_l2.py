@@ -62,7 +62,8 @@ class RaftPlusDiclModule(nn.Module):
         self.upnet = raft.Up8Network(hidden_dim=hdim)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
-    def forward(self, img1, img2, iterations=(4, 3), dap=True, upnet=True, corr_flow=False):
+    def forward(self, img1, img2, iterations=(4, 3), dap=True, upnet=True, corr_flow=False,
+                corr_grad_stop=False):
         hdim, cdim = self.hidden_dim, self.context_dim
         b, _, h, w = img1.shape
 
@@ -118,6 +119,9 @@ class RaftPlusDiclModule(nn.Module):
             if corr_flow:
                 out_4_corr.append(flow.detach() + flow_reg_4(corr))
 
+            if corr_grad_stop:
+                corr = corr.detach()
+
             # estimate delta for flow update
             h_4, d = update_4(h_4, ctx_4, corr, flow.detach())
 
@@ -147,6 +151,9 @@ class RaftPlusDiclModule(nn.Module):
             # intermediate flow output
             if corr_flow:
                 out_3_corr.append(flow.detach() + flow_reg_3(corr))
+
+            if corr_grad_stop:
+                corr = corr.detach()
 
             # estimate delta for flow update
             h_3, d = update_3(h_3, ctx_3, corr, flow.detach())
@@ -244,9 +251,16 @@ class RaftPlusDicl(Model):
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': (4, 3), 'dap': True, 'upnet': True, 'corr_flow': False}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
+
+        default_args = {
+            'iterations': (4, 3),
+            'dap': True,
+            'upnet': True,
+            'corr_flow': False,
+            'corr_grad_stop': False,
+        }
 
         return {
             'type': self.type,
@@ -277,8 +291,10 @@ class RaftPlusDicl(Model):
     def get_adapter(self) -> ModelAdapter:
         return common.adapters.mlseq.MultiLevelSequenceAdapter(self)
 
-    def forward(self, img1, img2, iterations=(4, 3), dap=True, upnet=True, corr_flow=False):
-        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet, corr_flow=corr_flow)
+    def forward(self, img1, img2, iterations=(4, 3), dap=True, upnet=True, corr_flow=False,
+                corr_grad_stop=False):
+        return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet,
+                           corr_flow=corr_flow, corr_grad_stop=corr_grad_stop)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm

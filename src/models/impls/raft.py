@@ -364,7 +364,8 @@ class RaftModule(nn.Module):
         coords = common.grid.coordinate_grid(batch, h // 8, w // 8, device=img.device)
         return coords, coords.clone()
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False,
+                corr_grad_stop=False, mask_costs=[]):
         hdim, cdim = self.hidden_dim, self.context_dim
 
         # run feature network
@@ -401,6 +402,9 @@ class RaftModule(nn.Module):
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg(corr)):
                     out_corr[i].append(flow.detach() + delta)
+
+            if corr_grad_stop:
+                corr = corr.detach()
 
             # estimate delta for flow update
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
@@ -491,9 +495,16 @@ class Raft(Model):
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': 12, 'upnet': True, 'corr_flow': False, 'mask_costs': []}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
+
+        default_args = {
+            'iterations': 12,
+            'upnet': True,
+            'corr_flow': False,
+            'corr_grad_stop': False,
+            'mask_costs': [],
+        }
 
         return {
             'type': self.type,
@@ -520,9 +531,10 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return RaftAdapter(self)
 
-    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False, mask_costs=[]):
+    def forward(self, img1, img2, iterations=12, flow_init=None, upnet=True, corr_flow=False,
+                corr_grad_stop=False, mask_costs=[]):
         return self.module(img1, img2, iterations=iterations, flow_init=flow_init, upnet=upnet,
-                           corr_flow=corr_flow, mask_costs=mask_costs)
+                           corr_flow=corr_flow, corr_grad_stop=corr_grad_stop, mask_costs=mask_costs)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm

@@ -45,7 +45,7 @@ class RaftModule(nn.Module):
 
         self.upnet = raft.Up8Network(hidden_dim=hdim)
 
-    def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True, corr_flow=False):
+    def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True, corr_flow=False, corr_grad_stop=False):
         batch, _c, h, w = img1.shape
         hdim, cdim = self.hidden_dim, self.context_dim
 
@@ -104,6 +104,9 @@ class RaftModule(nn.Module):
                 for i, delta in enumerate(self.flow_reg_5(corr)):
                     out_5_corr[i].append(flow.detach() + delta)
 
+            if corr_grad_stop:
+                corr = corr.detach()
+
             # estimate delta for flow update
             h_5, d = update_5(h_5, ctx_5, corr, flow.detach())
 
@@ -139,6 +142,9 @@ class RaftModule(nn.Module):
                 for i, delta in enumerate(self.flow_reg_4(corr)):
                     out_4_corr[i].append(flow.detach() + delta)
 
+            if corr_grad_stop:
+                corr = corr.detach()
+
             # estimate delta for flow update
             h_4, d = update_4(h_4, ctx_4, corr, flow.detach())
 
@@ -173,6 +179,9 @@ class RaftModule(nn.Module):
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg_3(corr)):
                     out_3_corr[i].append(flow.detach() + delta)
+
+            if corr_grad_stop:
+                corr = corr.detach()
 
             # estimate delta for flow update
             h_3, d = update_3(h_3, ctx_3, corr, flow.detach())
@@ -261,9 +270,15 @@ class Raft(Model):
                          on_stage_arguments=on_stage_args)
 
     def get_config(self):
-        default_args = {'iterations': (4, 3, 3), 'upnet': True, 'corr_flow': False}
         default_stage_args = {'freeze_batchnorm': True}
         default_epoch_args = {}
+
+        default_args = {
+            'iterations': (4, 3, 3),
+            'upnet': True,
+            'corr_flow': False,
+            'corr_grad_stop': False,
+        }
 
         return {
             'type': self.type,
@@ -290,8 +305,9 @@ class Raft(Model):
     def get_adapter(self) -> ModelAdapter:
         return common.adapters.mlseq.MultiLevelSequenceAdapter(self)
 
-    def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True, corr_flow=False):
-        return self.module(img1, img2, iterations=iterations, upnet=upnet, corr_flow=corr_flow)
+    def forward(self, img1, img2, iterations=(4, 3, 3), upnet=True, corr_flow=False, corr_grad_stop=False):
+        return self.module(img1, img2, iterations=iterations, upnet=upnet, corr_flow=corr_flow,
+                           corr_grad_stop=corr_grad_stop)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm
