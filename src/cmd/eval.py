@@ -215,7 +215,6 @@ def evaluate(args):
 
             # compute metrics
             sample_metrs = metrics(model, est, target, valid, sample_loss)
-            sample_metrs = {k: v.item() for k, v in sample_metrs.items()}
 
             # collect for output
             output.append({'id': str(meta.sample_id), 'metrics': sample_metrs})

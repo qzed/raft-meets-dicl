@@ -55,28 +55,5 @@ class Metric:
     def __call__(self, model, optimizer, estimate, target, valid, loss):
         return self.compute(model, optimizer, estimate, target, valid, loss)
 
-
-class Collection(Metric):
-    def __init__(self, metrics: List[Metric], key: str = ''):
-        super().__init__()
-
-        self.metrics = metrics
-        self.key = key
-
-    def get_config(self):
-        return {
-            'type': 'collection',
-            'key': self.key,
-            'metrics': [m.get_config() for m in self.metrics],
-        }
-
-    def compute(self, model, optimizer, estimate, target, valid, loss):
-        result = OrderedDict()
-
-        for metric in self.metrics:
-            partial = metric(model, optimizer, estimate, target, valid, loss)
-
-            for k, v in partial.items():
-                result[f'{self.key}{k}'] = v
-
-        return result
+    def reduce(self, values):
+        raise NotImplementedError

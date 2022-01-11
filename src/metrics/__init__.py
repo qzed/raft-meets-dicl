@@ -1,4 +1,4 @@
-from .common import Metric, Collection
+from .common import Metric
 
 from .aae import AverageAngularError
 from .epe import EndPointError

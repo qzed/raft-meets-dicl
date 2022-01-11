@@ -1,6 +1,5 @@
-from collections import OrderedDict
-
 import torch
+import numpy as np
 
 from .common import Metric
 
@@ -28,7 +27,8 @@ class Loss(Metric):
 
     @torch.no_grad()
     def compute(self, model, optimizer, estimate, target, valid, loss):
-        result = OrderedDict()
-        result[self.key] = loss
+        return {self.key: loss.item()}
 
-        return result
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: np.mean(vs) for k, vs in values.items()}

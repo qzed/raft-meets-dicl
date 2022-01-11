@@ -2,7 +2,7 @@ import logging
 
 from collections import OrderedDict, defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -50,6 +50,8 @@ class MetricsGroup:
     prefix: str
     metrics: List[metrics.Metric]
 
+    values = List[Dict[str, List[Any]]]
+
     @classmethod
     def from_config(cls, cfg):
         freq = int(cfg.get('frequency', 1))
@@ -62,6 +64,7 @@ class MetricsGroup:
         self.frequency = frequency
         self.prefix = prefix
         self.metrics = metrics
+        self.values = [defaultdict(list) for _ in self.metrics]
 
     def get_config(self):
         return {
@@ -70,13 +73,21 @@ class MetricsGroup:
             'metrics': [m.get_config() for m in self.metrics],
         }
 
-    def compute(self, model, optimizer, estimate, target, valid, loss):
-        result = OrderedDict()
+    def reset(self):
+        self.values = [defaultdict(list) for _ in self.metrics]
 
-        for metric in self.metrics:
+    def compute(self, model, optimizer, estimate, target, valid, loss):
+        for i, metric in enumerate(self.metrics):
             partial = metric(model, optimizer, estimate, target, valid, loss)
 
             for k, v in partial.items():
+                self.values[i][k].append(v)
+
+    def reduce(self):
+        result = OrderedDict()
+
+        for i, values in enumerate(self.values):
+            for k, v in self.metrics[i].reduce(values).items():
                 result[f'{self.prefix}{k}'] = v
 
         return result
@@ -197,7 +208,7 @@ class ValidationMetric:
         mtx = self.metric(model, optimizer, estimate, target, valid, loss)
 
         for k, v in mtx.items():
-            self.values[k].append(v.cpu())
+            self.values[k].append(v)
 
     def result(self):
         if self.reduce == 'mean':
@@ -564,23 +575,41 @@ class SummaryInspector(strategy.Inspector):
         # get final result (performs upsampling if necessary)
         final = result.final()
 
-        # compute metrics
+        # compute and accumulate metrics
         if self.metrics:
             for m in self.metrics:
                 if ctx.step % m.frequency != 0:
                     continue
 
-                metrics = m.compute(ctx.model, ctx.optimizer, final, target, valid, loss.detach())
+                m.compute(ctx.model, ctx.optimizer, final, target, valid, loss.detach())
 
-                for k, v in metrics.items():
-                    self.writer.add_scalar(k, v, ctx.step)
-
-        # dump images
-        if self.images is not None and ctx.step % self.images.frequency == 0:
+        # dump images (first sample, first batch if accumulating)
+        if self.images is not None and ctx.step % self.images.frequency == 0 and self.batch_index == 0:
             write_images(self.writer, self.images.prefix, 0, img1, img2, target, final, valid, meta, ctx.step)
+            self.wrote_images = True
+
+        self.batch_index += 1
+
+    @torch.no_grad()
+    def on_step_start(self, log, ctx, stage, epoch, i):
+        self.batch_index = 0
+
+        for m in self.metrics:
+            m.reset()
 
     @torch.no_grad()
     def on_step_end(self, log, ctx, stage, epoch, i):
+        # log metrics
+        for m in self.metrics:
+            metrics = m.reduce()
+
+            for k, v in metrics.items():
+                self.writer.add_scalar(k, v, ctx.step)
+
+        # reset metrics
+        for m in self.metrics:
+            m.reset()
+
         # run validations
         have_validation = False
         for val in self.val_step:

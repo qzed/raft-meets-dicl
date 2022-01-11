@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from .common import Metric
 
@@ -40,4 +41,8 @@ class FlAll(Metric):
         fl_all = torch.logical_and(epe > 3, epe > 0.05 * tgt)
 
         # compute metrics based on end-point error means
-        return {self.key: fl_all.float().mean()}
+        return {self.key: fl_all.float().mean().item()}
+
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: np.mean(vs) for k, vs in values.items()}

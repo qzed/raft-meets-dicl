@@ -2,6 +2,7 @@ from collections import OrderedDict
 from typing import List
 
 import torch
+import numpy as np
 
 from .common import Metric
 
@@ -45,8 +46,12 @@ class EndPointError(Metric):
 
         # note: these definitions are inverted (i.e. 1 - x) to the bad-pixel
         # error as used in literature
-        result[f'{self.key}mean'] = epe.mean()
+        result[f'{self.key}mean'] = epe.mean().item()
         for d in self.distances:
-            result[f'{self.key}{d}px'] = (epe <= d).float().mean()
+            result[f'{self.key}{d}px'] = (epe <= d).float().mean().item()
 
         return result
+
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: np.mean(vs) for k, vs in values.items()}

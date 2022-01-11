@@ -5,6 +5,9 @@ class Inspector:
     def setup(self, log, ctx):
         pass
 
+    def on_step_start(self, log, ctx, stage, epoch, i):
+        pass
+
     def on_step_end(self, log, ctx, stage, epoch, i):
         pass
 

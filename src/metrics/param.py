@@ -98,6 +98,10 @@ class ParameterNorm(Metric):
 
         return norms
 
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: vs[-1] for k, vs in values.items()}
+
 
 class ParameterMean(Metric):
     type = 'param-mean'
@@ -149,6 +153,10 @@ class ParameterMean(Metric):
             mean = {f"{self.key}{k}": mean[k][1] for k in self.params}
 
         return mean
+
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: vs[-1] for k, vs in values.items()}
 
 
 class ParameterMinMax(Metric):
@@ -202,7 +210,14 @@ class ParameterMinMax(Metric):
         else:
             mm = {k: mm[k] for k in self.params}
 
-        out = {f"{self.key}{k}/min": min for k, (min, max) in mm.items()}
-        out |= {f"{self.key}{k}/max": max for k, (min, max) in mm.items()}
+        out = {f"{self.key}{k}/min": min.item() for k, (min, max) in mm.items()}
+        out |= {f"{self.key}{k}/max": max.item() for k, (min, max) in mm.items()}
 
         return out
+
+    @torch.no_grad()
+    def reduce(self, values):
+        def _reduce(k, vs):
+            return np.min(vs) if k.endswith('/min') else np.max(vs)
+
+        return {k: _reduce(vs) for k, vs in values.items()}

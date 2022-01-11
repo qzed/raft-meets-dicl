@@ -233,6 +233,7 @@ class TrainingContext:
         # reset gradients
         if i % stage.gradient.accumulate == 0:
             self.optimizer.zero_grad()
+            self.inspector.on_step_start(log, self, stage, epoch, i)
 
         # move to cuda device
         img1 = img1.to(self.device, non_blocking=True)
@@ -287,10 +288,10 @@ class TrainingContext:
             for s in self.lr_sched_inst:
                 s.step()
 
-        self.inspector.on_step_end(log, self, stage, epoch, i)
+            self.inspector.on_step_end(log, self, stage, epoch, i)
 
-        # next step
-        self.step += 1
+            # next step
+            self.step += 1
 
     @torch.no_grad()
     def _validate_result(self, log, stage, epoch, result):

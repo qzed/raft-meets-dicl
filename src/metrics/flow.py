@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 from .common import Metric
 
@@ -30,6 +31,10 @@ class FlowMagnitude(Metric):
 
     @torch.no_grad()
     def compute(self, model, optimizer, estimate, target, valid, loss):
-        mag = torch.linalg.vector_norm(estimate, ord=self.ord, dim=-3).mean()
+        mag = torch.linalg.vector_norm(estimate, ord=self.ord, dim=-3).mean().item()
 
         return {self.key: mag}
+
+    @torch.no_grad()
+    def reduce(self, values):
+        return {k: np.mean(vs) for k, vs in values.items()}
