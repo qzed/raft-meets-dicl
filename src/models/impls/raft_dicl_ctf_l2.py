@@ -116,10 +116,10 @@ class RaftPlusDiclModule(nn.Module):
 
             # intermediate flow output
             if corr_flow:
-                out_4_corr.append(flow + flow_reg_4(corr))
+                out_4_corr.append(flow.detach() + flow_reg_4(corr))
 
             # estimate delta for flow update
-            h_4, d = update_4(h_4, ctx_4, corr, flow)
+            h_4, d = update_4(h_4, ctx_4, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d
@@ -146,10 +146,10 @@ class RaftPlusDiclModule(nn.Module):
 
             # intermediate flow output
             if corr_flow:
-                out_3_corr.append(flow + flow_reg_3(corr))
+                out_3_corr.append(flow.detach() + flow_reg_3(corr))
 
             # estimate delta for flow update
-            h_3, d = update_3(h_3, ctx_3, corr, flow)
+            h_3, d = update_3(h_3, ctx_3, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d

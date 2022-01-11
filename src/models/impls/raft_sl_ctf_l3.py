@@ -102,10 +102,10 @@ class RaftModule(nn.Module):
 
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg_5(corr)):
-                    out_5_corr[i].append(flow + delta)
+                    out_5_corr[i].append(flow.detach() + delta)
 
             # estimate delta for flow update
-            h_5, d = update_5(h_5, ctx_5, corr, flow)
+            h_5, d = update_5(h_5, ctx_5, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d
@@ -137,10 +137,10 @@ class RaftModule(nn.Module):
 
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg_4(corr)):
-                    out_4_corr[i].append(flow + delta)
+                    out_4_corr[i].append(flow.detach() + delta)
 
             # estimate delta for flow update
-            h_4, d = update_4(h_4, ctx_4, corr, flow)
+            h_4, d = update_4(h_4, ctx_4, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d
@@ -172,10 +172,10 @@ class RaftModule(nn.Module):
 
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg_3(corr)):
-                    out_3_corr[i].append(flow + delta)
+                    out_3_corr[i].append(flow.detach() + delta)
 
             # estimate delta for flow update
-            h_3, d = update_3(h_3, ctx_3, corr, flow)
+            h_3, d = update_3(h_3, ctx_3, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d

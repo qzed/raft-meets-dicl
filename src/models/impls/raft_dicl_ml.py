@@ -399,12 +399,11 @@ class RaftPlusDiclModule(nn.Module):
 
             if corr_flow:
                 for i, delta in enumerate(self.flow_reg(corr)):
-                    out_corr[i].append(flow + delta)
+                    out_corr[i].append(flow.detach() + delta)
 
             # estimate delta for flow update
-            flow = coords1 - coords0
             with torch.cuda.amp.autocast(enabled=self.mixed_precision):
-                h, d = self.update_block(h, x, corr, flow)
+                h, d = self.update_block(h, x, corr, flow.detach())
 
             # update flow estimate
             coords1 = coords1 + d
