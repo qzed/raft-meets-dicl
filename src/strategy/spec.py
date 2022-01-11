@@ -68,7 +68,7 @@ class ValidationSpec:
         return {
             'name': self.name,
             'source': self.source.get_config(),
-            'batch_size': self.batch_size,
+            'batch-size': self.batch_size,
             'images': list(self.images),
         }
 
