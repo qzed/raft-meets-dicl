@@ -220,4 +220,4 @@ class GradientMinMax(Metric):
         def _reduce(k, vs):
             return np.min(vs) if k.endswith('/min') else np.max(vs)
 
-        return {k: _reduce(vs) for k, vs in values.items()}
+        return {k: _reduce(k, vs) for k, vs in values.items()}
