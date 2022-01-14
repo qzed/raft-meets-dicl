@@ -31,7 +31,7 @@ class AverageAngularError(Metric):
         u_est, v_est = estimate[..., 0], estimate[..., 1]
         u_tgt, v_tgt = target[..., 0], target[..., 1]
 
-        # calculate cosine between flow vectors
+        # calculate cosine between spatio-temporal flow vectors (u, v, 1)
         n_est = torch.sqrt(torch.square(u_est) + torch.square(v_est))   # norm of estimate
         n_tgt = torch.sqrt(torch.square(u_tgt) + torch.square(v_tgt))   # norm of target
 
