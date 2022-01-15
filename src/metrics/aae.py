@@ -41,7 +41,7 @@ class AverageAngularError(Metric):
         cos = torch.clamp(cos, -1.0, 1.0)
 
         # compute average angular error
-        return {self.key: torch.rad2deg(torch.arccos(cos)).mean().item()}
+        return {self.key: torch.rad2deg(torch.arccos(cos).mean()).item()}
 
     @torch.no_grad()
     def reduce(self, values):
