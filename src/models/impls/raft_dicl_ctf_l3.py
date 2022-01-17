@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .. import Model, ModelAdapter
+from .. import Model, ModelAdapter, Loss
 from .. import common
 
 from . import raft
@@ -71,7 +71,7 @@ class RaftPlusDiclModule(nn.Module):
         self.upnet = raft.Up8Network(hidden_dim=hdim)
 
     def forward(self, img1, img2, iterations=(4, 3, 3), dap=True, upnet=True, corr_flow=False,
-                corr_grad_stop=False):
+                prev_flow=False, corr_grad_stop=False):
         hdim, cdim = self.hidden_dim, self.context_dim
         b, _, h, w = img1.shape
 
@@ -131,9 +131,13 @@ class RaftPlusDiclModule(nn.Module):
 
         # coarse iterations
         out_5 = []
+        out_5_prev = []
         out_5_corr = []
         for _ in range(iterations[0]):
             coords1 = coords1.detach()
+
+            if prev_flow:
+                out_5_prev.append(flow.detach())
 
             # correlation/cost volume lookup
             corr = corr_5(f1_5, f2_5, coords1, dap=dap)
@@ -164,9 +168,13 @@ class RaftPlusDiclModule(nn.Module):
 
         # middle iterations
         out_4 = []
+        out_4_prev = []
         out_4_corr = []
         for _ in range(iterations[1]):
             coords1 = coords1.detach()
+
+            if prev_flow:
+                out_4_prev.append(flow.detach())
 
             # correlation/cost volume lookup
             corr = corr_4(f1_4, f2_4, coords1, dap=dap)
@@ -197,9 +205,13 @@ class RaftPlusDiclModule(nn.Module):
 
         # fine iterations with flow upsampling
         out_3 = []
+        out_3_prev = []
         out_3_corr = []
         for _ in range(iterations[2]):
             coords1 = coords1.detach()
+
+            if prev_flow:
+                out_3_prev.append(flow.detach())
 
             # correlation/cost volume lookup
             corr = corr_3(f1_3, f2_3, coords1, dap=dap)
@@ -225,6 +237,16 @@ class RaftPlusDiclModule(nn.Module):
                 flow_up = 8 * F.interpolate(flow, (h, w), mode='bilinear', align_corners=True)
 
             out_3.append(flow_up)
+
+        if prev_flow:
+            out_5 = list(zip(out_5_prev, out_5))
+            out_4 = list(zip(out_4_prev, out_4))
+            out_3 = list(zip(out_3_prev, out_3))
+
+            if corr_flow:
+                out_5_corr = list(zip(out_5_prev, out_5_corr))
+                out_4_corr = list(zip(out_4_prev, out_4_corr))
+                out_3_corr = list(zip(out_3_prev, out_3_corr))
 
         if corr_flow:
             return out_5_corr, out_5, out_4_corr, out_4, out_3_corr, out_3
@@ -315,6 +337,7 @@ class RaftPlusDicl(Model):
             'dap': True,
             'upnet': True,
             'corr_flow': False,
+            'prev_flow': False,
             'corr_grad_stop': False,
         }
 
@@ -348,9 +371,9 @@ class RaftPlusDicl(Model):
         return common.adapters.mlseq.MultiLevelSequenceAdapter(self)
 
     def forward(self, img1, img2, iterations=(4, 3, 3), dap=True, upnet=True, corr_flow=False,
-                corr_grad_stop=False):
+                prev_flow=False, corr_grad_stop=False):
         return self.module(img1, img2, iterations=iterations, dap=dap, upnet=upnet,
-                           corr_flow=corr_flow, corr_grad_stop=corr_grad_stop)
+                           corr_flow=corr_flow, prev_flow=prev_flow, corr_grad_stop=corr_grad_stop)
 
     def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
         self.freeze_batchnorm = freeze_batchnorm
@@ -363,3 +386,77 @@ class RaftPlusDicl(Model):
 
         if mode:
             common.norm.freeze_batchnorm(self.module, self.freeze_batchnorm)
+
+
+class RestrictedMultiLevelSequenceLoss(Loss):
+    """Multi-level sequence loss"""
+
+    type = 'raft+dicl/mlseq-restricted'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        return cls(cfg.get('arguments', {}))
+
+    def __init__(self, arguments={}):
+        super().__init__(arguments)
+
+    def get_config(self):
+        default_args = {
+            'ord': 1,
+            'gamma': 0.85,
+            'alpha': (0.38, 0.6, 1.0),
+            'scale': 1.0,
+            'delta_range': (128, 64, 32),
+        }
+
+        return {
+            'type': self.type,
+            'arguments': default_args | self.arguments,
+        }
+
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=(0.4, 1.0), scale=1.0,
+                delta_range=(128, 64, 32)):
+        loss = 0.0
+
+        for i_level, level in enumerate(result):
+            n_predictions = len(level)
+
+            for i_seq, (flow_prev, flow) in enumerate(level):
+                # weight for level and sequence index
+                weight = alpha[i_level] * gamma**(n_predictions - i_seq - 1)
+
+                # upsample if needed
+                if flow.shape != target.shape:
+                    flow = self.upsample(flow, shape=target.shape)
+
+                if flow_prev.shape != target.shape:
+                    flow_prev = self.upsample(flow_prev, shape=target.shape)
+
+                # restrict loss to displacements in range
+                delta = (target - flow_prev).abs()
+                valid_lvl = (delta[:, 0, :, :] <= delta_range[i_level]) & (delta[:, 1, :, :] <= delta_range[i_level])
+                valid_lvl = valid_lvl & valid
+
+                if torch.any(valid_lvl):
+                    # compute flow distance according to specified norm
+                    dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
+
+                    # Only calculate error for valid pixels.
+                    dist = dist[valid_lvl]
+
+                    # update loss
+                    loss = loss + weight * dist.mean()
+
+        return loss * scale
+
+    def upsample(self, flow, shape, mode='bilinear'):
+        _b, _c, fh, fw = flow.shape
+        _b, _c, th, tw = shape
+
+        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
+        flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
+        flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
+
+        return flow

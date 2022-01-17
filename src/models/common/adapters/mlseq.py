@@ -23,7 +23,8 @@ class MultiLevelSequenceResult(Result):
         return [[x[batch_index].view(1, *x.shape[1:]) for x in level] for level in self.result]
 
     def final(self):
-        return self.result[-1][-1]
+        final = self.result[-1][-1]
+        return final[-1] if isinstance(final, (list, tuple)) else final
 
     def intermediate_flow(self):
         return self.result

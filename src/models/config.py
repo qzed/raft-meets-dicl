@@ -43,6 +43,7 @@ def load_loss(cfg) -> model.Loss:
         common.loss.mlseq.MultiLevelSequenceLoss,
         m.dicl.MultiscaleLoss,
         m.raft.SequenceLoss,
+        m.raft_dicl_ctf_l3.RestrictedMultiLevelSequenceLoss,
         m.outdated.raft_cl.SequenceLoss,
         m.outdated.raft_cl.SequenceCorrHingeLoss,
         m.outdated.raft_cl.SequenceCorrMseLoss,
