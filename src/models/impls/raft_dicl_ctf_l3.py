@@ -409,6 +409,7 @@ class RestrictedMultiLevelSequenceLoss(Loss):
             'alpha': (0.38, 0.6, 1.0),
             'scale': 1.0,
             'delta_range': (128, 64, 32),
+            'delta_mode': 'bilinear',
         }
 
         return {
@@ -417,7 +418,7 @@ class RestrictedMultiLevelSequenceLoss(Loss):
         }
 
     def compute(self, model, result, target, valid, ord=1, gamma=0.8, alpha=(0.4, 1.0), scale=1.0,
-                delta_range=(128, 64, 32)):
+                delta_range=(128, 64, 32), delta_mode='nearest'):
         loss = 0.0
 
         for i_level, level in enumerate(result):
@@ -432,7 +433,7 @@ class RestrictedMultiLevelSequenceLoss(Loss):
                     flow = self.upsample(flow, shape=target.shape)
 
                 if flow_prev.shape != target.shape:
-                    flow_prev = self.upsample(flow_prev, shape=target.shape)
+                    flow_prev = self.upsample(flow_prev, shape=target.shape, mode=delta_mode)
 
                 # restrict loss to displacements in range
                 delta = (target - flow_prev).abs()
@@ -455,7 +456,7 @@ class RestrictedMultiLevelSequenceLoss(Loss):
         _b, _c, fh, fw = flow.shape
         _b, _c, th, tw = shape
 
-        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=True)
+        flow = F.interpolate(flow, (th, tw), mode=mode, align_corners=None if mode == 'nearest' else True)
         flow[:, 0, :, :] = flow[:, 0, :, :] * (tw / fw)
         flow[:, 1, :, :] = flow[:, 1, :, :] * (th / fh)
 
