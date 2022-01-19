@@ -107,6 +107,20 @@ def setup_hooks(model, activations):
         register_activation_hook_raft(model, activations, 'module.update_block')
         return
 
+    elif model.type == 'dicl/baseline':
+        register_reset_hook(model, activations)
+        register_activation_hook(model, activations, 'module.lvl6.mnet')
+        register_activation_hook(model, activations, 'module.lvl6.dap')
+        register_activation_hook(model, activations, 'module.lvl5.mnet')
+        register_activation_hook(model, activations, 'module.lvl5.dap')
+        register_activation_hook(model, activations, 'module.lvl4.mnet')
+        register_activation_hook(model, activations, 'module.lvl4.dap')
+        register_activation_hook(model, activations, 'module.lvl3.mnet')
+        register_activation_hook(model, activations, 'module.lvl3.dap')
+        register_activation_hook(model, activations, 'module.lvl2.mnet')
+        register_activation_hook(model, activations, 'module.lvl2.dap')
+        return
+
     raise ValueError(f"model type not supported: {model.type}")
 
 
