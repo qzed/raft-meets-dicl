@@ -46,18 +46,37 @@ def register_activation_hook(model, activations, layer):
     return model.get_submodule(layer).register_forward_hook(_hook)
 
 
+def register_activation_hook_raft_dicl_dot(model, activations, layer):
+    def _hook(module, input, output):
+        input = input[0].detach()
+        output = output.detach()
+
+        activations[-1][f"{layer}.corr"].append(input)
+        activations[-1][f"{layer}.dap"].append(output)
+
+    return model.get_submodule(layer).register_forward_hook(_hook)
+
+
 def setup_hooks(model, activations):
     if model.type == 'raft+dicl/ctf-l3':
-        register_reset_hook(model, activations)
-        register_activation_hook(model, activations, 'module.corr_3.mnet')
-        register_activation_hook(model, activations, 'module.corr_4.mnet')
-        register_activation_hook(model, activations, 'module.corr_5.mnet')
-        register_activation_hook(model, activations, 'module.corr_3.dap')
-        register_activation_hook(model, activations, 'module.corr_4.dap')
-        register_activation_hook(model, activations, 'module.corr_5.dap')
+        if model.corr_type == 'dicl':
+            register_reset_hook(model, activations)
+            register_activation_hook(model, activations, 'module.corr_3.mnet')
+            register_activation_hook(model, activations, 'module.corr_4.mnet')
+            register_activation_hook(model, activations, 'module.corr_5.mnet')
+            register_activation_hook(model, activations, 'module.corr_3.dap')
+            register_activation_hook(model, activations, 'module.corr_4.dap')
+            register_activation_hook(model, activations, 'module.corr_5.dap')
+            return
 
-    else:
-        raise ValueError(f"model type not supported: {model.type}")
+        elif model.corr_type == 'dot':
+            register_reset_hook(model, activations)
+            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_3.dap')
+            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_4.dap')
+            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_5.dap')
+            return
+
+    raise ValueError(f"model type not supported: {model.type}")
 
 
 def evaluate(model, chkpt, data, path_out_base, device='cuda:0'):
