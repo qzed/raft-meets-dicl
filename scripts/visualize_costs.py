@@ -57,6 +57,19 @@ def register_activation_hook_raft_dicl_dot(model, activations, layer):
     return model.get_submodule(layer).register_forward_hook(_hook)
 
 
+def register_activation_hook_raft(model, activations, layer):
+    def _hook(module, input, output):
+        input = input[2].detach()
+
+        b, dxy, h, w = input.shape
+        d = int(np.sqrt(dxy))
+        input = input.reshape(b, d, d, h, w)
+
+        activations[-1][f"{layer}.corr"].append(input)
+
+    return model.get_submodule(layer).register_forward_hook(_hook)
+
+
 def setup_hooks(model, activations):
     if model.type == 'raft+dicl/ctf-l3':
         if model.corr_type == 'dicl':
@@ -74,6 +87,19 @@ def setup_hooks(model, activations):
             register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_3.dap')
             register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_4.dap')
             register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_5.dap')
+            return
+
+    elif model.type == 'raft/sl-ctf-l3':
+        if model.share_rnn:
+            register_reset_hook(model, activations)
+            register_activation_hook_raft(model, activations, 'module.update_block')
+            return
+
+        else:
+            register_reset_hook(model, activations)
+            register_activation_hook_raft(model, activations, 'module.update_block_3')
+            register_activation_hook_raft(model, activations, 'module.update_block_4')
+            register_activation_hook_raft(model, activations, 'module.update_block_5')
             return
 
     raise ValueError(f"model type not supported: {model.type}")
