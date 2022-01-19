@@ -11,7 +11,6 @@ from PIL import Image
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src import utils
@@ -22,13 +21,33 @@ from src import evaluation
 
 
 def save_cvol(cv, path, cmap=None):
+    # reshape
+    dx, dy, h, w = cv.shape
+    cv = cv.permute(2, 1, 3, 0)         # h, dy, w, dx
+    cv = cv.reshape(dy * h, dx * w)
+
+    # normalize
     cv_min = cv.min()
     cv_max = cv.max()
     cv = (cv - cv_min) / (cv_max - cv_min)
 
+    # apply color map
+    cv = cv.cpu().numpy()
     img = matplotlib.cm.get_cmap(cmap)(cv)
-    img = (img * 255.0).astype(np.uint8)
 
+    # add spacing between pixels
+    img_new = np.zeros((h, dy + 1, w, dx + 1, 4))
+    img_new[:, :, :, :, 3] = 1.0
+
+    img = img.reshape(h, dy, w, dx, 4)
+    img_new[:, :dy, :, :dx, :] = img
+    img = img_new.reshape((dy + 1) * h, (dx + 1) * w, 4)
+
+    h, w, _ = img.shape
+    img = img[:h-1, :w-1, :]
+
+    # save image
+    img = (img * 255.0).astype(np.uint8)
     Image.fromarray(img).save(path)
 
 
@@ -157,10 +176,6 @@ def evaluate(model, chkpt, data, path_out_base, device='cuda:0'):
 
                 # reshape for visualization
                 cv = cv[0]                          # remove batch dimension
-
-                dx, dy, h, w = cv.shape
-                cv = cv.permute(2, 1, 3, 0)         # h, dy, w, dx
-                cv = cv.reshape(dy * h, dx * w)
 
                 save_cvol(cv, path_out)
 
