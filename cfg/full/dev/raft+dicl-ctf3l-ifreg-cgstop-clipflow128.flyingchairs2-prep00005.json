@@ -502,7 +502,7 @@
                             },
                             {
                                 "type": "restrict-flow-magnitude",
-                                "maximum": 400.0
+                                "maximum": 128.0
                             }
                         ],
                         "source": {
