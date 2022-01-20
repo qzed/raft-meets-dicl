@@ -91,22 +91,30 @@ def register_activation_hook_raft(model, activations, layer):
 
 def setup_hooks(model, activations):
     if model.type == 'raft+dicl/ctf-l3':
-        if model.corr_type == 'dicl':
-            register_reset_hook(model, activations)
-            register_activation_hook(model, activations, 'module.corr_3.mnet')
-            register_activation_hook(model, activations, 'module.corr_4.mnet')
-            register_activation_hook(model, activations, 'module.corr_5.mnet')
-            register_activation_hook(model, activations, 'module.corr_3.dap')
-            register_activation_hook(model, activations, 'module.corr_4.dap')
-            register_activation_hook(model, activations, 'module.corr_5.dap')
-            return
+        if not model.share_dicl:
+            if model.corr_type == 'dicl':
+                register_reset_hook(model, activations)
+                register_activation_hook(model, activations, 'module.corr_3.mnet')
+                register_activation_hook(model, activations, 'module.corr_4.mnet')
+                register_activation_hook(model, activations, 'module.corr_5.mnet')
+                register_activation_hook(model, activations, 'module.corr_3.dap')
+                register_activation_hook(model, activations, 'module.corr_4.dap')
+                register_activation_hook(model, activations, 'module.corr_5.dap')
+                return
 
-        elif model.corr_type == 'dot':
-            register_reset_hook(model, activations)
-            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_3.dap')
-            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_4.dap')
-            register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_5.dap')
-            return
+            elif model.corr_type == 'dot':
+                register_reset_hook(model, activations)
+                register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_3.dap')
+                register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_4.dap')
+                register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_5.dap')
+                return
+
+        else:
+            if model.corr_type == 'dicl':
+                register_reset_hook(model, activations)
+                register_activation_hook(model, activations, 'module.corr.mnet')
+                register_activation_hook(model, activations, 'module.corr.dap')
+                return
 
     elif model.type == 'raft/sl-ctf-l3':
         if model.share_rnn:
