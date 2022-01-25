@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-11-30T16:39:46.744458",
-    "commit": "~09a68e552d6912025bedea315cf719870881c9b4",
+    "timestamp": "2022-01-25T13:06:06.066466",
+    "commit": "~23f20c9d5b13e41f2bd415810bc71bcd823844ce",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -9,7 +9,7 @@
         "data": "cfg/strategy/dev/train-sintel.aug-full.yaml",
         "model": "cfg/model/raft-sl-ctf3l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
-        "inspect": null,
+        "inspect": "cfg/inspect/default-1k.yaml",
         "env": null
     },
     "seeds": {
@@ -25,18 +25,33 @@
             "type": "raft/sl-ctf-l3",
             "parameters": {
                 "dropout": 0.0,
-                "mixed-precision": false,
                 "corr-radius": 4,
                 "corr-channels": 256,
-                "upnet": true
+                "context-channels": 128,
+                "recurrent-channels": 128,
+                "encoder-norm": "instance",
+                "context-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "share-rnn": true,
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none"
             },
             "arguments": {
                 "iterations": [
                     4,
                     3,
                     3
-                ]
-            }
+                ],
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft+dicl/mlseq",
@@ -47,7 +62,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -332,7 +348,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -400,7 +416,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -419,7 +435,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch:": {},
+                    "on-stage:": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -500,6 +518,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -518,7 +537,48 @@
         "validation": [
             {
                 "type": "strategy",
-                "frequency": "epoch",
+                "frequency": 1000,
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            },
+            {
+                "type": "strategy",
+                "frequency": "stage",
                 "checkpoint": true,
                 "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
                 "metrics": [
@@ -566,6 +626,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }

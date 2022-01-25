@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-08T21:15:56.225597",
-    "commit": "~4e4c2245241e2f780a1e8e43bfa4268c0b225bcc",
+    "timestamp": "2022-01-25T12:59:26.789917",
+    "commit": "~23f20c9d5b13e41f2bd415810bc71bcd823844ce",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -31,8 +31,16 @@
                 "dap-init": "identity",
                 "encoder-norm": "instance",
                 "context-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
                 "mnet-norm": "batch",
-                "share-dicl": false
+                "share-dicl": false,
+                "share-rnn": true,
+                "corr-type": "dicl",
+                "corr-args": {},
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none"
             },
             "arguments": {
                 "iterations": [
@@ -41,8 +49,15 @@
                     3
                 ],
                 "dap": true,
-                "upnet": true
-            }
+                "upnet": true,
+                "corr_flow": false,
+                "prev_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft+dicl/mlseq",
@@ -53,7 +68,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -338,7 +354,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -406,7 +422,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -425,7 +441,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch:": {},
+                    "on-stage:": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -506,6 +524,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -572,6 +591,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
