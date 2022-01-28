@@ -1,7 +1,0 @@
-mode: continuous
-
-stages:
-  - raft/s0-chairs.yaml
-  - raft/s1-things.yaml
-  - raft/s2-sintel.yaml
-  - raft/s3-kitti.yaml

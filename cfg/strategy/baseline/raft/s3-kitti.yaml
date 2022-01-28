@@ -1,73 +1,79 @@
-name: "RAFT: Stage 3: KITTI"
-id: raft/s3-kitti
+mode: continuous
+stages:
+  - name: "RAFT: Stage 3: KITTI"
+    id: raft/s3-kitti
 
-data:
-  epochs: 155       # ~ 50k steps or 300k samples
-  batch-size: 6
+    data:
+      epochs: 155       # ~ 50k steps or 300k samples
+      batch-size: 6
 
-  source:
-    type: augment
+      source:
+        type: augment
 
-    source:         # repeat a bunch of times so we don't run validation every 30s
-      type: repeat
-      times: 10
+        source:         # repeat a bunch of times so we don't run validation every 30s
+          type: repeat
+          times: 10
+          source: ../../../data/kitti-2015.train.yaml
+
+        augmentations:
+          - type: scale-sparse
+            min-size: &img_size [960, 288]
+            min-scale: 0.87
+            max-scale: 1.32
+            max-stretch: 0.2
+            prob-stretch: 0.8
+
+          - type: crop
+            size: *img_size
+
+          - type: flip
+            probability: [0.5, 0.1]
+
+          - type: color-jitter
+            prob-asymmetric: 0.2
+            brightness: 0.4
+            contrast: 0.4
+            saturation: 0.4
+            hue: 0.1592   # 0.5 / pi
+
+          - type: occlusion-forward
+            probability: 0.5
+            num: [1, 3]
+            min-size: [1, 1]
+            max-size: [100, 50]
+
+    validation:
       source: ../../../data/kitti-2015.train.yaml
+      batch-size: 1     # needs to be one due to images having different size
+      images: [0]
 
-    augmentations:
-      - type: scale-sparse
-        min-size: &img_size [960, 288]
-        min-scale: 0.87
-        max-scale: 1.32
-        max-stretch: 0.2
-        prob-stretch: 0.8
+    model:
+      on-stage:
+        freeze_batchnorm: true
 
-      - type: crop
-        size: *img_size
+    loss:
+      arguments:
+        gamma: 0.85
 
-      - type: flip
-        probability: [0.5, 0.1]
+    optimizer:
+      type: adam-w
 
-      - type: color-jitter
-        prob-asymmetric: 0.2
-        brightness: 0.4
-        contrast: 0.4
-        saturation: 0.4
-        hue: 0.1592   # 0.5 / pi
-
-      - type: occlusion-forward
-        probability: 0.5
-        num: [1, 3]
-        min-size: [1, 1]
-        max-size: [100, 50]
-
-validation:
-  source: ../../../data/kitti-2015.train.yaml
-  batch-size: 1     # needs to be one due to images having different size
-  images: [0]
-
-loss:
-  arguments:
-    gamma: 0.85
-
-optimizer:
-  type: adam-w
-
-  parameters:
-    lr: &learning_rate 0.0001
-    weight_decay: 0.00001
-    eps: 1.0e-8
-
-lr-scheduler:
-  instance:
-    - type: one-cycle
       parameters:
-        max_lr: *learning_rate
-        total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
-        pct_start: 0.05
-        cycle_momentum: false
-        anneal_strategy: linear
+        lr: &learning_rate 0.0001
+        weight_decay: 0.00001
+        eps: 1.0e-8
 
-gradient:
-  clip:
-    type: norm
-    value: 1.0
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate
+            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
