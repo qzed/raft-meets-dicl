@@ -121,7 +121,7 @@ stages:
         - type: one-cycle
           parameters:
             max_lr: *learning_rate
-            total_steps: '({n_epochs} * {n_batches}) // {n_accum} + 100'
+            total_steps: '100000 + 100'
             pct_start: 0.05
             cycle_momentum: false
             anneal_strategy: linear
