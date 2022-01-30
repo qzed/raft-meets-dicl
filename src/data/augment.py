@@ -475,15 +475,18 @@ class Occlusion(Augmentation):
         if len(max_size) != 2:
             raise ValueError('invalid max-size, expected list or tuple with two elements')
 
-        return cls(probability, num, min_size, max_size)
+        skew_correction = bool(cfg.get('skew-correction', True))
 
-    def __init__(self, probability, num, min_size, max_size):
+        return cls(probability, num, min_size, max_size, skew_correction)
+
+    def __init__(self, probability, num, min_size, max_size, skew_correction=True):
         super().__init__()
 
         self.probability = probability
         self.num = num
         self.min_size = min_size
         self.max_size = max_size
+        self.skew_correction = skew_correction
 
     def get_config(self):
         return {
@@ -492,6 +495,7 @@ class Occlusion(Augmentation):
             'num': self.num,
             'min-size': self.min_size,
             'max-size': self.max_size,
+            'skew-correction': self.skew_correction,
         }
 
     def _patch(self, img):
@@ -509,11 +513,13 @@ class Occlusion(Augmentation):
         for _ in range(num):
             dx, dy = np.random.randint(self.min_size, self.max_size)
 
-            # allow drawing accross border to not skew distribution
-            y0, x0 = np.random.randint((-dy, -dx), np.array(img.shape[1:3]))
+            if self.skew_correction:
+                # allow drawing accross border to not skew distribution
+                y0, x0 = np.random.randint((-dy + 1, -dx + 1), np.array(img.shape[1:3]))
 
-            # clip to borders
-            y0, x0 = np.clip([y0, x0], [0, 0], img.shape[1:3])
+            else:
+                y0, x0 = np.random.randint((0, 0), np.array(img.shape[1:3]))
+
             y1, x1 = np.clip([y0 + dy, x0 + dy], [0, 0], img.shape[1:3])
 
             # apply patch
@@ -530,8 +536,8 @@ class OcclusionForward(Occlusion):
     def from_config(cls, cfg):
         return cls._from_config(cfg)
 
-    def __init__(self, probability, num, min_size, max_size):
-        super().__init__(probability, num, min_size, max_size)
+    def __init__(self, probability, num, min_size, max_size, skew_correction=True):
+        super().__init__(probability, num, min_size, max_size, skew_correction)
 
     def process(self, img1, img2, flow, valid, meta):
         return img1, self._patch(img2), flow, valid, meta
@@ -544,8 +550,8 @@ class OcclusionBackward(Occlusion):
     def from_config(cls, cfg):
         return cls._from_config(cfg)
 
-    def __init__(self, probability, num, min_size, max_size):
-        super().__init__(probability, num, min_size, max_size)
+    def __init__(self, probability, num, min_size, max_size, skew_correction=True):
+        super().__init__(probability, num, min_size, max_size, skew_correction)
 
     def process(self, img1, img2, flow, valid, meta):
         return self._patch(img1), img2, flow, valid, meta
