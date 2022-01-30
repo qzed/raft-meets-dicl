@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import scipy.ndimage as ndimage
 
+from PIL import Image
+
 import torch
 import torchvision.transforms as T
 
@@ -186,6 +188,85 @@ class ColorJitter(Augmentation):
             stack = torch.stack((img1, img2), dim=0)
             stack = np.array(self.transform(stack).permute(0, 1, 3, 4, 2))
             img1, img2 = stack[0], stack[1]
+
+        return img1, img2, flow, valid, meta
+
+
+class ColorJitter8bit(Augmentation):
+    type = 'color-jitter-8bit'
+
+    @classmethod
+    def from_config(cls, cfg):
+        cls._typecheck(cfg)
+
+        prob_asymmetric = cfg['prob-asymmetric']
+        brightness = cfg['brightness']
+        contrast = cfg['contrast']
+        saturation = cfg['saturation']
+        hue = cfg['hue']
+
+        return cls(prob_asymmetric, brightness, contrast, saturation, hue)
+
+    def __init__(self, prob_asymmetric, brightness, contrast, saturation, hue):
+        super().__init__()
+
+        self.prob_asymmetric = prob_asymmetric
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+        self.transform = T.ColorJitter(brightness, contrast, saturation, hue)
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'prob-asymmetric': self.prob_asymmetric,
+            'brightness': self.brightness,
+            'contrast': self.contrast,
+            'saturation': self.saturation,
+            'hue': self.hue,
+        }
+
+    def process(self, img1, img2, flow, valid, meta):
+        batch, h, w, c = img1.shape
+
+        # concatenate batches
+        img1 = img1.reshape(batch * h, w, c)
+        img2 = img2.reshape(batch * h, w, c)
+
+        # apply transform
+        if np.random.rand() < self.prob_asymmetric:     # asymmetric
+            # convert to PIL Image
+            img1 = Image.fromarray((img1 * np.iinfo(np.uint8).max).astype(np.uint8))
+            img2 = Image.fromarray((img2 * np.iinfo(np.uint8).max).astype(np.uint8))
+
+            # apply transform
+            img1 = self.transform(img1)
+            img2 = self.transform(img2)
+
+            # convert back to numpy array
+            img1 = np.array(img1, dtype=np.uint8).astype(np.float32) / np.iinfo(np.uint8).max
+            img2 = np.array(img2, dtype=np.uint8).astype(np.float32) / np.iinfo(np.uint8).max
+        else:                                           # symmetric
+            # stack images
+            stack = np.concatenate([img1, img2], axis=0)
+
+            # convert to PIL Image
+            stack = Image.fromarray((stack * np.iinfo(np.uint8).max).astype(np.uint8))
+
+            # apply transform
+            stack = self.transform(stack)
+
+            # convert back to numpy array
+            stack = np.array(stack, dtype=np.uint8).astype(np.float32) / np.iinfo(np.uint8).max
+
+            # split stack
+            img1, img2 = np.split(stack, 2, axis=0)
+
+        # split batches
+        img1 = img1.reshape(batch, h, w, c)
+        img2 = img2.reshape(batch, h, w, c)
 
         return img1, img2, flow, valid, meta
 
