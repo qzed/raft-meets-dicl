@@ -795,7 +795,7 @@ class ScaleSparse(_Scale):
         return img1, img2, flow, valid, meta
 
 
-class _ScaleRaft(Augmentation):
+class _ScaleExp(Augmentation):
     @classmethod
     def _from_config(cls, cfg, **args):
         cls._typecheck(cfg)
@@ -873,8 +873,8 @@ class _ScaleRaft(Augmentation):
         return new_size, scale
 
 
-class ScaleRaft(_ScaleRaft):
-    type = 'scale'
+class ScaleExp(_ScaleExp):
+    type = 'scale-exp'
 
     @classmethod
     def from_config(cls, cfg):
@@ -926,8 +926,8 @@ class ScaleRaft(_ScaleRaft):
         return img1, img2, flow, valid, meta
 
 
-class ScaleSparseRaft(_ScaleRaft):
-    type = 'scale-sparse-raft'
+class ScaleSparseExp(_ScaleExp):
+    type = 'scale-sparse-exp'
 
     @classmethod
     def from_config(cls, cfg):
@@ -1161,9 +1161,9 @@ def _build_augmentation(cfg):
         RestrictFlowMagnitude,
         Rotate,
         Scale,
-        ScaleRaft,
+        ScaleExp,
         ScaleSparse,
-        ScaleSparseRaft,
+        ScaleSparseExp,
         Translate,
     ]
 
