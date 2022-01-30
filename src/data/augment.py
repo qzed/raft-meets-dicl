@@ -32,7 +32,7 @@ class Augment(Collection):
 
         augs = [_build_augmentation(acfg) for acfg in augs]
 
-        return Augment(augs, config.load(path, source))
+        return Augment(augs, config.load(path, source), sync)
 
     def __init__(self, augmentations, source, sync=True):
         super().__init__()
