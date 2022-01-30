@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-30T15:47:57.215234",
-    "commit": "~c413bcf9aefb568818c3eb5f4027a46a12aba8f2",
+    "timestamp": "2022-01-30T15:54:43.566667",
+    "commit": "~d2fbd3496a8cd713978be4c5aa194658e6ab484b",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -109,7 +109,7 @@
                                     100,
                                     100
                                 ],
-                                "skew-correction": true
+                                "skew-correction": false
                             },
                             {
                                 "type": "scale-sparse-exp",
