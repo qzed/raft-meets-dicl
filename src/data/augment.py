@@ -795,6 +795,206 @@ class ScaleSparse(_Scale):
         return img1, img2, flow, valid, meta
 
 
+class _ScaleRaft(Augmentation):
+    @classmethod
+    def _from_config(cls, cfg, **args):
+        cls._typecheck(cfg)
+
+        min_size = list(cfg.get('min-size', [0, 0]))
+        if len(min_size) != 2 or min_size[0] < 0 or min_size[1] < 0:
+            raise ValueError('invalid min-size, expected list with two unsigned integers')
+
+        min_scale = float(cfg['min-scale'])
+        max_scale = float(cfg['max-scale'])
+
+        if min_scale > max_scale:
+            raise ValueError('min-scale must be smaller than or equal to max-scale')
+
+        max_stretch = float(cfg['max-stretch'])
+        if max_stretch < 0:
+            raise ValueError('stretch must be non-negative')
+
+        prob_stretch = float(cfg.get('prob-stretch', 1.0))
+        if prob_stretch < 0:
+            raise ValueError('prob-stretch must be non-negative')
+
+        mode = cfg.get('mode', 'linear')
+
+        return cls(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode, **args)
+
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
+        super().__init__()
+
+        self.min_size = min_size
+        self.min_scale = min_scale
+        self.max_scale = max_scale
+        self.max_stretch = max_stretch
+        self.prob_stretch = prob_stretch
+        self.mode = mode
+
+        if mode == 'nearest':
+            self.modenum = cv2.INTER_NEAREST
+        elif mode == 'linear':
+            self.modenum = cv2.INTER_LINEAR
+        elif mode == 'cubic':
+            self.modenum = cv2.INTER_CUBIC
+        elif mode == 'area':
+            self.modenum = cv2.INTER_AREA
+        else:
+            raise ValueError(f"invalid scaling mode '{mode}'")
+
+    def get_config(self):
+        return {
+            'type': self.type,
+            'min-size': self.min_size,
+            'min-scale': self.min_scale,
+            'max-scale': self.max_scale,
+            'max-stretch': self.max_stretch,
+            'prob-stretch': self.prob_stretch,
+            'mode': self.mode,
+        }
+
+    def _get_new_size(self, input_size):
+        # draw random scale factor
+        scale = 2 ** np.random.uniform(self.min_scale, self.max_scale)
+        sx = scale
+        sy = scale
+
+        # apply random stretch factor
+        if np.random.rand() < self.prob_stretch:
+            sx *= 2 ** np.random.uniform(-self.max_stretch, self.max_stretch)
+            sy *= 2 ** np.random.uniform(-self.max_stretch, self.max_stretch)
+
+        # calculate new size and actual/clipped scale (store as width, height)
+        old_size = np.array(input_size)[::-1]
+        new_size = np.clip(np.ceil(old_size * [sx, sy]).astype(np.int32), self.min_size, None)
+        scale = new_size / old_size
+
+        return new_size, scale
+
+
+class ScaleRaft(_ScaleRaft):
+    type = 'scale'
+
+    @classmethod
+    def from_config(cls, cfg):
+        th_valid = cfg.get('th-valid', 0.99)
+
+        return cls._from_config(cfg, th_valid=th_valid)
+
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode, th_valid):
+        super().__init__(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
+
+        self.th_valid = th_valid
+
+    def get_config(self):
+        return super().get_config() | {
+            'th-valid': self.th_valid,
+        }
+
+    def process(self, img1, img2, flow, valid, meta):
+        assert img1.shape[:3] == img2.shape[:3]
+
+        # draw random but valid scale factors
+        size, scale = self._get_new_size(img1.shape[1:3])
+
+        # scale images
+        img1_out, img2_out = [], []
+        for i in range(img1.shape[0]):
+            img1_out += [cv2.resize(img1[i], size, interpolation=self.modenum)]
+            img2_out += [cv2.resize(img2[i], size, interpolation=self.modenum)]
+
+        img1 = np.stack(img1_out, axis=0)
+        img2 = np.stack(img2_out, axis=0)
+
+        if flow is not None:
+            flow_out = []
+            valid_out = []
+            for i in range(flow.shape[0]):
+                flow_out += [cv2.resize(flow[i], size, interpolation=self.modenum) * scale]
+
+                # attempt to scale validity mask, mark as invalid if below threshold
+                v = cv2.resize(valid[i].astype(np.float32), size, interpolation=self.modenum)
+                valid_out += [v >= self.th_valid]
+
+            flow = np.stack(flow_out, axis=0)
+            valid = np.stack(valid_out, axis=0)
+
+        for m in meta:
+            m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
+
+        return img1, img2, flow, valid, meta
+
+
+class ScaleSparseRaft(_ScaleRaft):
+    type = 'scale-sparse-raft'
+
+    @classmethod
+    def from_config(cls, cfg):
+        return cls._from_config(cfg)
+
+    def __init__(self, min_size, min_scale, max_scale, max_stretch, prob_stretch, mode):
+        super().__init__(min_size, min_scale, max_scale, max_stretch, prob_stretch, mode)
+
+    def process(self, img1, img2, flow, valid, meta):
+        assert img1.shape[:3] == img2.shape[:3] == flow.shape[:3] == valid.shape[:3]
+
+        # draw random but valid scale factors
+        size, scale = self._get_new_size(img1.shape[1:3])
+
+        # scale images
+        img1_out, img2_out = [], []
+        for i in range(img1.shape[0]):
+            img1_out += [cv2.resize(img1[i], size, interpolation=self.modenum)]
+            img2_out += [cv2.resize(img2[i], size, interpolation=self.modenum)]
+
+        img1 = np.stack(img1_out, axis=0)
+        img2 = np.stack(img2_out, axis=0)
+
+        # scale flow
+        flow_out, valid_out = [], []
+        for i in range(flow.shape[0]):
+            # build grid of coordinates
+            coords = np.meshgrid(np.arange(flow.shape[2]), np.arange(flow.shape[1]))
+            coords = np.stack(coords, axis=-1).astype(np.float32)
+
+            # filter for valid ones (note: this reshapes into list of values/tuples)
+            coords = coords[valid[i]]
+            flow_i = flow[i][valid[i]]
+
+            # actually scale flow (and flow coordinates)
+            coords = coords * scale
+            flow_i = flow_i * scale
+
+            # round flow coordinates back to integer and separate
+            coords = np.round(coords).astype(np.int32)
+            cx, cy = coords[:, 0], coords[:, 1]
+
+            # filter new flow coordinates to ensure they are still in range
+            cv = (cx >= 0) & (cx < size[0]) & (cy >= 0) & (cy < size[1])
+            coords = coords[cv]
+            flow_i = flow_i[cv]
+
+            # map sparse flow back onto full image
+            new_flow = np.zeros((*size[::-1], 2), dtype=np.float32)
+            new_flow[cy, cx] = flow_i
+
+            # create new validity map
+            new_valid = np.zeros(size[::-1], dtype=bool)
+            new_valid[cy, cx] = True
+
+            flow_out += [new_flow]
+            valid_out += [new_valid]
+
+        flow = np.stack(flow_out, axis=0)
+        valid = np.stack(valid_out, axis=0)
+
+        for m in meta:
+            m.original_extents = ((0, img1.shape[1]), (0, img1.shape[2]))
+
+        return img1, img2, flow, valid, meta
+
+
 class Translate(Augmentation):
     type = 'translate'
 
@@ -960,7 +1160,9 @@ def _build_augmentation(cfg):
         RestrictFlowMagnitude,
         Rotate,
         Scale,
+        ScaleRaft,
         ScaleSparse,
+        ScaleSparseRaft,
         Translate,
     ]
 
