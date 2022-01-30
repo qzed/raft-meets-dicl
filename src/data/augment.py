@@ -1151,6 +1151,7 @@ class Rotate(Augmentation):
 def _build_augmentation(cfg):
     types = [
         ColorJitter,
+        ColorJitter8bit,
         Crop,
         CropCenter,
         Flip,
