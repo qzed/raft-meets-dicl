@@ -210,7 +210,7 @@ def evaluate(args):
 
         if target is not None:
             # compute loss
-            sample_loss = loss(model, out, target, valid)
+            sample_loss = loss(model, out.output(), target, valid)
             sample_loss = sample_loss.detach()
 
             # compute metrics
