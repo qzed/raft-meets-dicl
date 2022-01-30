@@ -53,7 +53,7 @@ def make_encoder_s3(encoder_type, output_dim, norm_type, dropout, relu_inplace=T
     if encoder_type == 'raft':
         return raft.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace, **kwargs)
     if encoder_type == 'dicl':
-        return rfpm.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace, **kwargs)
+        return dicl.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
     if encoder_type == 'rfpm-raft':
         return rfpm.s3.FeatureEncoder(output_dim=output_dim, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace, **kwargs)
     else:
