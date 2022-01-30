@@ -1,10 +1,10 @@
 {
-    "timestamp": "2021-11-13T23:57:40.077270",
-    "commit": "~35148352292cacc9afefa47a53c703078f2b3320",
+    "timestamp": "2022-01-30T17:02:13.776681",
+    "commit": "~af2d95fff0c7af1521ff944109e64a41377dce07",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
-        "output": "cfg/strategy/dev/combined/raft-baseline.sintel.json",
+        "output": "cfg/full/dev/raft-baseline.sintel.json",
         "config": null,
         "data": "cfg/strategy/dev/train-sintel.aug-full.yaml",
         "model": "cfg/model/raft-baseline.yaml",
@@ -26,12 +26,29 @@
             "parameters": {
                 "dropout": 0.0,
                 "mixed-precision": false,
+                "corr-levels": 4,
                 "corr-radius": 4,
-                "upnet": true
+                "corr-channels": 256,
+                "context-channels": 128,
+                "recurrent-channels": 128,
+                "encoder-norm": "instance",
+                "context-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {}
             },
             "arguments": {
-                "iterations": 4
-            }
+                "iterations": 4,
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false,
+                "mask_costs": []
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft/sequence",
@@ -129,7 +146,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -142,8 +160,8 @@
                                 {
                                     "type": "dataset",
                                     "spec": {
-                                        "id": "mpi-sintel-clean",
-                                        "name": "MPI Sintel (clean)",
+                                        "id": "mpi-sintel",
+                                        "name": "MPI Sintel",
                                         "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                         "layout": {
                                             "type": "generic",
@@ -199,8 +217,8 @@
                                 {
                                     "type": "dataset",
                                     "spec": {
-                                        "id": "mpi-sintel-clean",
-                                        "name": "MPI Sintel (clean)",
+                                        "id": "mpi-sintel",
+                                        "name": "MPI Sintel",
                                         "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                         "layout": {
                                             "type": "generic",
@@ -268,8 +286,8 @@
                         "source": {
                             "type": "dataset",
                             "spec": {
-                                "id": "mpi-sintel-clean",
-                                "name": "MPI Sintel (clean)",
+                                "id": "mpi-sintel",
+                                "name": "MPI Sintel",
                                 "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                 "layout": {
                                     "type": "generic",
@@ -322,7 +340,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -336,8 +354,8 @@
                         "source": {
                             "type": "dataset",
                             "spec": {
-                                "id": "mpi-sintel-clean",
-                                "name": "MPI Sintel (clean)",
+                                "id": "mpi-sintel",
+                                "name": "MPI Sintel",
                                 "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
                                 "layout": {
                                     "type": "generic",
@@ -390,7 +408,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -409,7 +427,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch:": {},
+                    "on-stage:": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -490,6 +510,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -556,6 +577,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
