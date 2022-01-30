@@ -754,7 +754,7 @@ class ScaleSparse(_Scale):
         # scale flow
         flow_out, valid_out = [], []
         for i in range(flow.shape[0]):
-            # buil grid of coordinates
+            # build grid of coordinates
             coords = np.meshgrid(np.arange(flow.shape[2]), np.arange(flow.shape[1]))
             coords = np.stack(coords, axis=-1).astype(np.float32)
 
