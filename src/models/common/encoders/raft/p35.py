@@ -9,44 +9,44 @@ from ...blocks.raft import ResidualBlock
 class FeatureEncoder(nn.Module):
     """Feature / context encoder network"""
 
-    def __init__(self, output_dim=32, norm_type='batch', dropout=0.0):
+    def __init__(self, output_dim=32, norm_type='batch', dropout=0.0, relu_inplace=True):
         super().__init__()
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=64, num_groups=8)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(96, 96, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(128, 128, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer4 = nn.Sequential(    # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            ResidualBlock(128, 160, norm_type, stride=2),
-            ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(160, 160, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer5 = nn.Sequential(    # (H/16, W/16, 160) -> (H/16, H/16, 192)
-            ResidualBlock(160, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            ResidualBlock(160, 192, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(192, 192, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         # output blocks
-        self.out3 = EncoderOutputNet(128, output_dim, 160, norm_type=norm_type, dropout=dropout)
-        self.out4 = EncoderOutputNet(160, output_dim, 192, norm_type=norm_type, dropout=dropout)
-        self.out5 = EncoderOutputNet(192, output_dim, 224, norm_type=norm_type, dropout=dropout)
+        self.out3 = EncoderOutputNet(128, output_dim, 160, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
+        self.out4 = EncoderOutputNet(160, output_dim, 192, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
+        self.out5 = EncoderOutputNet(192, output_dim, 224, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():

@@ -16,12 +16,12 @@ from . import raft
 # -- Asymmetric encoders ---------------------------------------------------------------------------
 
 class EncoderOutputNet(nn.Module):
-    def __init__(self, input_dim, output_dim, dilation=1, norm_type='batch'):
+    def __init__(self, input_dim, output_dim, dilation=1, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(input_dim, 128, kernel_size=3, padding=dilation, dilation=dilation)
         self.norm1 = common.norm.make_norm2d(norm_type, num_channels=128, num_groups=8)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
         self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
 
     def forward(self, x):
@@ -35,7 +35,7 @@ class EncoderOutputNet(nn.Module):
 class StackEncoder(nn.Module):
     """Encoder for frame 1 (feature stack)"""
 
-    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch'):
+    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         if levels < 1 or levels > 4:
@@ -45,19 +45,26 @@ class StackEncoder(nn.Module):
 
         # keep spatial resolution and channel count, output networks for each
         # level (with dilation)
-        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
+        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type,
+                                     relu_inplace=relu_inplace)
 
         if levels >= 2:
-            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256, norm_type=norm_type)
-            self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2, norm_type=norm_type)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=256, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out4 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=2,
+                                         norm_type=norm_type, relu_inplace=relu_inplace)
 
         if levels >= 3:
-            self.down4 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
-            self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4, norm_type=norm_type)
+            self.down4 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out5 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=4,
+                                         norm_type=norm_type, relu_inplace=relu_inplace)
 
         if levels == 4:
-            self.down5 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type)
-            self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8, norm_type=norm_type)
+            self.down5 = ResidualBlock(in_planes=256, out_planes=256, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out6 = EncoderOutputNet(input_dim=256, output_dim=output_dim, dilation=8,
+                                         norm_type=norm_type, relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():
@@ -96,7 +103,7 @@ class StackEncoder(nn.Module):
 class PyramidEncoder(nn.Module):
     """Encoder for frame 2 (feature pyramid)"""
 
-    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch'):
+    def __init__(self, input_dim, output_dim, levels=4, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         if levels < 1 or levels > 4:
@@ -106,19 +113,26 @@ class PyramidEncoder(nn.Module):
 
         # go down in spatial resolution but up in channels, output networks for
         # each level (no dilation)
-        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type)
+        self.out3 = EncoderOutputNet(input_dim=input_dim, output_dim=output_dim, norm_type=norm_type,
+                                     relu_inplace=relu_inplace)
 
         if levels >= 2:
-            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2, norm_type=norm_type)
-            self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim, norm_type=norm_type)
+            self.down3 = ResidualBlock(in_planes=input_dim, out_planes=384, stride=2, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out4 = EncoderOutputNet(input_dim=384, output_dim=output_dim, norm_type=norm_type,
+                                         relu_inplace=relu_inplace)
 
         if levels >= 3:
-            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2, norm_type=norm_type)
-            self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim, norm_type=norm_type)
+            self.down4 = ResidualBlock(in_planes=384, out_planes=576, stride=2, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out5 = EncoderOutputNet(input_dim=576, output_dim=output_dim, norm_type=norm_type,
+                                         relu_inplace=relu_inplace)
 
         if levels >= 4:
-            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2, norm_type=norm_type)
-            self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim, norm_type=norm_type)
+            self.down5 = ResidualBlock(in_planes=576, out_planes=864, stride=2, norm_type=norm_type,
+                                       relu_inplace=relu_inplace)
+            self.out6 = EncoderOutputNet(input_dim=864, output_dim=output_dim, norm_type=norm_type,
+                                         relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():
@@ -155,12 +169,14 @@ class PyramidEncoder(nn.Module):
 
 
 class RaftEncoder(nn.Module):
-    def __init__(self, output_dim, levels=4, norm_type='batch'):
+    def __init__(self, output_dim, levels=4, norm_type='batch', relu_inplace=True):
         super().__init__()
 
-        self.fnet = FeatureEncoder(output_dim=256, norm_type=norm_type, init_mode='fan_in')
-        self.fnet_1 = StackEncoder(input_dim=256, output_dim=output_dim, levels=levels, norm_type=norm_type)
-        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=output_dim, levels=levels, norm_type=norm_type)
+        self.fnet = FeatureEncoder(output_dim=256, norm_type=norm_type, init_mode='fan_in', relu_inplace=relu_inplace)
+        self.fnet_1 = StackEncoder(input_dim=256, output_dim=output_dim, levels=levels,
+                                   norm_type=norm_type, relu_inplace=relu_inplace)
+        self.fnet_2 = PyramidEncoder(input_dim=256, output_dim=output_dim, levels=levels,
+                                     norm_type=norm_type, relu_inplace=relu_inplace)
 
     def forward(self, img1, img2):
         fmap1 = self.fnet(img1)
@@ -174,11 +190,11 @@ class RaftEncoder(nn.Module):
 
 
 class PoolEncoder(nn.Module):
-    def __init__(self, output_dim, levels=4, norm_type='batch', pool_type='max'):
+    def __init__(self, output_dim, levels=4, norm_type='batch', pool_type='max', relu_inplace=True):
         super().__init__()
 
         self.levels = levels
-        self.fnet = FeatureEncoder(output_dim=output_dim, norm_type=norm_type, init_mode='fan_in')
+        self.fnet = FeatureEncoder(output_dim=output_dim, norm_type=norm_type, init_mode='fan_in', relu_inplace=relu_inplace)
 
         if pool_type == 'avg':
             self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
@@ -203,13 +219,13 @@ class PoolEncoder(nn.Module):
         return fmap1_stack, fmap2_pyramid
 
 
-def make_encoder(encoder_type, output_dim, levels=4, norm_type='batch'):
+def make_encoder(encoder_type, output_dim, levels=4, norm_type='batch', relu_inplace=True):
     if encoder_type == 'raft-cnn':
-        return RaftEncoder(output_dim, levels=levels, norm_type=norm_type)
+        return RaftEncoder(output_dim, levels=levels, norm_type=norm_type, relu_inplace=relu_inplace)
     elif encoder_type == 'raft-avgpool':
-        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='avg')
+        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='avg', relu_inplace=relu_inplace)
     elif encoder_type == 'raft-maxpool':
-        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='max')
+        return PoolEncoder(output_dim, levels=levels, norm_type=norm_type, pool_type='max', relu_inplace=relu_inplace)
     else:
         raise ValueError(f"unknown encoder type: '{encoder_type}'")
 
@@ -218,7 +234,7 @@ def make_encoder(encoder_type, output_dim, levels=4, norm_type='batch'):
 
 class CorrelationModule(nn.Module):
     def __init__(self, feature_dim, levels, radius, dap_init='identity', dap_type='separate',
-                 norm_type='batch', share=False):
+                 norm_type='batch', share=False, relu_inplace=True):
         super().__init__()
 
         self.radius = radius
@@ -229,7 +245,7 @@ class CorrelationModule(nn.Module):
             raise ValueError(f"DAP type '{self.dap_type}' not supported")
 
         if self.share:
-            self.mnet = MatchingNet(2 * feature_dim, norm_type=norm_type)
+            self.mnet = MatchingNet(2 * feature_dim, norm_type=norm_type, relu_inplace=relu_inplace)
 
             # DAP separated by layers
             if self.dap_type == 'separate':
@@ -237,7 +253,7 @@ class CorrelationModule(nn.Module):
 
         else:
             self.mnet = nn.ModuleList([
-                MatchingNet(2 * feature_dim, norm_type=norm_type)
+                MatchingNet(2 * feature_dim, norm_type=norm_type, relu_inplace=relu_inplace)
                 for _ in range(levels)
             ])
 
@@ -336,7 +352,7 @@ class RaftPlusDiclModule(nn.Module):
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
                  encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax',
-                 corr_reg_args={}):
+                 corr_reg_args={}, relu_inplace=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -348,17 +364,19 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = corr_levels * (2 * corr_radius + 1)**2
 
-        self.fnet = make_encoder(encoder_type, corr_channels, levels=corr_levels, norm_type=encoder_norm)
-        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout, init_mode='fan_in')
+        self.fnet = make_encoder(encoder_type, corr_channels, levels=corr_levels, norm_type=encoder_norm,
+                                 relu_inplace=relu_inplace)
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout, init_mode='fan_in',
+                                   relu_inplace=relu_inplace)
 
         self.flow_reg = raft.make_flow_regression(corr_reg_type, corr_levels, corr_radius, **corr_reg_args)
 
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = raft.Up8Network(hidden_dim=hdim)
+        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, relu_inplace=relu_inplace)
+        self.upnet = raft.Up8Network(hidden_dim=hdim, relu_inplace=relu_inplace)
 
         self.cvol = CorrelationModule(feature_dim=corr_channels, levels=self.corr_levels,
                                       radius=self.corr_radius, dap_init=dap_init, dap_type=dap_type,
-                                      norm_type=mnet_norm, share=share_dicl)
+                                      norm_type=mnet_norm, share=share_dicl, relu_inplace=relu_inplace)
 
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
@@ -451,6 +469,7 @@ class RaftPlusDicl(Model):
         share_dicl = param_cfg.get('share-dicl', False)
         corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
+        relu_inplace = param_cfg.get('relu-inplace', True)
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -461,14 +480,14 @@ class RaftPlusDicl(Model):
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
                    dap_init=dap_init, dap_type=dap_type, encoder_norm=encoder_norm, context_norm=context_norm,
                    mnet_norm=mnet_norm, encoder_type=encoder_type, share_dicl=share_dicl,
-                   corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
+                   corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args, relu_inplace=relu_inplace,
                    arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128, dap_init='identity',
                  dap_type='separate', encoder_norm='instance', context_norm='batch', mnet_norm='batch',
                  encoder_type='raft-cnn', share_dicl=False, corr_reg_type='softargmax', corr_reg_args={},
-                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 relu_inplace=True, arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -485,6 +504,7 @@ class RaftPlusDicl(Model):
         self.share_dicl = share_dicl
         self.corr_reg_type = corr_reg_type
         self.corr_reg_args = corr_reg_args
+        self.relu_inplace = relu_inplace
 
         self.freeze_batchnorm = True
 
@@ -495,7 +515,8 @@ class RaftPlusDicl(Model):
                                             dap_type=dap_type, encoder_norm=encoder_norm,
                                             context_norm=context_norm, mnet_norm=mnet_norm,
                                             encoder_type=encoder_type, share_dicl=share_dicl,
-                                            corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args),
+                                            corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
+                                            relu_inplace=relu_inplace),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -532,6 +553,7 @@ class RaftPlusDicl(Model):
                 'corr-reg-type': self.corr_reg_type,
                 'corr-reg-args': self.corr_reg_args,
                 'share-dicl': self.share_dicl,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,

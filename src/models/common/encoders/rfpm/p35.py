@@ -14,90 +14,90 @@ from ...blocks.raft import ResidualBlock
 class FeatureEncoder(nn.Module):
     """RFPM feature encoder using three internal pyramids"""
 
-    def __init__(self, output_dim=32, norm_type='batch', dropout=0.0):
+    def __init__(self, output_dim=32, norm_type='batch', dropout=0.0, relu_inplace=True):
         super().__init__()
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=64, num_groups=8)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
 
         # left-/base-pyramid
         self.layer1_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer2_left = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(96, 96, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer3_left = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(128, 128, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer4_left = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            ResidualBlock(128, 160, norm_type, stride=2),
-            ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(160, 160, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer5_left = nn.Sequential(       # (H/16, W/16, 160) -> (H/16, H/16, 192)
-            ResidualBlock(160, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            ResidualBlock(160, 192, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(192, 192, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         # center pyramid
         self.layer1_center = nn.Sequential(     # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer2_center = nn.Sequential(     # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            RfpmRfdBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            RfpmRfdBlock(64, 96, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(96, 96, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer3_center = nn.Sequential(     # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            RfpmRfdBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            RfpmRfdBlock(96, 128, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(128, 128, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer4_center = nn.Sequential(     # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            RfpmRfdBlock(128, 160, norm_type, stride=2),
-            ResidualBlock(160, 160, norm_type, stride=1),
+            RfpmRfdBlock(128, 160, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(160, 160, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer5_center = nn.Sequential(     # (H/16, W/16, 128) -> (H/32, H/32, 192)
-            RfpmRfdBlock(160, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            RfpmRfdBlock(160, 192, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(192, 192, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         # right pyramid
         self.layer1_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer2_right = nn.Sequential(       # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(96, 96, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer3_right = nn.Sequential(       # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(128, 128, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer4_right = nn.Sequential(       # (H/8, W/8, 128) -> (H/16, H/16, 160)
-            ResidualBlock(128, 160, norm_type, stride=2),
-            ResidualBlock(160, 160, norm_type, stride=1),
+            ResidualBlock(128, 160, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(160, 160, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer5_right = nn.Sequential(       # (H/16, W/16, 160) -> (H/16, H/16, 192)
-            ResidualBlock(160, 192, norm_type, stride=2),
-            ResidualBlock(192, 192, norm_type, stride=1),
+            ResidualBlock(160, 192, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(192, 192, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         # repair masks
@@ -117,9 +117,9 @@ class FeatureEncoder(nn.Module):
         self.mask5_cr = RfpmRepairMaskNet(192)
 
         # output blocks
-        self.out3 = RfpmOutputNet(3*128, output_dim, 3*160, norm_type=norm_type, dropout=dropout)
-        self.out4 = RfpmOutputNet(3*160, output_dim, 3*192, norm_type=norm_type, dropout=dropout)
-        self.out5 = RfpmOutputNet(3*192, output_dim, 3*224, norm_type=norm_type, dropout=dropout)
+        self.out3 = RfpmOutputNet(3*128, output_dim, 3*160, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
+        self.out4 = RfpmOutputNet(3*160, output_dim, 3*192, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
+        self.out5 = RfpmOutputNet(3*192, output_dim, 3*224, norm_type=norm_type, dropout=dropout, relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():

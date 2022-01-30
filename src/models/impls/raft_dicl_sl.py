@@ -15,7 +15,7 @@ class RaftPlusDiclModule(nn.Module):
                  corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch',
                  mnet_norm='batch', corr_type='dicl', corr_args={}, corr_reg_type='softargmax',
-                 corr_reg_args={}, encoder_type='raft', context_type='raft'):
+                 corr_reg_args={}, encoder_type='raft', context_type='raft', relu_inplace=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -26,16 +26,19 @@ class RaftPlusDiclModule(nn.Module):
         self.corr_radius = corr_radius
 
         self.fnet = common.encoders.make_encoder_s3(encoder_type, output_dim=corr_channels,
-                                                    norm_type=encoder_norm, dropout=dropout)
+                                                    norm_type=encoder_norm, dropout=dropout,
+                                                    relu_inplace=relu_inplace)
         self.cnet = common.encoders.make_encoder_s3(context_type, output_dim=hdim+cdim,
-                                                    norm_type=context_norm, dropout=dropout)
+                                                    norm_type=context_norm, dropout=dropout,
+                                                    relu_inplace=relu_inplace)
         self.cvol = common.corr.make_cmod(corr_type, corr_channels, radius=corr_radius, dap_init=dap_init,
-                                          norm_type=mnet_norm, **corr_args)
+                                          norm_type=mnet_norm, relu_inplace=relu_inplace, **corr_args)
 
         self.flow_reg = common.corr.make_flow_regression(corr_type, corr_reg_type, corr_radius, **corr_reg_args)
 
-        self.update_block = raft.BasicUpdateBlock(self.cvol.output_dim, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = raft.Up8Network(hdim)
+        self.update_block = raft.BasicUpdateBlock(self.cvol.output_dim, input_dim=cdim, hidden_dim=hdim,
+                                                  relu_inplace=relu_inplace)
+        self.upnet = raft.Up8Network(hdim, relu_inplace=relu_inplace)
 
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
@@ -128,6 +131,7 @@ class RaftPlusDicl(Model):
         context_type = param_cfg.get('context-type', 'raft')
         corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
+        relu_inplace = param_cfg.get('relu-inplace', True)
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -138,16 +142,16 @@ class RaftPlusDicl(Model):
                    recurrent_channels=recurrent_channels, dap_init=dap_init, encoder_norm=encoder_norm,
                    context_norm=context_norm, mnet_norm=mnet_norm, corr_type=corr_type, corr_args=corr_args,
                    corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args, encoder_type=encoder_type,
-                   context_type=context_type, arguments=args, on_epoch_args=on_epoch_args,
-                   on_stage_args=on_stage_args)
+                   context_type=context_type, relu_inplace=relu_inplace,
+                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_radius=4,
                  corr_channels=32, context_channels=128, recurrent_channels=128,
                  dap_init='identity', encoder_norm='instance', context_norm='batch',
                  mnet_norm='batch', corr_type='dicl', corr_args={},
                  corr_reg_type='softargmax', corr_reg_args={},
-                 encoder_type='raft', context_type='raft', arguments={},
-                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 encoder_type='raft', context_type='raft', relu_inplace=True,
+                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_radius = corr_radius
@@ -164,6 +168,7 @@ class RaftPlusDicl(Model):
         self.corr_reg_args = corr_reg_args
         self.encoder_type = encoder_type
         self.context_type = context_type
+        self.relu_inplace = relu_inplace
 
         self.freeze_batchnorm = True
 
@@ -173,7 +178,8 @@ class RaftPlusDicl(Model):
                                             dap_init=dap_init, encoder_norm=encoder_norm, context_norm=context_norm,
                                             mnet_norm=mnet_norm, corr_type=corr_type, corr_args=corr_args,
                                             corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
-                                            encoder_type=encoder_type, context_type=context_type),
+                                            encoder_type=encoder_type, context_type=context_type,
+                                            relu_inplace=relu_inplace),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -209,6 +215,7 @@ class RaftPlusDicl(Model):
                 'corr-reg-args': self.corr_reg_args,
                 'encoder-type': self.encoder_type,
                 'context-type': self.context_type,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,

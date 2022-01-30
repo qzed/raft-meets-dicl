@@ -7,28 +7,28 @@ from ...blocks.raft import ResidualBlock
 class FeatureEncoder(nn.Module):
     """RAFT-based feature / context encoder network using pooling for coarser layer"""
 
-    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0, pool_type='avg'):
+    def __init__(self, output_dim=128, norm_type='batch', dropout=0.0, pool_type='avg', relu_inplace=True):
         super().__init__()
 
         # input convolution             # (H, W, 3) -> (H/2, W/2, 64)
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
         self.norm1 = norm.make_norm2d(norm_type, num_channels=64, num_groups=8)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
 
         # residual blocks
         self.layer1 = nn.Sequential(    # (H/2, W/2, 64) -> (H/2, W/2, 64)
-            ResidualBlock(64, 64, norm_type, stride=1),
-            ResidualBlock(64, 64, norm_type, stride=1),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
+            ResidualBlock(64, 64, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer2 = nn.Sequential(    # (H/2, W/2, 64) -> (H/4, W/4, 96)
-            ResidualBlock(64, 96, norm_type, stride=2),
-            ResidualBlock(96, 96, norm_type, stride=1),
+            ResidualBlock(64, 96, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(96, 96, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         self.layer3 = nn.Sequential(    # (H/4, W/4, 96) -> (H/8, W/8, 128)
-            ResidualBlock(96, 128, norm_type, stride=2),
-            ResidualBlock(128, 128, norm_type, stride=1),
+            ResidualBlock(96, 128, norm_type, stride=2, relu_inplace=relu_inplace),
+            ResidualBlock(128, 128, norm_type, stride=1, relu_inplace=relu_inplace),
         )
 
         # output convolution            # (H/8, W/8, 128) -> (H/8, W/8, output_dim)

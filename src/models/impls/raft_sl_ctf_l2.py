@@ -14,7 +14,7 @@ class RaftModule(nn.Module):
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
                  encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none',
-                 corr_reg_type='softargmax', corr_reg_args={}):
+                 corr_reg_type='softargmax', corr_reg_args={}, relu_inplace=True):
         super().__init__()
 
         self.hidden_dim = hdim = recurrent_channels
@@ -25,19 +25,24 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
-        self.fnet = common.encoders.make_encoder_p34(encoder_type, corr_channels, encoder_norm, dropout=dropout)
-        self.cnet = common.encoders.make_encoder_p34(context_type, hdim + cdim, context_norm, dropout=dropout)
+        self.fnet = common.encoders.make_encoder_p34(encoder_type, corr_channels, encoder_norm, dropout=dropout,
+                                                     relu_inplace=relu_inplace)
+        self.cnet = common.encoders.make_encoder_p34(context_type, hdim + cdim, context_norm, dropout=dropout,
+                                                     relu_inplace=relu_inplace)
 
         if share_rnn:
-            self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim,
+                                                      relu_inplace=relu_inplace)
         else:
-            self.update_block_3 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-            self.update_block_4 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
+            self.update_block_3 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim,
+                                                        relu_inplace=relu_inplace)
+            self.update_block_4 = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim,
+                                                        relu_inplace=relu_inplace)
 
         self.flow_reg_3 = raft.make_flow_regression(corr_reg_type, self.corr_levels, corr_radius, **corr_reg_args)
         self.flow_reg_4 = raft.make_flow_regression(corr_reg_type, self.corr_levels, corr_radius, **corr_reg_args)
 
-        self.upnet = raft.Up8Network(hidden_dim=hdim)
+        self.upnet = raft.Up8Network(hidden_dim=hdim, relu_inplace=relu_inplace)
         self.upnet_h = common.hsup.make_hidden_state_upsampler(upsample_hidden, recurrent_channels)
 
     def forward(self, img1, img2, iterations=(4, 3), upnet=True, corr_flow=False, corr_grad_stop=False):
@@ -145,7 +150,7 @@ class RaftModule(nn.Module):
             out_3.append(flow_up)
 
         if corr_flow:
-            return *reversed(out_4_corr), out_4, *reversed(out_3_corr), out_3
+            return (*reversed(out_4_corr), out_4, *reversed(out_3_corr), out_3)
         else:
             return out_4, out_3
 
@@ -171,6 +176,7 @@ class Raft(Model):
         upsample_hidden = param_cfg.get('upsample-hidden', 'none')
         corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
+        relu_inplace = param_cfg.get('relu-inplace', True)
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -181,13 +187,13 @@ class Raft(Model):
                    encoder_norm=encoder_norm, context_norm=context_norm,
                    encoder_type=encoder_type, context_type=context_type, share_rnn=share_rnn,
                    upsample_hidden=upsample_hidden, corr_reg_type=corr_reg_type,
-                   corr_reg_args=corr_reg_args, arguments=args, on_epoch_args=on_epoch_args,
-                   on_stage_args=on_stage_args)
+                   corr_reg_args=corr_reg_args, relu_inplace=relu_inplace,
+                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, corr_radius=4, corr_channels=256, context_channels=128,
                  recurrent_channels=128, encoder_norm='instance', context_norm='batch',
                  encoder_type='raft', context_type='raft', share_rnn=True, upsample_hidden='none',
-                 corr_reg_type='softargmax', corr_reg_args={},
+                 corr_reg_type='softargmax', corr_reg_args={}, relu_inplace=True,
                  arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.corr_radius = corr_radius
@@ -202,6 +208,7 @@ class Raft(Model):
         self.corr_reg_type = corr_reg_type
         self.corr_reg_args = corr_reg_args
         self.upsample_hidden = upsample_hidden
+        self.relu_inplace = relu_inplace
 
         self.freeze_batchnorm = True
 
@@ -210,7 +217,8 @@ class Raft(Model):
                                     encoder_norm=encoder_norm, context_norm=context_norm,
                                     encoder_type=encoder_type, context_type=context_type,
                                     share_rnn=share_rnn, upsample_hidden=upsample_hidden,
-                                    corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args),
+                                    corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
+                                    relu_inplace=relu_inplace),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -242,6 +250,7 @@ class Raft(Model):
                 'corr-reg-type': self.corr_reg_type,
                 'corr-reg-args': self.corr_reg_args,
                 'upsample-hidden': self.upsample_hidden,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,

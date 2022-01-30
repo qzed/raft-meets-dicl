@@ -262,12 +262,12 @@ class SepConvGru(nn.Module):
 class FlowHead(nn.Module):
     """Head to compute delta-flow from GRU hidden-state"""
 
-    def __init__(self, input_dim=128, hidden_dim=256):
+    def __init__(self, input_dim=128, hidden_dim=256, relu_inplace=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(input_dim, hidden_dim, 3, padding=1)
         self.conv2 = nn.Conv2d(hidden_dim, 2, 3, padding=1)
-        self.relu = nn.ReLU()
+        self.relu = nn.ReLU(inplace=relu_inplace)
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x)))
@@ -276,13 +276,13 @@ class FlowHead(nn.Module):
 class BasicUpdateBlock(nn.Module):
     """Network to compute single flow update delta"""
 
-    def __init__(self, corr_planes, input_dim=128, hidden_dim=128):
+    def __init__(self, corr_planes, input_dim=128, hidden_dim=128, relu_inplace=True):
         super().__init__()
 
         # network for flow update delta
         self.enc = BasicMotionEncoder(corr_planes)
         self.gru = SepConvGru(hidden_dim=hidden_dim, input_dim=input_dim+self.enc.output_dim)
-        self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256)
+        self.flow = FlowHead(input_dim=hidden_dim, hidden_dim=256, relu_inplace=relu_inplace)
 
     def forward(self, h, x, corr, flow):
         # compute GRU input from flow
@@ -299,13 +299,13 @@ class BasicUpdateBlock(nn.Module):
 class Up8Network(nn.Module):
     """RAFT 8x flow upsampling module for finest level"""
 
-    def __init__(self, hidden_dim=128, mixed_precision=False):
+    def __init__(self, hidden_dim=128, mixed_precision=False, relu_inplace=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
 
         self.conv1 = nn.Conv2d(hidden_dim, 256, 3, padding=1)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
         self.conv2 = nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
 
     def forward(self, hidden, flow):
@@ -335,7 +335,8 @@ class RaftModule(nn.Module):
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch', encoder_type='raft',
-                 context_type='raft', corr_reg_type='softargmax', corr_reg_args={}):
+                 context_type='raft', corr_reg_type='softargmax', corr_reg_args={},
+                 relu_inplace=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -348,14 +349,16 @@ class RaftModule(nn.Module):
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
         self.fnet = common.encoders.make_encoder_s3(encoder_type, output_dim=corr_channels,
-                                                    norm_type=encoder_norm, dropout=dropout)
+                                                    norm_type=encoder_norm, dropout=dropout,
+                                                    relu_inplace=relu_inplace)
         self.cnet = common.encoders.make_encoder_s3(context_type, output_dim=hdim+cdim,
-                                                    norm_type=context_norm, dropout=dropout)
+                                                    norm_type=context_norm, dropout=dropout,
+                                                    relu_inplace=relu_inplace)
 
         self.flow_reg = make_flow_regression(corr_reg_type, corr_levels, corr_radius, **corr_reg_args)
 
-        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = Up8Network(hidden_dim=hdim, mixed_precision=mixed_precision)
+        self.update_block = BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, relu_inplace=relu_inplace)
+        self.upnet = Up8Network(hidden_dim=hdim, mixed_precision=mixed_precision, relu_inplace=relu_inplace)
 
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
@@ -449,6 +452,7 @@ class Raft(Model):
         context_type = param_cfg.get('context-type', 'raft')
         corr_reg_type = param_cfg.get('corr-reg-type', 'softargmax')
         corr_reg_args = param_cfg.get('corr-reg-args', {})
+        relu_inplace = param_cfg.get('relu-inplace', True)
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -460,13 +464,15 @@ class Raft(Model):
                    encoder_norm=encoder_norm, context_norm=context_norm,
                    encoder_type=encoder_type, context_type=context_type,
                    corr_reg_type=corr_reg_type, corr_reg_args=corr_reg_args,
-                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
+                   relu_inplace=relu_inplace, arguments=args, on_epoch_args=on_epoch_args,
+                   on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
                  encoder_norm='instance', context_norm='batch', encoder_type='raft',
                  context_type='raft', corr_reg_type='softargmax', corr_reg_args={},
-                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 relu_inplace=True, arguments={}, on_epoch_args={},
+                 on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -480,6 +486,7 @@ class Raft(Model):
         self.context_type = context_type
         self.corr_reg_type = corr_reg_type
         self.corr_reg_args = corr_reg_args
+        self.relu_inplace = relu_inplace
 
         self.freeze_batchnorm = True
 
@@ -489,7 +496,7 @@ class Raft(Model):
                                     recurrent_channels=recurrent_channels, encoder_norm=encoder_norm,
                                     context_norm=context_norm, encoder_type=encoder_type,
                                     context_type=context_type, corr_reg_type=corr_reg_type,
-                                    corr_reg_args=corr_reg_args),
+                                    corr_reg_args=corr_reg_args, relu_inplace=relu_inplace),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -522,6 +529,7 @@ class Raft(Model):
                 'context-type': self.context_type,
                 'corr-reg-type': self.corr_reg_type,
                 'corr-reg-args': self.corr_reg_args,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,

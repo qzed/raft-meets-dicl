@@ -13,12 +13,15 @@ from .. import norm
 class ResidualBlock(nn.Module):
     """Residual block for feature / context encoder"""
 
-    def __init__(self, in_planes, out_planes, norm_type='group', stride=1):
+    def __init__(self, in_planes, out_planes, norm_type='group', stride=1, relu_inplace=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(in_planes, out_planes, kernel_size=3, padding=1, stride=stride)
         self.conv2 = nn.Conv2d(out_planes, out_planes, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
+
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
+        self.relu2 = nn.ReLU(inplace=relu_inplace)
+        self.relu3 = nn.ReLU(inplace=relu_inplace)
 
         self.norm1 = norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
         self.norm2 = norm.make_norm2d(norm_type, num_channels=out_planes, num_groups=out_planes//8)
@@ -34,10 +37,10 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         y = x
-        y = self.relu(self.norm1(self.conv1(y)))
-        y = self.relu(self.norm2(self.conv2(y)))
+        y = self.relu1(self.norm1(self.conv1(y)))
+        y = self.relu2(self.norm2(self.conv2(y)))
 
         if self.downsample is not None:
             x = self.downsample(x)
 
-        return self.relu(x + y)
+        return self.relu3(x + y)

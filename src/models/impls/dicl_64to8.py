@@ -17,47 +17,47 @@ _default_context_scale = {
 class FeatureNet(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
-    def __init__(self, output_channels):
+    def __init__(self, output_channels, relu_inplace=True):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            ConvBlock(3, 32, kernel_size=3, padding=1),
-            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2),
-            ConvBlock(32, 32, kernel_size=3, padding=1),
+            ConvBlock(3, 32, kernel_size=3, padding=1, relu_inplace=relu_inplace),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace),
+            ConvBlock(32, 32, kernel_size=3, padding=1, relu_inplace=relu_inplace),
         )
 
-        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2)
-        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2)
-        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2)
-        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2)
-        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2)
-        self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2)
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
+        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
+        self.conv6a = ConvBlock(160, 192, kernel_size=3, padding=1, stride=2, relu_inplace=relu_inplace)
 
-        self.deconv6a = GaConv2xBlockTransposed(192, 160)
-        self.deconv5a = GaConv2xBlockTransposed(160, 128)
-        self.deconv4a = GaConv2xBlockTransposed(128, 96)
-        self.deconv3a = GaConv2xBlockTransposed(96, 64)
-        self.deconv2a = GaConv2xBlockTransposed(64, 48)
-        self.deconv1a = GaConv2xBlockTransposed(48, 32)
+        self.deconv6a = GaConv2xBlockTransposed(192, 160, relu_inplace=relu_inplace)
+        self.deconv5a = GaConv2xBlockTransposed(160, 128, relu_inplace=relu_inplace)
+        self.deconv4a = GaConv2xBlockTransposed(128, 96, relu_inplace=relu_inplace)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64, relu_inplace=relu_inplace)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48, relu_inplace=relu_inplace)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32, relu_inplace=relu_inplace)
 
-        self.conv1b = GaConv2xBlock(32, 48)
-        self.conv2b = GaConv2xBlock(48, 64)
-        self.conv3b = GaConv2xBlock(64, 96)
-        self.conv4b = GaConv2xBlock(96, 128)
-        self.conv5b = GaConv2xBlock(128, 160)
-        self.conv6b = GaConv2xBlock(160, 192)
+        self.conv1b = GaConv2xBlock(32, 48, relu_inplace=relu_inplace)
+        self.conv2b = GaConv2xBlock(48, 64, relu_inplace=relu_inplace)
+        self.conv3b = GaConv2xBlock(64, 96, relu_inplace=relu_inplace)
+        self.conv4b = GaConv2xBlock(96, 128, relu_inplace=relu_inplace)
+        self.conv5b = GaConv2xBlock(128, 160, relu_inplace=relu_inplace)
+        self.conv6b = GaConv2xBlock(160, 192, relu_inplace=relu_inplace)
 
-        self.deconv6b = GaConv2xBlockTransposed(192, 160)
-        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1)
+        self.deconv6b = GaConv2xBlockTransposed(192, 160, relu_inplace=relu_inplace)
+        self.outconv6 = ConvBlock(160, output_channels, kernel_size=3, padding=1, relu_inplace=relu_inplace)
 
-        self.deconv5b = GaConv2xBlockTransposed(160, 128)
-        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1)
+        self.deconv5b = GaConv2xBlockTransposed(160, 128, relu_inplace=relu_inplace)
+        self.outconv5 = ConvBlock(128, output_channels, kernel_size=3, padding=1, relu_inplace=relu_inplace)
 
-        self.deconv4b = GaConv2xBlockTransposed(128, 96)
-        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1)
+        self.deconv4b = GaConv2xBlockTransposed(128, 96, relu_inplace=relu_inplace)
+        self.outconv4 = ConvBlock(96, output_channels, kernel_size=3, padding=1, relu_inplace=relu_inplace)
 
-        self.deconv3b = GaConv2xBlockTransposed(96, 64)
-        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64, relu_inplace=relu_inplace)
+        self.outconv3 = ConvBlock(64, output_channels, kernel_size=3, padding=1, relu_inplace=relu_inplace)
 
     def forward(self, x):
         x = res0 = self.conv0(x)                # -> 32, H/2, W/2
@@ -99,20 +99,20 @@ class FeatureNet(nn.Module):
 
 
 class DiclModule(nn.Module):
-    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32):
+    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, relu_inplace=True):
         super().__init__()
 
         if dap_init not in ['identity', 'standard']:
             raise ValueError(f"unknown dap_init value '{dap_init}'")
 
         # feature network
-        self.feature = FeatureNet(feature_channels)
+        self.feature = FeatureNet(feature_channels, relu_inplace=relu_inplace)
 
         # coarse-to-fine flow levels
-        self.lvl6 = dicl.FlowLevel(feature_channels, 6, disp_ranges['level-6'])
-        self.lvl5 = dicl.FlowLevel(feature_channels, 5, disp_ranges['level-5'])
-        self.lvl4 = dicl.FlowLevel(feature_channels, 4, disp_ranges['level-4'])
-        self.lvl3 = dicl.FlowLevel(feature_channels, 3, disp_ranges['level-3'])
+        self.lvl6 = dicl.FlowLevel(feature_channels, 6, disp_ranges['level-6'], relu_inplace=relu_inplace)
+        self.lvl5 = dicl.FlowLevel(feature_channels, 5, disp_ranges['level-5'], relu_inplace=relu_inplace)
+        self.lvl4 = dicl.FlowLevel(feature_channels, 4, disp_ranges['level-4'], relu_inplace=relu_inplace)
+        self.lvl3 = dicl.FlowLevel(feature_channels, 3, disp_ranges['level-3'], relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():
@@ -162,16 +162,19 @@ class Dicl(Model):
         disp_ranges = param_cfg['displacement-range']
         dap_init = param_cfg.get('dap-init', 'identity')
         feature_channels = param_cfg.get('feature-channels', 32)
+        relu_inplace = param_cfg.get('relu-inplace', True)
         args = cfg.get('arguments', {})
 
-        return cls(disp_ranges, dap_init, feature_channels, args)
+        return cls(disp_ranges, dap_init, feature_channels, relu_inplace, args)
 
-    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, arguments={}):
+    def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, relu_inplace=True,
+                 arguments={}):
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
         self.feature_channels = feature_channels
+        self.relu_inplace = relu_inplace
 
-        super().__init__(DiclModule(disp_ranges, dap_init, feature_channels), arguments)
+        super().__init__(DiclModule(disp_ranges, dap_init, feature_channels, relu_inplace), arguments)
 
     def get_config(self):
         default_args = {
@@ -186,6 +189,7 @@ class Dicl(Model):
                 'feature-channels': self.feature_channels,
                 'displacement-range': self.disp_ranges,
                 'dap-init': self.dap_init,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
         }

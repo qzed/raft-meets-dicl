@@ -3,13 +3,13 @@ from . import dicl_emb
 from . import dot
 
 
-def make_cmod(type, feature_dim, radius, dap_init='identity', norm_type='batch', **kwargs):
+def make_cmod(type, feature_dim, radius, dap_init='identity', norm_type='batch', relu_inplace=True, **kwargs):
     if type == 'dicl':
         return dicl.CorrelationModule(feature_dim=feature_dim, radius=radius, dap_init=dap_init,
-                                      norm_type=norm_type, **kwargs)
+                                      norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
     elif type == 'dicl-emb':
         return dicl_emb.CorrelationModule(feature_dim=feature_dim, radius=radius, dap_init=dap_init,
-                                          norm_type=norm_type, **kwargs)
+                                          norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
     if type == 'dot':
         return dot.CorrelationModule(radius=radius, dap_init=dap_init, **kwargs)
     else:

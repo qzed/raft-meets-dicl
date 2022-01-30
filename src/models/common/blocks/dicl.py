@@ -15,37 +15,37 @@ from .. import norm
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
             norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(),
+            nn.ReLU(inplace=relu_inplace),
         )
 
 
 class ConvBlockTransposed(nn.Sequential):
     """Basic transposed convolution block"""
 
-    def __init__(self, c_in, c_out, norm_type='batch', **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
             norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
-            nn.ReLU(),
+            nn.ReLU(inplace=relu_inplace),
         )
 
 
 class GaConv2xBlock(nn.Module):
     """2x convolution block for GA-Net based feature encoder"""
 
-    def __init__(self, c_in, c_out, norm_type='batch'):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         self.conv1 = nn.Conv2d(c_in, c_out, bias=False, kernel_size=3, padding=1, stride=2)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
         self.bn2 = norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.ReLU(inplace=relu_inplace)
 
     def forward(self, x, res):
         x = self.conv1(x)
@@ -65,15 +65,15 @@ class GaConv2xBlock(nn.Module):
 class GaConv2xBlockTransposed(nn.Module):
     """Transposed convolution + convolution block for GA-Net based feature encoder"""
 
-    def __init__(self, c_in, c_out, norm_type='batch'):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         self.conv1 = nn.ConvTranspose2d(c_in, c_out, bias=False, kernel_size=4, padding=1, stride=2)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.ReLU(inplace=relu_inplace)
 
         self.conv2 = nn.Conv2d(c_out*2, c_out, bias=False, kernel_size=3, padding=1)
         self.bn2 = norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8)
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.ReLU(inplace=relu_inplace)
 
     def forward(self, x, res):
         x = self.conv1(x)
@@ -93,13 +93,13 @@ class GaConv2xBlockTransposed(nn.Module):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self, input_channels, norm_type='batch'):
+    def __init__(self, input_channels, norm_type='batch', relu_inplace=True):
         super().__init__(
-            ConvBlock(input_channels, 96, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type),
+            ConvBlock(input_channels, 96, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 

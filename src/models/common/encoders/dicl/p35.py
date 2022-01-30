@@ -6,40 +6,40 @@ from ...blocks.dicl import ConvBlock, GaConv2xBlock, GaConv2xBlockTransposed
 class FeatureEncoder(nn.Module):
     """Feature encoder based on 'Guided Aggregation Net for End-to-end Sereo Matching'"""
 
-    def __init__(self, output_dim, norm_type='batch'):
+    def __init__(self, output_dim, norm_type='batch', relu_inplace=True):
         super().__init__()
 
         self.conv0 = nn.Sequential(
-            ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type),
-            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type),
-            ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type),
+            ConvBlock(3, 32, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(32, 32, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(32, 32, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
         )
 
-        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
-        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2, norm_type=norm_type)
+        self.conv1a = ConvBlock(32, 48, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv2a = ConvBlock(48, 64, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv3a = ConvBlock(64, 96, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv4a = ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv5a = ConvBlock(128, 160, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace)
 
-        self.deconv5a = GaConv2xBlockTransposed(160, 128, norm_type=norm_type)
-        self.deconv4a = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3a = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
-        self.deconv2a = GaConv2xBlockTransposed(64, 48, norm_type=norm_type)
-        self.deconv1a = GaConv2xBlockTransposed(48, 32, norm_type=norm_type)
+        self.deconv5a = GaConv2xBlockTransposed(160, 128, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv4a = GaConv2xBlockTransposed(128, 96, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv3a = GaConv2xBlockTransposed(96, 64, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv2a = GaConv2xBlockTransposed(64, 48, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv1a = GaConv2xBlockTransposed(48, 32, norm_type=norm_type, relu_inplace=relu_inplace)
 
-        self.conv1b = GaConv2xBlock(32, 48, norm_type=norm_type)
-        self.conv2b = GaConv2xBlock(48, 64, norm_type=norm_type)
-        self.conv3b = GaConv2xBlock(64, 96, norm_type=norm_type)
-        self.conv4b = GaConv2xBlock(96, 128, norm_type=norm_type)
-        self.conv5b = GaConv2xBlock(128, 160, norm_type=norm_type)
+        self.conv1b = GaConv2xBlock(32, 48, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv2b = GaConv2xBlock(48, 64, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv3b = GaConv2xBlock(64, 96, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv4b = GaConv2xBlock(96, 128, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.conv5b = GaConv2xBlock(128, 160, norm_type=norm_type, relu_inplace=relu_inplace)
 
-        self.deconv5b = GaConv2xBlockTransposed(160, 128, norm_type=norm_type)
-        self.deconv4b = GaConv2xBlockTransposed(128, 96, norm_type=norm_type)
-        self.deconv3b = GaConv2xBlockTransposed(96, 64, norm_type=norm_type)
+        self.deconv5b = GaConv2xBlockTransposed(160, 128, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv4b = GaConv2xBlockTransposed(128, 96, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.deconv3b = GaConv2xBlockTransposed(96, 64, norm_type=norm_type, relu_inplace=relu_inplace)
 
-        self.outconv5 = ConvBlock(128, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
-        self.outconv4 = ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
-        self.outconv3 = ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type)
+        self.outconv5 = ConvBlock(128, output_dim, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.outconv4 = ConvBlock(96, output_dim, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.outconv3 = ConvBlock(64, output_dim, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace)
 
         # initialize weights
         for m in self.modules():

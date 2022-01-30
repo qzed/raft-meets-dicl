@@ -8,12 +8,12 @@ from ..blocks.dicl import MatchingNet, DisplacementAwareProjection
 class PairEmbedding(nn.Sequential):
     """Feature pair embedding"""
 
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, input_dim, output_dim, relu_inplace=True):
         super().__init__(
             nn.Conv2d(input_dim, 48, kernel_size=1),
-            nn.ReLU(),
+            nn.ReLU(inplace=relu_inplace),
             nn.Conv2d(48, 64, kernel_size=1),
-            nn.ReLU(),
+            nn.ReLU(inplace=relu_inplace),
             nn.Conv2d(64, output_dim, kernel_size=1),
         )
 
@@ -30,12 +30,12 @@ class PairEmbedding(nn.Sequential):
 
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, embedding_dim=32, dap_init='identity', norm_type='batch'):
+    def __init__(self, feature_dim, radius, embedding_dim=32, dap_init='identity', norm_type='batch', relu_inplace=True):
         super().__init__()
 
         self.radius = radius
-        self.mnet = MatchingNet(2*feature_dim + 2, norm_type=norm_type)
-        self.emb = PairEmbedding(2*feature_dim + 2, embedding_dim)
+        self.mnet = MatchingNet(2*feature_dim + 2, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.emb = PairEmbedding(2*feature_dim + 2, embedding_dim, relu_inplace=relu_inplace)
         self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
 
         # build lookup kernel

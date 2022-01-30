@@ -92,7 +92,7 @@ class RaftModule(nn.Module):
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
-                 encoder_norm='instance', context_norm='batch'):
+                 encoder_norm='instance', context_norm='batch', relu_inplace=True):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -104,11 +104,13 @@ class RaftModule(nn.Module):
         self.corr_radius = corr_radius
         corr_planes = self.corr_levels * (2 * self.corr_radius + 1)**2
 
-        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout)
-        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout)
+        self.fnet = FeatureEncoder(output_dim=corr_channels, norm_type=encoder_norm, dropout=dropout,
+                                   relu_inplace=relu_inplace)
+        self.cnet = FeatureEncoder(output_dim=hdim+cdim, norm_type=context_norm, dropout=dropout,
+                                   relu_inplace=relu_inplace)
 
-        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim)
-        self.upnet = raft.Up8Network(hdim)
+        self.update_block = raft.BasicUpdateBlock(corr_planes, input_dim=cdim, hidden_dim=hdim, relu_inplace=relu_inplace)
+        self.upnet = raft.Up8Network(hdim, relu_inplace=relu_inplace)
 
     def initialize_flow(self, img):
         # flow is represented as difference between two coordinate grids (flow = coords1 - coords0)
@@ -185,6 +187,7 @@ class Raft(Model):
         recurrent_channels = param_cfg.get('recurrent-channels', 128)
         encoder_norm = param_cfg.get('encoder-norm', 'instance')
         context_norm = param_cfg.get('context-norm', 'batch')
+        relu_inplace = param_cfg.get('relu-inplace', True)
 
         args = cfg.get('arguments', {})
         on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': True})
@@ -193,13 +196,13 @@ class Raft(Model):
         return cls(dropout=dropout, mixed_precision=mixed_precision,
                    corr_levels=corr_levels, corr_radius=corr_radius, corr_channels=corr_channels,
                    context_channels=context_channels, recurrent_channels=recurrent_channels,
-                   encoder_norm=encoder_norm, context_norm=context_norm, arguments=args,
-                   on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
+                   encoder_norm=encoder_norm, context_norm=context_norm, relu_inplace=relu_inplace,
+                   arguments=args, on_epoch_args=on_epoch_args, on_stage_args=on_stage_args)
 
     def __init__(self, dropout=0.0, mixed_precision=False, corr_levels=4, corr_radius=4,
                  corr_channels=256, context_channels=128, recurrent_channels=128,
-                 encoder_norm='instance', context_norm='batch', arguments={},
-                 on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
+                 encoder_norm='instance', context_norm='batch', relu_inplace=True,
+                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': True}):
         self.dropout = dropout
         self.mixed_precision = mixed_precision
         self.corr_levels = corr_levels
@@ -209,6 +212,7 @@ class Raft(Model):
         self.recurrent_channels = recurrent_channels
         self.encoder_norm = encoder_norm
         self.context_norm = context_norm
+        self.relu_inplace = relu_inplace
 
         self.freeze_batchnorm = True
 
@@ -216,7 +220,7 @@ class Raft(Model):
                                     corr_levels=corr_levels, corr_radius=corr_radius,
                                     corr_channels=corr_channels, context_channels=context_channels,
                                     recurrent_channels=recurrent_channels, encoder_norm=encoder_norm,
-                                    context_norm=context_norm),
+                                    context_norm=context_norm, relu_inplace=relu_inplace),
                          arguments=arguments,
                          on_epoch_arguments=on_epoch_args,
                          on_stage_arguments=on_stage_args)
@@ -238,6 +242,7 @@ class Raft(Model):
                 'recurrent-channels': self.recurrent_channels,
                 'encoder-norm': self.encoder_norm,
                 'context-norm': self.context_norm,
+                'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
             'on-stage': default_stage_args | self.on_stage_arguments,
