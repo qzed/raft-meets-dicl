@@ -44,6 +44,8 @@ def convert_raft(state, metadata):
     sub = [
         ('module.update_block.encoder.', 'module.update_block.enc.'),
         ('module.update_block.flow_head.', 'module.update_block.flow.'),
+        ('module.update_block.mask.0.', 'module.upnet.conv1.'),
+        ('module.update_block.mask.2.', 'module.upnet.conv2.'),
     ]
 
     return to_checkpoint('raft/baseline', replace_pfx(state, sub), metadata)
