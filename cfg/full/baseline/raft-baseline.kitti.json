@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-28T19:32:43.740485",
-    "commit": "~0af17bf185ed85318974dc9f9dcb9c76cfc42f41",
+    "timestamp": "2022-01-30T15:47:57.215234",
+    "commit": "~c413bcf9aefb568818c3eb5f4027a46a12aba8f2",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -87,32 +87,6 @@
                         "type": "augment",
                         "augmentations": [
                             {
-                                "type": "scale-sparse",
-                                "min-size": [
-                                    960,
-                                    288
-                                ],
-                                "min-scale": 0.87,
-                                "max-scale": 1.32,
-                                "max-stretch": 0.2,
-                                "prob-stretch": 0.8,
-                                "mode": "linear"
-                            },
-                            {
-                                "type": "crop",
-                                "size": [
-                                    960,
-                                    288
-                                ]
-                            },
-                            {
-                                "type": "flip",
-                                "probability": [
-                                    0.5,
-                                    0.1
-                                ]
-                            },
-                            {
                                 "type": "color-jitter",
                                 "prob-asymmetric": 0.2,
                                 "brightness": 0.4,
@@ -128,12 +102,32 @@
                                     3
                                 ],
                                 "min-size": [
-                                    1,
-                                    1
+                                    50,
+                                    50
                                 ],
                                 "max-size": [
                                     100,
-                                    50
+                                    100
+                                ],
+                                "skew-correction": true
+                            },
+                            {
+                                "type": "scale-sparse-exp",
+                                "min-size": [
+                                    968,
+                                    296
+                                ],
+                                "min-scale": -0.2,
+                                "max-scale": 0.4,
+                                "max-stretch": 0.0,
+                                "prob-stretch": 0.0,
+                                "mode": "linear"
+                            },
+                            {
+                                "type": "crop",
+                                "size": [
+                                    960,
+                                    288
                                 ]
                             }
                         ],

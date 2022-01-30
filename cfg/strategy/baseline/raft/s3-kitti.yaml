@@ -16,19 +16,6 @@ stages:
           source: ../../../data/kitti-2015.train.yaml
 
         augmentations:
-          - type: scale-sparse
-            min-size: &img_size [960, 288]
-            min-scale: 0.87
-            max-scale: 1.32
-            max-stretch: 0.2
-            prob-stretch: 0.8
-
-          - type: crop
-            size: *img_size
-
-          - type: flip
-            probability: [0.5, 0.1]
-
           - type: color-jitter
             prob-asymmetric: 0.2
             brightness: 0.4
@@ -39,8 +26,18 @@ stages:
           - type: occlusion-forward
             probability: 0.5
             num: [1, 3]
-            min-size: [1, 1]
-            max-size: [100, 50]
+            min-size: [50, 50]
+            max-size: [100, 100]
+
+          - type: scale-sparse-exp
+            min-size: [968, 296]    # size + 8
+            min-scale: -0.2
+            max-scale: 0.4
+            max-stretch: 0.0
+            prob-stretch: 0.0
+
+          - type: crop
+            size: [960, 288]
 
     validation:
       source: ../../../data/kitti-2015.train.yaml

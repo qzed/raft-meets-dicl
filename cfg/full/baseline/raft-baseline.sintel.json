@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-28T19:31:04.611936",
-    "commit": "~0af17bf185ed85318974dc9f9dcb9c76cfc42f41",
+    "timestamp": "2022-01-30T15:47:34.021610",
+    "commit": "~c413bcf9aefb568818c3eb5f4027a46a12aba8f2",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -87,13 +87,6 @@
                         "type": "augment",
                         "augmentations": [
                             {
-                                "type": "crop",
-                                "size": [
-                                    768,
-                                    368
-                                ]
-                            },
-                            {
                                 "type": "flip",
                                 "probability": [
                                     0.5,
@@ -101,27 +94,10 @@
                                 ]
                             },
                             {
-                                "type": "color-jitter",
-                                "prob-asymmetric": 0.2,
-                                "brightness": 0.4,
-                                "contrast": 0.4,
-                                "saturation": 0.4,
-                                "hue": 0.1592
-                            },
-                            {
-                                "type": "occlusion-forward",
-                                "probability": 0.5,
-                                "num": [
-                                    1,
-                                    3
-                                ],
-                                "min-size": [
-                                    1,
-                                    1
-                                ],
-                                "max-size": [
-                                    100,
-                                    50
+                                "type": "crop",
+                                "size": [
+                                    768,
+                                    368
                                 ]
                             }
                         ],
@@ -132,13 +108,38 @@
                                     "type": "augment",
                                     "augmentations": [
                                         {
-                                            "type": "scale",
-                                            "min-size": [
-                                                768,
-                                                368
+                                            "type": "color-jitter",
+                                            "prob-asymmetric": 0.2,
+                                            "brightness": 0.4,
+                                            "contrast": 0.4,
+                                            "saturation": 0.4,
+                                            "hue": 0.1592
+                                        },
+                                        {
+                                            "type": "occlusion-forward",
+                                            "probability": 0.5,
+                                            "num": [
+                                                1,
+                                                3
                                             ],
-                                            "min-scale": 0.87,
-                                            "max-scale": 1.52,
+                                            "min-size": [
+                                                50,
+                                                50
+                                            ],
+                                            "max-size": [
+                                                100,
+                                                100
+                                            ],
+                                            "skew-correction": true
+                                        },
+                                        {
+                                            "type": "scale-exp",
+                                            "min-size": [
+                                                776,
+                                                376
+                                            ],
+                                            "min-scale": -0.2,
+                                            "max-scale": 0.6,
                                             "max-stretch": 0.2,
                                             "prob-stretch": 0.8,
                                             "mode": "linear",
@@ -356,15 +357,40 @@
                                             "type": "augment",
                                             "augmentations": [
                                                 {
-                                                    "type": "scale-sparse",
-                                                    "min-size": [
-                                                        768,
-                                                        368
+                                                    "type": "color-jitter",
+                                                    "prob-asymmetric": 0.2,
+                                                    "brightness": 0.4,
+                                                    "contrast": 0.4,
+                                                    "saturation": 0.4,
+                                                    "hue": 0.1592
+                                                },
+                                                {
+                                                    "type": "occlusion-forward",
+                                                    "probability": 0.5,
+                                                    "num": [
+                                                        1,
+                                                        3
                                                     ],
-                                                    "min-scale": 0.81,
-                                                    "max-scale": 1.41,
-                                                    "max-stretch": 0.2,
-                                                    "prob-stretch": 0.8,
+                                                    "min-size": [
+                                                        50,
+                                                        50
+                                                    ],
+                                                    "max-size": [
+                                                        100,
+                                                        100
+                                                    ],
+                                                    "skew-correction": true
+                                                },
+                                                {
+                                                    "type": "scale-sparse-exp",
+                                                    "min-size": [
+                                                        776,
+                                                        376
+                                                    ],
+                                                    "min-scale": -0.3,
+                                                    "max-scale": 0.5,
+                                                    "max-stretch": 0.0,
+                                                    "prob-stretch": 0.0,
                                                     "mode": "linear"
                                                 }
                                             ],
@@ -374,12 +400,12 @@
                                                 "source": {
                                                     "type": "dataset",
                                                     "spec": {
-                                                        "id": "kitti-2012",
-                                                        "name": "KITTI 2012",
-                                                        "path": "cfg/strategy/baseline/raft/../../../data/dataset/../../../../datasets/kitti-flow-2012/data",
+                                                        "id": "kitti-2015",
+                                                        "name": "KITTI 2015",
+                                                        "path": "cfg/strategy/baseline/raft/../../../data/dataset/../../../../datasets/kitti-flow-2015/data",
                                                         "layout": {
                                                             "type": "generic",
-                                                            "images": "{type}/colored_0/{seq:06d}_{idx:02d}.png",
+                                                            "images": "{type}/image_2/{seq:06d}_{idx:02d}.png",
                                                             "flows": "{type}/flow_occ/{seq:06d}_{idx:02d}.png",
                                                             "key": "{type}/{seq:06d}_{idx:02d}"
                                                         },
@@ -423,15 +449,40 @@
                                             "type": "augment",
                                             "augmentations": [
                                                 {
-                                                    "type": "scale-sparse",
-                                                    "min-size": [
-                                                        768,
-                                                        368
+                                                    "type": "color-jitter",
+                                                    "prob-asymmetric": 0.2,
+                                                    "brightness": 0.4,
+                                                    "contrast": 0.4,
+                                                    "saturation": 0.4,
+                                                    "hue": 0.1592
+                                                },
+                                                {
+                                                    "type": "occlusion-forward",
+                                                    "probability": 0.5,
+                                                    "num": [
+                                                        1,
+                                                        3
                                                     ],
-                                                    "min-scale": 0.71,
-                                                    "max-scale": 1.15,
-                                                    "max-stretch": 0.2,
-                                                    "prob-stretch": 0.8,
+                                                    "min-size": [
+                                                        50,
+                                                        50
+                                                    ],
+                                                    "max-size": [
+                                                        100,
+                                                        100
+                                                    ],
+                                                    "skew-correction": true
+                                                },
+                                                {
+                                                    "type": "scale-sparse-exp",
+                                                    "min-size": [
+                                                        776,
+                                                        376
+                                                    ],
+                                                    "min-scale": -0.5,
+                                                    "max-scale": 0.2,
+                                                    "max-stretch": 0.0,
+                                                    "prob-stretch": 0.0,
                                                     "mode": "linear"
                                                 }
                                             ],

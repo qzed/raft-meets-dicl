@@ -17,10 +17,23 @@ stages:
             - type: augment         # full flow datasets
 
               augmentations:
-                - type: scale
-                  min-size: &img_size [768, 368]
-                  min-scale: 0.87
-                  max-scale: 1.52
+                - type: color-jitter
+                  prob-asymmetric: 0.2
+                  brightness: 0.4
+                  contrast: 0.4
+                  saturation: 0.4
+                  hue: 0.1592   # 0.5 / pi
+
+                - type: occlusion-forward
+                  probability: 0.5
+                  num: [1, 3]
+                  min-size: [50, 50]
+                  max-size: [100, 100]
+
+                - type: scale-exp
+                  min-size: [776, 376]      # size + 8
+                  min-scale: -0.2
+                  max-scale: 0.6
                   max-stretch: 0.2
                   prob-stretch: 0.8
 
@@ -42,27 +55,53 @@ stages:
                 - type: augment
 
                   augmentations:
-                    - type: scale-sparse
-                      min-size: *img_size
-                      min-scale: 0.81
-                      max-scale: 1.41
-                      max-stretch: 0.2
-                      prob-stretch: 0.8
+                    - type: color-jitter
+                      prob-asymmetric: 0.2
+                      brightness: 0.4
+                      contrast: 0.4
+                      saturation: 0.4
+                      hue: 0.1592   # 0.5 / pi
+
+                    - type: occlusion-forward
+                      probability: 0.5
+                      num: [1, 3]
+                      min-size: [50, 50]
+                      max-size: [100, 100]
+
+                    - type: scale-sparse-exp
+                      min-size: [776, 376]      # size + 8
+                      min-scale: -0.3
+                      max-scale: 0.5
+                      max-stretch: 0.0
+                      prob-stretch: 0.0
 
                   source:
                     type: repeat
                     times: 200
-                    source: ../../../data/kitti-2012.train.yaml
+                    source: ../../../data/kitti-2015.train.yaml
 
                 - type: augment
 
                   augmentations:
-                    - type: scale-sparse
-                      min-size: *img_size
-                      min-scale: 0.71
-                      max-scale: 1.15
-                      max-stretch: 0.2
-                      prob-stretch: 0.8
+                    - type: color-jitter
+                      prob-asymmetric: 0.2
+                      brightness: 0.4
+                      contrast: 0.4
+                      saturation: 0.4
+                      hue: 0.1592   # 0.5 / pi
+
+                    - type: occlusion-forward
+                      probability: 0.5
+                      num: [1, 3]
+                      min-size: [50, 50]
+                      max-size: [100, 100]
+
+                    - type: scale-sparse-exp
+                      min-size: [776, 376]      # size + 8
+                      min-scale: -0.5
+                      max-scale: 0.2
+                      max-stretch: 0.0
+                      prob-stretch: 0.0
 
                   source:
                     type: repeat
@@ -70,24 +109,11 @@ stages:
                     source: ../../../data/hci-hd1k.yaml
 
         augmentations:              # general augmentations
-          - type: crop
-            size: *img_size
-
           - type: flip
             probability: [0.5, 0.1]
 
-          - type: color-jitter
-            prob-asymmetric: 0.2
-            brightness: 0.4
-            contrast: 0.4
-            saturation: 0.4
-            hue: 0.1592   # 0.5 / pi
-
-          - type: occlusion-forward
-            probability: 0.5
-            num: [1, 3]
-            min-size: [1, 1]
-            max-size: [100, 50]
+          - type: crop
+            size: [768, 368]
 
     validation:
       - name: sintel-clean
