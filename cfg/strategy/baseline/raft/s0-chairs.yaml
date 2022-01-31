@@ -39,6 +39,9 @@ stages:
           - type: crop
             size: [496, 368]
 
+          - type: restrict-flow-magnitude
+            maximum: 400
+
     validation:
       source: ../../../data/ufreiburg-flyingchairs.test.yaml
       batch-size: 2

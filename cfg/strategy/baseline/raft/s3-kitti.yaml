@@ -40,6 +40,9 @@ stages:
           - type: crop
             size: [960, 288]
 
+          - type: restrict-flow-magnitude
+            maximum: 400
+
     validation:
       source: ../../../data/kitti-2015.train.yaml
       batch-size: 1     # needs to be one due to images having different size

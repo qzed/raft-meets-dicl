@@ -118,6 +118,9 @@ stages:
           - type: crop
             size: [768, 368]
 
+          - type: restrict-flow-magnitude
+            maximum: 400
+
     validation:
       - name: sintel-clean
         source: ../../../data/mpi-sintel-clean.train-full.yaml
