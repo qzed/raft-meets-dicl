@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-30T15:46:47.186986",
-    "commit": "~c413bcf9aefb568818c3eb5f4027a46a12aba8f2",
+    "timestamp": "2022-01-31T12:13:43.456633",
+    "commit": "~c7e495e0fe1c5472fa9119319efc521af2670a25",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -36,7 +36,8 @@
                 "encoder-type": "raft",
                 "context-type": "raft",
                 "corr-reg-type": "softargmax",
-                "corr-reg-args": {}
+                "corr-reg-args": {},
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": 12,
@@ -54,7 +55,7 @@
             "type": "raft/sequence",
             "arguments": {
                 "ord": 1,
-                "gamma": 0.85
+                "gamma": 0.8
             }
         },
         "input": {
@@ -137,6 +138,10 @@
                                     496,
                                     368
                                 ]
+                            },
+                            {
+                                "type": "restrict-flow-magnitude",
+                                "maximum": 400.0
                             }
                         ],
                         "source": {
