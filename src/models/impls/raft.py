@@ -604,14 +604,14 @@ class SequenceLoss(Loss):
         super().__init__(arguments)
 
     def get_config(self):
-        default_args = {'ord': 1, 'gamma': 0.8}
+        default_args = {'ord': 1, 'gamma': 0.8, 'include_invalid': False}
 
         return {
             'type': self.type,
             'arguments': default_args | self.arguments,
         }
 
-    def compute(self, model, result, target, valid, ord=1, gamma=0.8):
+    def compute(self, model, result, target, valid, ord=1, gamma=0.8, include_invalid=False):
         n_predictions = len(result)
 
         loss = 0.0
@@ -627,11 +627,14 @@ class SequenceLoss(Loss):
             else:
                 dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
 
-            # Only calculate error for valid pixels. N.b.: This is a difference
-            # to the original implementation, where invalid pixels are included
-            # in the mean as zero loss, skewing it (this should not make much
-            # of a difference wrt. optimization).
-            dist = dist[valid]
+            if include_invalid:
+                dist = dist * valid
+            else:
+                # Only calculate error for valid pixels. N.b.: This is a difference
+                # to the original implementation, where invalid pixels are included
+                # in the mean as zero loss, skewing it (this should not make much
+                # of a difference wrt. optimization).
+                dist = dist[valid]
 
             # update loss
             loss = loss + weight * dist.mean()

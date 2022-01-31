@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-31T12:51:05.685410",
-    "commit": "~0767efb37f9a72133c6661c286fb079afbb33c94",
+    "timestamp": "2022-01-31T12:57:49.794398",
+    "commit": "~dd55ec7eba69b689ed58b61d42c4288b38425ae6",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -55,7 +55,8 @@
             "type": "raft/sequence",
             "arguments": {
                 "ord": "absmean",
-                "gamma": 0.8
+                "gamma": 0.8,
+                "include_invalid": true
             }
         },
         "input": {
