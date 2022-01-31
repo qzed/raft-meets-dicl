@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-01-31T12:13:43.456633",
-    "commit": "~c7e495e0fe1c5472fa9119319efc521af2670a25",
+    "timestamp": "2022-01-31T12:51:05.685410",
+    "commit": "~0767efb37f9a72133c6661c286fb079afbb33c94",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -54,7 +54,7 @@
         "loss": {
             "type": "raft/sequence",
             "arguments": {
-                "ord": 1,
+                "ord": "absmean",
                 "gamma": 0.8
             }
         },

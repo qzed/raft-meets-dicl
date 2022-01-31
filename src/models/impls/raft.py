@@ -619,8 +619,13 @@ class SequenceLoss(Loss):
             # compute weight for sequence index
             weight = gamma**(n_predictions - i - 1)
 
-            # compute flow distance according to specified norm (L1 in orig. impl.)
-            dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
+            # Compute flow distance according to specified norm. In the
+            # original implementation, this is the mean of absolute values,
+            # i.e. scaled L1 norm.
+            if ord == 'absmean':
+                dist = (flow - target).abs().mean(dim=-3)
+            else:
+                dist = torch.linalg.vector_norm(flow - target, ord=ord, dim=-3)
 
             # Only calculate error for valid pixels. N.b.: This is a difference
             # to the original implementation, where invalid pixels are included
