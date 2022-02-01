@@ -74,6 +74,8 @@ class ModuloPadding(Padding):
         new_h = ((h + self.size[1] - 1) // self.size[1]) * self.size[1]
         new_w = ((w + self.size[0] - 1) // self.size[0]) * self.size[0]
 
+        # TODO: add option to pad on all sites
+
         pad = ((0, 0), (0, new_h - h), (0, new_w - w), (0, 0))
         pad_v = ((0, 0), (0, new_h - h), (0, new_w - w))
 
