@@ -299,7 +299,7 @@ class BasicUpdateBlock(nn.Module):
 class Up8Network(nn.Module):
     """RAFT 8x flow upsampling module for finest level"""
 
-    def __init__(self, hidden_dim=128, mixed_precision=False, relu_inplace=True):
+    def __init__(self, hidden_dim=128, mixed_precision=False, relu_inplace=True, temperature=4.0):
         super().__init__()
 
         self.mixed_precision = mixed_precision
@@ -308,14 +308,16 @@ class Up8Network(nn.Module):
         self.relu1 = nn.ReLU(inplace=relu_inplace)
         self.conv2 = nn.Conv2d(256, 8 * 8 * 9, 1, padding=0)
 
+        self.temperature = temperature                      # 4.0 = 1.0/0.25 in original raft
+
     def forward(self, hidden, flow):
         batch, c, h, w = flow.shape
 
         # prepare mask
         with torch.cuda.amp.autocast(enabled=self.mixed_precision):
             mask = self.conv2(self.relu1(self.conv1(hidden)))
-            mask = mask.view(batch, 1, 9, 8, 8, h, w)           # reshape for softmax + broadcasting
-            mask = torch.softmax(mask, dim=2)                   # softmax along neighbor weights
+            mask = mask.view(batch, 1, 9, 8, 8, h, w)             # reshape for softmax + broadcasting
+            mask = torch.softmax(mask / self.temperature, dim=2)  # softmax along neighbor weights
 
         # prepare flow
         up_flow = F.unfold(8 * flow, (3, 3), padding=1)     # build windows for upsampling
