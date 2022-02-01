@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-08T20:50:58.815223",
-    "commit": "6e6e79b24c27635c261e4156675b913ddfd4c566",
+    "timestamp": "2022-02-01T09:44:03.437244",
+    "commit": "~15e4fb20ef4faa8148a1083deedf524a920fdb82",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -9,7 +9,7 @@
         "data": "cfg/strategy/dev/train-ufreiburg-flyingthings3d.aug-full.yaml",
         "model": "cfg/model/raft-sl-ctf4l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
-        "inspect": null,
+        "inspect": "cfg/inspect/default-1k.yaml",
         "env": null
     },
     "seeds": {
@@ -30,7 +30,14 @@
                 "context-channels": 128,
                 "recurrent-channels": 128,
                 "encoder-norm": "instance",
-                "context-norm": "batch"
+                "context-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "share-rnn": true,
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": [
@@ -39,8 +46,14 @@
                     3,
                     3
                 ],
-                "upnet": true
-            }
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft+dicl/mlseq",
@@ -52,7 +65,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -144,7 +158,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -385,7 +400,7 @@
                             },
                             "filter": null
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -449,7 +464,7 @@
                             },
                             "filter": null
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -468,7 +483,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch:": {},
+                    "on-stage:": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -549,6 +566,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -567,7 +585,48 @@
         "validation": [
             {
                 "type": "strategy",
-                "frequency": "epoch",
+                "frequency": 1000,
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            },
+            {
+                "type": "strategy",
+                "frequency": "stage",
                 "checkpoint": true,
                 "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
                 "metrics": [
@@ -615,6 +674,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
