@@ -49,6 +49,9 @@ class ModuloPadding(Padding):
     def __init__(self, mode, size, align_hz='left', align_vt='top'):
         super().__init__()
 
+        modes = ['edge', 'maximum', 'mean', 'median', 'minimum', 'reflect', 'symmetric', 'wrap',
+                 'zeros', 'ones']
+
         self.mode = mode
         self.size = size
         self.align_hz = align_hz
@@ -59,6 +62,9 @@ class ModuloPadding(Padding):
 
         if align_vt not in ('bottom', 'center', 'top'):
             raise ValueError(f"invalid vertical alignment for padding: {align_hz}")
+
+        if mode not in modes:
+            raise ValueError(f"invalid padding mode: {mode}")
 
     def get_config(self):
         return {
