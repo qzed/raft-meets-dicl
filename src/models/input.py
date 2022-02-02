@@ -99,7 +99,7 @@ class ModuloPadding(Padding):
         elif self.align_vt == 'bottom':
             ph1 = new_h - h
             ph2 = 0
-        elif self.aling_vt == 'center':
+        elif self.align_vt == 'center':
             ph = new_h - h
             ph1 = ph // 2
             ph2 = ph - ph // 2
@@ -110,7 +110,7 @@ class ModuloPadding(Padding):
         elif self.align_hz == 'right':
             pw1 = new_w - w
             pw2 = 0
-        elif self.aling_hz == 'center':
+        elif self.align_hz == 'center':
             pw = new_w - w
             pw1 = pw // 2
             pw2 = pw - pw // 2
@@ -125,8 +125,9 @@ class ModuloPadding(Padding):
             flow = np.pad(flow, pad, mode='constant', constant_values=0)
             valid = np.pad(valid, pad_v, mode='constant', constant_values=False)
 
-        # note: no need to change meta.original_extents as we apply padding
-        # only the hign-index ends
+        for m in meta:
+            (h1, h2), (w1, w2) = m.original_extents
+            m.original_extents = ((h1 + ph1, h2 + ph2), (w1 + pw1, w2 + pw2))
 
         return img1, img2, flow, valid, meta
 
