@@ -3,6 +3,7 @@ from ..data.dataset import Metadata, SampleArgs, SampleId
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
 
@@ -50,7 +51,7 @@ class ModuloPadding(Padding):
         super().__init__()
 
         modes = ['edge', 'maximum', 'mean', 'median', 'minimum', 'reflect', 'symmetric', 'wrap',
-                 'zeros', 'ones']
+                 'zeros', 'ones', 'torch.replicate', 'torch.reflect', 'torch.circular']
 
         self.mode = mode
         self.size = size
@@ -76,15 +77,15 @@ class ModuloPadding(Padding):
         }
 
     def apply(self, img1, img2, flow, valid, meta):
-        modes = ['edge', 'maximum', 'mean', 'median', 'minimum', 'reflect', 'symmetric', 'wrap']
-
         if self.mode == 'zeros':
             mode = 'constant'
             args = {'constant_values': 0.0}
         elif self.mode == 'ones':
             mode = 'constant'
             args = {'constant_values': 1.0}
-        elif self.mode in modes:
+        elif self.mode.startswith('torch.'):
+            mode = self.mode.removeprefix('torch.')
+        else:
             mode = self.mode
             args = {}
 
@@ -115,14 +116,19 @@ class ModuloPadding(Padding):
             pw1 = pw // 2
             pw2 = pw - pw // 2
 
-        pad = ((0, 0), (ph1, ph2), (pw1, pw2), (0, 0))
+        pad_n = ((0, 0), (ph1, ph2), (pw1, pw2), (0, 0))
+        pad_t = (0, 0, pw1, pw2, ph1, ph2)
         pad_v = ((0, 0), (ph1, ph2), (pw1, pw2))
 
-        img1 = np.pad(img1, pad, mode=mode, **args)
-        img2 = np.pad(img2, pad, mode=mode, **args)
+        if not self.mode.startswith('torch.'):
+            img1 = np.pad(img1, pad_n, mode=mode, **args)
+            img2 = np.pad(img2, pad_n, mode=mode, **args)
+        else:
+            img1 = F.pad(torch.from_numpy(img1), pad_t, mode=mode).numpy()
+            img2 = F.pad(torch.from_numpy(img2), pad_t, mode=mode).numpy()
 
         if flow is not None:
-            flow = np.pad(flow, pad, mode='constant', constant_values=0)
+            flow = np.pad(flow, pad_n, mode='constant', constant_values=0)
             valid = np.pad(valid, pad_v, mode='constant', constant_values=False)
 
         for m in meta:
