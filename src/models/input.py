@@ -41,19 +41,32 @@ class ModuloPadding(Padding):
         if len(size) != 2:
             raise ValueError("expected list/tuple of 2 integers for attribute 'size'")
 
-        return cls(mode, size)
+        align_hz = cfg.get('align-horizontal', 'left')
+        align_vt = cfg.get('align-vertical', 'top')
 
-    def __init__(self, mode, size):
+        return cls(mode, size, align_hz=align_hz, align_vt=align_vt)
+
+    def __init__(self, mode, size, align_hz='left', align_vt='top'):
         super().__init__()
 
         self.mode = mode
         self.size = size
+        self.align_hz = align_hz
+        self.align_vt = align_vt
+
+        if align_hz not in ('left', 'center', 'right'):
+            raise ValueError(f"invalid horizontal alignment for padding: {align_hz}")
+
+        if align_vt not in ('bottom', 'center', 'top'):
+            raise ValueError(f"invalid vertical alignment for padding: {align_hz}")
 
     def get_config(self):
         return {
             'type': self.type,
             'mode': self.mode,
             'size': self.size,
+            'align-horizontal': self.align_hz,
+            'align-vertical': self.align_vt,
         }
 
     def apply(self, img1, img2, flow, valid, meta):
@@ -74,10 +87,30 @@ class ModuloPadding(Padding):
         new_h = ((h + self.size[1] - 1) // self.size[1]) * self.size[1]
         new_w = ((w + self.size[0] - 1) // self.size[0]) * self.size[0]
 
-        # TODO: add option to pad on all sites
+        if self.align_vt == 'top':
+            ph1 = 0
+            ph2 = new_h - h
+        elif self.align_vt == 'bottom':
+            ph1 = new_h - h
+            ph2 = 0
+        elif self.aling_vt == 'center':
+            ph = new_h - h
+            ph1 = ph // 2
+            ph2 = ph - ph // 2
 
-        pad = ((0, 0), (0, new_h - h), (0, new_w - w), (0, 0))
-        pad_v = ((0, 0), (0, new_h - h), (0, new_w - w))
+        if self.align_hz == 'left':
+            pw1 = 0
+            pw2 = new_w - w
+        elif self.align_hz == 'right':
+            pw1 = new_w - w
+            pw2 = 0
+        elif self.aling_hz == 'center':
+            pw = new_w - w
+            pw1 = pw // 2
+            pw2 = pw - pw // 2
+
+        pad = ((0, 0), (ph1, ph2), (pw1, pw2), (0, 0))
+        pad_v = ((0, 0), (ph1, ph2), (pw1, pw2))
 
         img1 = np.pad(img1, pad, mode=mode, **args)
         img2 = np.pad(img2, pad, mode=mode, **args)
