@@ -247,8 +247,8 @@
                 },
                 "model": {
                     "arguments": {},
-                    "on-epoch:": {},
-                    "on-stage:": {
+                    "on-epoch": {},
+                    "on-stage": {
                         "freeze_batchnorm": false
                     }
                 },

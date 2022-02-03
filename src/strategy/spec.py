@@ -389,8 +389,8 @@ class Stage:
             'optimizer': self.optimizer.get_config(),
             'model': {
                 'arguments': self.model_args,
-                'on-epoch:': self.model_on_epoch_args,
-                'on-stage:': self.model_on_stage_args,
+                'on-epoch': self.model_on_epoch_args,
+                'on-stage': self.model_on_stage_args,
             },
             'loss': {'arguments': self.loss_args},
             'gradient': self.gradient.get_config() if self.gradient is not None else None,
