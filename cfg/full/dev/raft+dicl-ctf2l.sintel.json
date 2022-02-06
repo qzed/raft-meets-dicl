@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-11-30T15:38:27.525376",
-    "commit": "~47947c36a4242d15da2b844512d8038beb214ec1",
+    "timestamp": "2022-02-06T14:47:50.658454",
+    "commit": "~b65d630a54f84750dde578bdeb5931d6bf51c4b0",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -25,15 +25,38 @@
             "type": "raft+dicl/ctf-l2",
             "parameters": {
                 "corr-radius": 4,
-                "dap-init": "identity"
+                "corr-channels": 32,
+                "context-channels": 128,
+                "recurrent-channels": 128,
+                "dap-init": "identity",
+                "encoder-norm": "instance",
+                "context-norm": "batch",
+                "mnet-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "share-dicl": false,
+                "share-rnn": true,
+                "corr-type": "dicl",
+                "corr-args": {},
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": [
                     4,
                     3
                 ],
-                "dap": true
-            }
+                "dap": true,
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft+dicl/mlseq",
@@ -43,7 +66,8 @@
                 "alpha": [
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -61,7 +85,9 @@
                 "size": [
                     32,
                     32
-                ]
+                ],
+                "align-horizontal": "left",
+                "align-vertical": "top"
             }
         }
     },
@@ -135,7 +161,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -328,7 +355,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -396,7 +423,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -415,7 +442,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -496,6 +525,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -562,6 +592,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }

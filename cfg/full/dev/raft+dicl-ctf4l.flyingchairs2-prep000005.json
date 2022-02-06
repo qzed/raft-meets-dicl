@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-10T14:55:15.654069",
-    "commit": "~511c0bce2ef1e083d8d2f70ecdedbf88462f0c16",
+    "timestamp": "2022-02-06T14:55:43.500534",
+    "commit": "~b65d630a54f84750dde578bdeb5931d6bf51c4b0",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -9,7 +9,7 @@
         "data": "cfg/strategy/dev/train-ufreiburg-flyingchairs2.prepstage-lr000005.yaml",
         "model": "cfg/model/raft+dicl-ctf4l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
-        "inspect": null,
+        "inspect": "cfg/inspect/default-1k.yaml",
         "env": null
     },
     "seeds": {
@@ -32,7 +32,16 @@
                 "encoder-norm": "instance",
                 "context-norm": "batch",
                 "mnet-norm": "batch",
-                "share-dicl": false
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "share-dicl": false,
+                "share-rnn": true,
+                "corr-type": "dicl",
+                "corr-args": {},
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": [
@@ -42,8 +51,14 @@
                     3
                 ],
                 "dap": true,
-                "upnet": true
-            }
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
         },
         "loss": {
             "type": "raft+dicl/mlseq",
@@ -55,7 +70,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -73,7 +89,9 @@
                 "size": [
                     128,
                     128
-                ]
+                ],
+                "align-horizontal": "left",
+                "align-vertical": "top"
             }
         }
     },
@@ -352,7 +370,7 @@
                                 }
                             ]
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -371,7 +389,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -475,7 +495,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -734,7 +755,7 @@
                                 }
                             ]
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -753,7 +774,9 @@
                     }
                 },
                 "model": {
-                    "arguments": {}
+                    "arguments": {},
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -834,6 +857,7 @@
                 ]
             }
         ],
+        "hooks": [],
         "images": {
             "frequency": 100,
             "prefix": "Train:S{n_stage}:{id_stage}/"
@@ -852,7 +876,48 @@
         "validation": [
             {
                 "type": "strategy",
-                "frequency": "epoch",
+                "frequency": 1000,
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            },
+            {
+                "type": "strategy",
+                "frequency": "stage",
                 "checkpoint": true,
                 "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
                 "metrics": [
@@ -900,6 +965,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
