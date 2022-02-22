@@ -309,20 +309,32 @@ class Dicl(Model):
         dap_init = param_cfg.get('dap-init', 'identity')
         feature_channels = param_cfg.get('feature-channels', 32)
         relu_inplace = param_cfg.get('relu-inplace', True)
-        args = cfg.get('arguments', {})
 
-        return cls(disp_ranges, dap_init, feature_channels, relu_inplace, args)
+        args = cfg.get('arguments', {})
+        on_stage_args = cfg.get('on-stage', {'freeze_batchnorm': False})
+        on_epoch_args = cfg.get('on-epoch', {})
+
+        return cls(disp_ranges=disp_ranges, dap_init=dap_init, feature_channels=feature_channels,
+                   relu_inplace=relu_inplace, arguments=args, on_epoch_args=on_epoch_args,
+                   on_stage_args=on_stage_args)
 
     def __init__(self, disp_ranges, dap_init='identity', feature_channels=32, relu_inplace=True,
-                 arguments={}):
+                 arguments={}, on_epoch_args={}, on_stage_args={'freeze_batchnorm': False}):
         self.disp_ranges = disp_ranges
         self.dap_init = dap_init
         self.feature_channels = feature_channels
         self.relu_inplace = relu_inplace
 
-        super().__init__(DiclModule(disp_ranges, dap_init, feature_channels, relu_inplace), arguments)
+        super().__init__(DiclModule(disp_ranges=disp_ranges, dap_init=dap_init,
+                                    feature_channels=feature_channels, relu_inplace=relu_inplace),
+                         arguments=arguments,
+                         on_epoch_arguments=on_epoch_args,
+                         on_stage_arguments=on_stage_args)
 
     def get_config(self):
+        default_stage_args = {'freeze_batchnorm': False}
+        default_epoch_args = {}
+
         default_args = {
             'raw': False,
             'dap': True,
@@ -338,6 +350,8 @@ class Dicl(Model):
                 'relu-inplace': self.relu_inplace,
             },
             'arguments': default_args | self.arguments,
+            'on-stage': default_stage_args | self.on_stage_arguments,
+            'on-epoch': default_epoch_args | self.on_epoch_arguments,
         }
 
     def get_adapter(self) -> ModelAdapter:
@@ -345,6 +359,18 @@ class Dicl(Model):
 
     def forward(self, img1, img2, raw=False, dap=True, ctx=True, context_scale=_default_context_scale):
         return self.module(img1, img2, raw, dap, ctx, context_scale)
+
+    def on_stage(self, stage, freeze_batchnorm=True, **kwargs):
+        self.freeze_batchnorm = freeze_batchnorm
+
+        if self.training:
+            common.norm.freeze_batchnorm(self.module, freeze_batchnorm)
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+
+        if mode:
+            common.norm.freeze_batchnorm(self.module, self.freeze_batchnorm)
 
 
 class DiclAdapter(ModelAdapter):
