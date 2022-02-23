@@ -325,6 +325,8 @@ class Dicl(Model):
         self.feature_channels = feature_channels
         self.relu_inplace = relu_inplace
 
+        self.freeze_batchnorm = False
+
         super().__init__(DiclModule(disp_ranges=disp_ranges, dap_init=dap_init,
                                     feature_channels=feature_channels, relu_inplace=relu_inplace),
                          arguments=arguments,
