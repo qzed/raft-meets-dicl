@@ -1,0 +1,44 @@
+mode: continuous
+
+stages:
+  - name: "MPI Sintel mix (71% Sintel, 13.5% FlyingThings3D, 13.5% KITTI 2015, 2% HD1K)"
+    id: train/sintel-0
+
+    data:
+      source: ../../data/mpi-sintel-mix.train.aug-full.yaml
+      epochs: 2       # >> 100k steps
+      batch-size: 4
+
+    validation:
+      - name: sintel-clean
+        source: ../../data/mpi-sintel-clean.val.yaml
+        batch-size: 4
+        images: [0, 24, 49, 74, 99]
+
+      - name: sintel-final
+        source: ../../data/mpi-sintel-final.val.yaml
+        batch-size: 4
+        images: [0, 24, 49, 74, 99]
+
+    optimizer:
+      type: adam-w
+
+      parameters:
+        lr: &learning_rate 1.25e-4
+        weight_decay: 1.0e-5
+        eps: 1.0e-8
+
+    lr-scheduler:
+      instance:
+        - type: one-cycle
+          parameters:
+            max_lr: *learning_rate
+            total_steps: '100000 + 100'
+            pct_start: 0.05
+            cycle_momentum: false
+            anneal_strategy: linear
+
+    gradient:
+      clip:
+        type: norm
+        value: 1.0
