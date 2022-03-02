@@ -33,9 +33,9 @@
                 "recurrent-channels": 128,
                 "dap-init": "identity",
                 "dap-type": "full",
-                "encoder-norm": "group",
-                "context-norm": "group",
-                "mnet-norm": "group",
+                "encoder-norm": "batch",
+                "context-norm": "batch",
+                "mnet-norm": "batch",
                 "encoder-type": "raft-avgpool",
                 "share-dicl": true
             },
