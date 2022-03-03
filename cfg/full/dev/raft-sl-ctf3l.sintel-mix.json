@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-03-02T04:05:33.618198",
-    "commit": "~fca3f2872dd4774fa2d3cf969fa4a1da698485ea",
+    "timestamp": "2022-03-03T05:24:17.124471",
+    "commit": "~23d2c7497c5c4e0c4e53fe6617035b250583fa7e",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -219,7 +219,11 @@
                                                         "type": "train",
                                                         "pass": "clean"
                                                     },
-                                                    "filter": null
+                                                    "filter": {
+                                                        "type": "file",
+                                                        "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                                        "value": "0"
+                                                    }
                                                 }
                                             },
                                             {
@@ -276,7 +280,11 @@
                                                         "type": "train",
                                                         "pass": "final"
                                                     },
-                                                    "filter": null
+                                                    "filter": {
+                                                        "type": "file",
+                                                        "file": "cfg/strategy/dev/../../data/splits/mpi-sintel.mfnval.txt",
+                                                        "value": "0"
+                                                    }
                                                 }
                                             },
                                             {

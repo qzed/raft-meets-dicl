@@ -32,11 +32,11 @@ source:
         sources:
           - type: repeat
             times: 128
-            source: mpi-sintel-clean.train-full.yaml
+            source: mpi-sintel-clean.train.yaml
 
           - type: repeat
             times: 128
-            source: mpi-sintel-final.train-full.yaml
+            source: mpi-sintel-final.train.yaml
 
           - type: dataset
             spec: dataset/ufreiburg-flyingthings3d.yaml
