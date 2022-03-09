@@ -15,10 +15,10 @@ from .. import norm
 class ConvBlock(nn.Sequential):
     """Basic convolution block"""
 
-    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, num_groups=8, **kwargs):
         super().__init__(
             nn.Conv2d(c_in, c_out, bias=False, **kwargs),
-            norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
+            norm.make_norm2d(norm_type, num_channels=c_out, num_groups=num_groups),
             nn.ReLU(inplace=relu_inplace),
         )
 
@@ -26,10 +26,10 @@ class ConvBlock(nn.Sequential):
 class ConvBlockTransposed(nn.Sequential):
     """Basic transposed convolution block"""
 
-    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, **kwargs):
+    def __init__(self, c_in, c_out, norm_type='batch', relu_inplace=True, num_groups=8, **kwargs):
         super().__init__(
             nn.ConvTranspose2d(c_in, c_out, bias=False, **kwargs),
-            norm.make_norm2d(norm_type, num_channels=c_out, num_groups=8),
+            norm.make_norm2d(norm_type, num_channels=c_out, num_groups=num_groups),
             nn.ReLU(inplace=relu_inplace),
         )
 
@@ -99,7 +99,7 @@ class MatchingNet(nn.Sequential):
             ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
             ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
             ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace, num_groups=4),
             nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
