@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-20T04:31:50.520234",
-    "commit": "~be42f8c38662a6fac2b87e5a344d5b3e6c3670e5",
+    "timestamp": "2022-03-09T17:44:35.101931",
+    "commit": "~94a4444fdfb88df840e6eae1a06a894afa7b59c1",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -38,7 +38,10 @@
                 "share-rnn": false,
                 "corr-type": "dicl",
                 "corr-args": {},
-                "upsample-hidden": "none"
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": [
@@ -47,7 +50,10 @@
                     3
                 ],
                 "dap": true,
-                "upnet": true
+                "upnet": true,
+                "corr_flow": false,
+                "prev_flow": false,
+                "corr_grad_stop": false
             },
             "on-stage": {
                 "freeze_batchnorm": true
@@ -63,7 +69,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -81,7 +88,9 @@
                 "size": [
                     64,
                     64
-                ]
+                ],
+                "align-horizontal": "left",
+                "align-vertical": "top"
             }
         }
     },
@@ -360,7 +369,7 @@
                                 }
                             ]
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -380,8 +389,8 @@
                 },
                 "model": {
                     "arguments": {},
-                    "on-epoch:": {},
-                    "on-stage:": {}
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -485,7 +494,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -744,7 +754,7 @@
                                 }
                             ]
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -764,8 +774,8 @@
                 },
                 "model": {
                     "arguments": {},
-                    "on-epoch:": {},
-                    "on-stage:": {}
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -954,6 +964,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
