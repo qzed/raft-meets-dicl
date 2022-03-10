@@ -6,11 +6,11 @@ from ..blocks.dicl import MatchingNet, DisplacementAwareProjection
 
 
 class CorrelationModule(nn.Module):
-    def __init__(self, feature_dim, radius, dap_init='identity', norm_type='batch', relu_inplace=True):
+    def __init__(self, feature_dim, radius, dap_init='identity', norm_type='batch', relu_inplace=True, mnet_scale=1):
         super().__init__()
 
         self.radius = radius
-        self.mnet = MatchingNet(2 * feature_dim, norm_type=norm_type, relu_inplace=relu_inplace)
+        self.mnet = MatchingNet(2 * feature_dim, norm_type=norm_type, relu_inplace=relu_inplace, scale=mnet_scale)
         self.dap = DisplacementAwareProjection((radius, radius), init=dap_init)
 
         # build lookup kernel

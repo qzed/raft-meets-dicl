@@ -93,14 +93,19 @@ class GaConv2xBlockTransposed(nn.Module):
 class MatchingNet(nn.Sequential):
     """Matching network to compute cost from stacked features"""
 
-    def __init__(self, input_channels, norm_type='batch', relu_inplace=True):
+    def __init__(self, input_channels, norm_type='batch', relu_inplace=True, scale=1):
+        c1 = int(scale * 96)
+        c2 = int(scale * 128)
+        c3 = int(scale * 64)
+        c4 = int(scale * 32)
+
         super().__init__(
-            ConvBlock(input_channels, 96, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlock(96, 128, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlock(128, 128, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlock(128, 64, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlockTransposed(64, 32, kernel_size=4, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace, num_groups=4),
-            nn.Conv2d(32, 1, kernel_size=3, padding=1),     # note: with bias
+            ConvBlock(input_channels, c1, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(c1, c2, kernel_size=3, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(c2, c2, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(c2, c3, kernel_size=3, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlockTransposed(c3, c4, kernel_size=4, padding=1, stride=2, norm_type=norm_type, relu_inplace=relu_inplace, num_groups=4),
+            nn.Conv2d(c4, 1, kernel_size=3, padding=1),     # note: with bias
         )
 
     def forward(self, mvol):
