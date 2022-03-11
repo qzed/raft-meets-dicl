@@ -25,7 +25,7 @@
             "type": "raft+dicl/ctf-l3",
             "parameters": {
                 "corr-radius": 4,
-                "corr-channels": 32,
+                "corr-channels": 64,
                 "context-channels": 128,
                 "recurrent-channels": 128,
                 "dap-init": "identity",
