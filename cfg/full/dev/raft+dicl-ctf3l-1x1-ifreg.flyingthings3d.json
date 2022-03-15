@@ -1,0 +1,692 @@
+{
+    "timestamp": "2022-03-15T05:24:19.248352",
+    "commit": "~2a9e26c36f2b1822e6fbcf44b00149da447be020",
+    "cwd": "/media/t0/uni/mt/code",
+    "args": {
+        "command": "gencfg",
+        "output": "cfg/full/dev/raft+dicl-ctf3l-1x1-ifreg.flyingthings3d.json",
+        "config": null,
+        "data": "cfg/strategy/dev/train-ufreiburg-flyingthings3d.aug-full.yaml",
+        "model": "cfg/model/raft+dicl-ctf3l.yaml",
+        "seeds": "cfg/seeds/dev.yaml",
+        "inspect": "cfg/inspect/default-1k.yaml",
+        "env": null
+    },
+    "seeds": {
+        "python": -2490582583985330632,
+        "numpy": 3330162416,
+        "torch": -8116055267317430429,
+        "cuda": -1021252639206788731
+    },
+    "model": {
+        "name": "RAFT+DICL coarse-to-fine three-level",
+        "id": "raft+dicl/ctf-l3",
+        "model": {
+            "type": "raft+dicl/ctf-l3",
+            "parameters": {
+                "corr-radius": 4,
+                "corr-channels": 32,
+                "context-channels": 128,
+                "recurrent-channels": 128,
+                "dap-init": "identity",
+                "encoder-norm": "instance",
+                "context-norm": "batch",
+                "encoder-type": "raft",
+                "context-type": "raft",
+                "mnet-norm": "batch",
+                "share-dicl": false,
+                "share-rnn": true,
+                "corr-type": "dicl-1x1",
+                "corr-args": {},
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
+            },
+            "arguments": {
+                "iterations": [
+                    4,
+                    3,
+                    3
+                ],
+                "dap": true,
+                "upnet": true,
+                "corr_flow": true,
+                "prev_flow": false,
+                "corr_grad_stop": false
+            },
+            "on-stage": {
+                "freeze_batchnorm": true
+            },
+            "on-epoch": {}
+        },
+        "loss": {
+            "type": "raft+dicl/mlseq",
+            "arguments": {
+                "ord": 1,
+                "gamma": 0.85,
+                "alpha": [
+                    0.32,
+                    0.38,
+                    0.51,
+                    0.6,
+                    0.85,
+                    1.0
+                ],
+                "scale": 0.5
+            }
+        },
+        "input": {
+            "clip": [
+                0.0,
+                1.0
+            ],
+            "range": [
+                -1,
+                1
+            ],
+            "padding": {
+                "type": "modulo",
+                "mode": "zeros",
+                "size": [
+                    64,
+                    64
+                ],
+                "align-horizontal": "left",
+                "align-vertical": "top"
+            }
+        }
+    },
+    "strategy": {
+        "mode": "continuous",
+        "stages": [
+            {
+                "name": "FlyingThings3d",
+                "id": "train/things3d-0",
+                "data": {
+                    "source": {
+                        "type": "augment",
+                        "augmentations": [
+                            {
+                                "type": "translate",
+                                "min-size": [
+                                    720,
+                                    400
+                                ],
+                                "delta": [
+                                    10,
+                                    10
+                                ]
+                            },
+                            {
+                                "type": "scale",
+                                "min-size": [
+                                    720,
+                                    400
+                                ],
+                                "min-scale": 0.75,
+                                "max-scale": 1.75,
+                                "max-stretch": 0.2,
+                                "prob-stretch": 0.8,
+                                "mode": "linear",
+                                "th-valid": 0.99
+                            },
+                            {
+                                "type": "crop",
+                                "size": [
+                                    720,
+                                    400
+                                ]
+                            },
+                            {
+                                "type": "flip",
+                                "probability": [
+                                    0.5,
+                                    0.1
+                                ]
+                            },
+                            {
+                                "type": "color-jitter",
+                                "prob-asymmetric": 0.2,
+                                "brightness": 0.4,
+                                "contrast": 0.4,
+                                "saturation": 0.4,
+                                "hue": 0.1592
+                            },
+                            {
+                                "type": "occlusion-forward",
+                                "probability": 0.5,
+                                "num": [
+                                    1,
+                                    3
+                                ],
+                                "min-size": [
+                                    1,
+                                    1
+                                ],
+                                "max-size": [
+                                    100,
+                                    50
+                                ],
+                                "skew-correction": true
+                            },
+                            {
+                                "type": "restrict-flow-magnitude",
+                                "maximum": 400.0
+                            }
+                        ],
+                        "source": {
+                            "type": "concat",
+                            "sources": [
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingthings3d",
+                                        "name": "Uni Freiburg FlyingThings3d",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingthings3d/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
+                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm",
+                                                    "key": "{type}/{abc}/{seq:04d}/into_future/{camera}/{idx:04d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
+                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm",
+                                                    "key": "{type}/{abc}/{seq:04d}/into_past/{camera}/{idx:04d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "camera": {
+                                                "values": [
+                                                    "left",
+                                                    "right"
+                                                ],
+                                                "sub": {
+                                                    "left": {
+                                                        "camera": "left",
+                                                        "camera_short": "L"
+                                                    },
+                                                    "right": {
+                                                        "camera": "right",
+                                                        "camera_short": "R"
+                                                    }
+                                                }
+                                            },
+                                            "pass": {
+                                                "values": [
+                                                    "clean",
+                                                    "final"
+                                                ],
+                                                "sub": "pass"
+                                            },
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "TEST"
+                                                    },
+                                                    "train": {
+                                                        "type": "TRAIN"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "train",
+                                        "pass": "clean",
+                                        "direction": "forwards",
+                                        "camera": "left"
+                                    },
+                                    "filter": null
+                                },
+                                {
+                                    "type": "dataset",
+                                    "spec": {
+                                        "id": "ufreiburg-flyingthings3d",
+                                        "name": "Uni Freiburg FlyingThings3d",
+                                        "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/ufreiburg-flyingthings3d/data",
+                                        "layout": {
+                                            "type": "multi",
+                                            "parameter": "direction",
+                                            "instances": {
+                                                "forwards": {
+                                                    "type": "generic",
+                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
+                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_future/{camera}/OpticalFlowIntoFuture_{idx:04d}_{camera_short}.pfm",
+                                                    "key": "{type}/{abc}/{seq:04d}/into_future/{camera}/{idx:04d}"
+                                                },
+                                                "backwards": {
+                                                    "type": "generic-backwards",
+                                                    "images": "frames_{pass}pass/{type}/{abc}/{seq:04d}/{camera}/{idx:04d}.png",
+                                                    "flows": "optical_flow/{type}/{abc}/{seq:04d}/into_past/{camera}/OpticalFlowIntoPast_{idx:04d}_{camera_short}.pfm",
+                                                    "key": "{type}/{abc}/{seq:04d}/into_past/{camera}/{idx:04d}"
+                                                }
+                                            }
+                                        },
+                                        "split": null,
+                                        "parameters": {
+                                            "camera": {
+                                                "values": [
+                                                    "left",
+                                                    "right"
+                                                ],
+                                                "sub": {
+                                                    "left": {
+                                                        "camera": "left",
+                                                        "camera_short": "L"
+                                                    },
+                                                    "right": {
+                                                        "camera": "right",
+                                                        "camera_short": "R"
+                                                    }
+                                                }
+                                            },
+                                            "pass": {
+                                                "values": [
+                                                    "clean",
+                                                    "final"
+                                                ],
+                                                "sub": "pass"
+                                            },
+                                            "type": {
+                                                "values": [
+                                                    "train",
+                                                    "test"
+                                                ],
+                                                "sub": {
+                                                    "test": {
+                                                        "type": "TEST"
+                                                    },
+                                                    "train": {
+                                                        "type": "TRAIN"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "loader": {
+                                            "image": "generic-image",
+                                            "flow": {
+                                                "type": "generic-flow",
+                                                "uvmax": [
+                                                    1000.0,
+                                                    1000.0
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "parameters": {
+                                        "type": "train",
+                                        "pass": "final",
+                                        "direction": "forwards",
+                                        "camera": "left"
+                                    },
+                                    "filter": null
+                                }
+                            ]
+                        },
+                        "sync": true
+                    },
+                    "epochs": 10,
+                    "batch-size": 4,
+                    "drop-last": true,
+                    "shuffle": true
+                },
+                "validation": [
+                    {
+                        "name": "sintel-clean",
+                        "source": {
+                            "type": "dataset",
+                            "spec": {
+                                "id": "mpi-sintel",
+                                "name": "MPI Sintel",
+                                "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
+                                "layout": {
+                                    "type": "generic",
+                                    "images": "{type}/{pass}/{scene}/frame_{idx:04d}.png",
+                                    "flows": "{type}/flow/{scene}/frame_{idx:04d}.flo",
+                                    "key": "{type}/{scene}/frame_{idx:04d}"
+                                },
+                                "split": null,
+                                "parameters": {
+                                    "type": {
+                                        "values": [
+                                            "train",
+                                            "test"
+                                        ],
+                                        "sub": {
+                                            "test": {
+                                                "type": "test"
+                                            },
+                                            "train": {
+                                                "type": "training"
+                                            }
+                                        }
+                                    },
+                                    "pass": {
+                                        "values": [
+                                            "clean",
+                                            "final"
+                                        ],
+                                        "sub": "pass"
+                                    }
+                                },
+                                "loader": {
+                                    "image": "generic-image",
+                                    "flow": {
+                                        "type": "generic-flow",
+                                        "uvmax": [
+                                            1000.0,
+                                            1000.0
+                                        ]
+                                    }
+                                }
+                            },
+                            "parameters": {
+                                "type": "train",
+                                "pass": "clean"
+                            },
+                            "filter": null
+                        },
+                        "batch-size": 4,
+                        "images": [
+                            0,
+                            99,
+                            74,
+                            49,
+                            24
+                        ]
+                    },
+                    {
+                        "name": "sintel-final",
+                        "source": {
+                            "type": "dataset",
+                            "spec": {
+                                "id": "mpi-sintel",
+                                "name": "MPI Sintel",
+                                "path": "cfg/strategy/dev/../../data/dataset/../../../../datasets/mpi-sintel-flow/data",
+                                "layout": {
+                                    "type": "generic",
+                                    "images": "{type}/{pass}/{scene}/frame_{idx:04d}.png",
+                                    "flows": "{type}/flow/{scene}/frame_{idx:04d}.flo",
+                                    "key": "{type}/{scene}/frame_{idx:04d}"
+                                },
+                                "split": null,
+                                "parameters": {
+                                    "type": {
+                                        "values": [
+                                            "train",
+                                            "test"
+                                        ],
+                                        "sub": {
+                                            "test": {
+                                                "type": "test"
+                                            },
+                                            "train": {
+                                                "type": "training"
+                                            }
+                                        }
+                                    },
+                                    "pass": {
+                                        "values": [
+                                            "clean",
+                                            "final"
+                                        ],
+                                        "sub": "pass"
+                                    }
+                                },
+                                "loader": {
+                                    "image": "generic-image",
+                                    "flow": {
+                                        "type": "generic-flow",
+                                        "uvmax": [
+                                            1000.0,
+                                            1000.0
+                                        ]
+                                    }
+                                }
+                            },
+                            "parameters": {
+                                "type": "train",
+                                "pass": "final"
+                            },
+                            "filter": null
+                        },
+                        "batch-size": 4,
+                        "images": [
+                            0,
+                            99,
+                            74,
+                            49,
+                            24
+                        ]
+                    }
+                ],
+                "optimizer": {
+                    "type": "adam-w",
+                    "parameters": {
+                        "lr": 0.000125,
+                        "weight_decay": 0.0001,
+                        "eps": 1e-08
+                    }
+                },
+                "model": {
+                    "arguments": {},
+                    "on-epoch": {},
+                    "on-stage": {}
+                },
+                "loss": {
+                    "arguments": {}
+                },
+                "gradient": {
+                    "accumulate": 1,
+                    "clip": {
+                        "type": "norm",
+                        "value": 1.0,
+                        "ord": 2.0
+                    },
+                    "scaler": {
+                        "enabled": false,
+                        "init-scale": 65536.0,
+                        "growth-factor": 2.0,
+                        "backoff-factor": 0.5,
+                        "growth-interval": 2000
+                    }
+                },
+                "lr-scheduler": {
+                    "instance": [
+                        {
+                            "type": "one-cycle",
+                            "parameters": {
+                                "max_lr": 0.000125,
+                                "total_steps": "({n_epochs} * {n_batches}) // {n_accum} + 100",
+                                "pct_start": 0.05,
+                                "cycle_momentum": false,
+                                "anneal_strategy": "linear"
+                            }
+                        }
+                    ],
+                    "epoch": []
+                },
+                "loader": {}
+            }
+        ]
+    },
+    "inspect": {
+        "metrics": [
+            {
+                "frequency": 1,
+                "prefix": "Train:S{n_stage}:{id_stage}/",
+                "metrics": [
+                    {
+                        "type": "epe",
+                        "key": "EndPointError/",
+                        "distances": [
+                            1,
+                            3,
+                            5
+                        ]
+                    },
+                    {
+                        "type": "fl-all",
+                        "key": "Fl-all"
+                    },
+                    {
+                        "type": "loss",
+                        "key": "Loss"
+                    },
+                    {
+                        "type": "learning-rate",
+                        "key": "LearningRate"
+                    },
+                    {
+                        "type": "grad-norm",
+                        "key": "GradientNorm/",
+                        "parameters": [
+                            "total"
+                        ]
+                    },
+                    {
+                        "type": "flow-magnitude",
+                        "key": "FlowMagnitude",
+                        "ord": 2
+                    }
+                ]
+            }
+        ],
+        "hooks": [],
+        "images": {
+            "frequency": 100,
+            "prefix": "Train:S{n_stage}:{id_stage}/"
+        },
+        "checkpoints": {
+            "path": "checkpoints",
+            "name": "{id_model}-s{n_stage}_e{n_epoch}_b{n_steps}-epe{m_EndPointError_mean:.4f}.pth",
+            "compare": [
+                "{m_EndPointError_mean}"
+            ],
+            "keep": {
+                "latest": 2,
+                "best": 2
+            }
+        },
+        "validation": [
+            {
+                "type": "strategy",
+                "frequency": 1000,
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            },
+            {
+                "type": "strategy",
+                "frequency": "stage",
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            }
+        ],
+        "tensorboard": {
+            "path": "tb.{id_model}"
+        }
+    },
+    "environment": {
+        "loader": {
+            "num_workers": 4,
+            "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
+        }
+    }
+}
