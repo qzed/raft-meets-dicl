@@ -1,4 +1,5 @@
 from . import dicl
+from . import dicl_1x1
 from . import dicl_emb
 from . import dot
 
@@ -7,6 +8,9 @@ def make_cmod(type, feature_dim, radius, dap_init='identity', norm_type='batch',
     if type == 'dicl':
         return dicl.CorrelationModule(feature_dim=feature_dim, radius=radius, dap_init=dap_init,
                                       norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
+    elif type == 'dicl-1x1':
+        return dicl_1x1.CorrelationModule(feature_dim=feature_dim, radius=radius, dap_init=dap_init,
+                                          norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
     elif type == 'dicl-emb':
         return dicl_emb.CorrelationModule(feature_dim=feature_dim, radius=radius, dap_init=dap_init,
                                           norm_type=norm_type, relu_inplace=relu_inplace, **kwargs)
@@ -22,6 +26,12 @@ def make_flow_regression(cmod_type, type, radius, **kwargs):
             return dicl.SoftArgMaxFlowRegression(radius, **kwargs)
         elif type == 'softargmax+dap':
             return dicl.SoftArgMaxFlowRegressionWithDap(radius, **kwargs)
+
+    elif cmod_type == 'dicl-1x1':
+        if type == 'softargmax':
+            return dicl_1x1.SoftArgMaxFlowRegression(radius, **kwargs)
+        elif type == 'softargmax+dap':
+            return dicl_1x1.SoftArgMaxFlowRegressionWithDap(radius, **kwargs)
 
     elif cmod_type == 'dicl-emb':
         if type == 'softargmax':
