@@ -20,7 +20,10 @@ class MultiLevelSequenceResult(Result):
         if batch_index is None:
             return self.result
 
-        return [[x[batch_index].view(1, *x.shape[1:]) for x in level] for level in self.result]
+        if not isinstance(self.result[0][0], tuple):
+            return [[x[batch_index].view(1, *x.shape[1:]) for x in level] for level in self.result]
+        else:
+            return [[[x[batch_index].view(1, *x.shape[1:]) for x in tp] for tp in level] for level in self.result]
 
     def final(self):
         final = self.result[-1][-1]
