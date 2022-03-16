@@ -124,7 +124,13 @@ def evaluate(args):
     # preapare model
     logging.info(f"loading model specification, file='{args.model}'")
 
-    model = models.load(args.model)
+    model = utils.config.load(args.model)
+
+    # if we have a full config, only extract model part
+    if 'strategy' in model:
+        model = model['model']
+
+    model = models.load(model)
     model, loss, input = model.model, model.loss, model.input
     model_adapter = model.get_adapter()
 
