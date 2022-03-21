@@ -58,6 +58,9 @@ class MeanCollector(Collector):
 
     def collect(self, metrics):
         for k, v in metrics.items():
+            if np.isnan(v):
+                continue
+
             if k not in self.results:
                 self.results[k] = list()
 
