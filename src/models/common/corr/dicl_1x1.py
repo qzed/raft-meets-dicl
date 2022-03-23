@@ -14,10 +14,10 @@ class MatchingNet1x1(nn.Sequential):
         c3 = int(scale * 64)
 
         super().__init__(
-            ConvBlock(input_channels, c1, kernel_size=1, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlock(c1, c2, kernel_size=1, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            ConvBlock(c2, c3, kernel_size=1, padding=1, norm_type=norm_type, relu_inplace=relu_inplace),
-            nn.Conv2d(c3, 1, kernel_size=1, padding=1),     # note: with bias
+            ConvBlock(input_channels, c1, kernel_size=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(c1, c2, kernel_size=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            ConvBlock(c2, c3, kernel_size=1, norm_type=norm_type, relu_inplace=relu_inplace),
+            nn.Conv2d(c3, 1, kernel_size=1),     # note: with bias
         )
 
     def forward(self, mvol):
