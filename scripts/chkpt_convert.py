@@ -168,6 +168,56 @@ def convert_raft_dicl_sdap_to_fdap(chkpt, metadata):
     return to_checkpoint(chkpt.model, state, metadata)
 
 
+def convert_raft_old_to_new(chkpt, metadata):
+    chkpt = Checkpoint.from_dict(chkpt)
+    state = chkpt.state.model
+
+    state['module.upnet.conv1.weight'] = state['module.update_block.mask.0.weight']
+    state['module.upnet.conv1.bias'] = state['module.update_block.mask.0.bias']
+    state['module.upnet.conv2.weight'] = state['module.update_block.mask.2.weight']
+    state['module.upnet.conv2.bias'] = state['module.update_block.mask.2.bias']
+
+    del state['module.update_block.mask.0.weight']
+    del state['module.update_block.mask.0.bias']
+    del state['module.update_block.mask.2.weight']
+    del state['module.update_block.mask.2.bias']
+
+    return to_checkpoint(chkpt.model, state, metadata)
+
+
+def convert_rpdml_old_to_new(chkpt, metadata):
+    chkpt = Checkpoint.from_dict(chkpt)
+    state = chkpt.state.model
+
+    # upsampling network
+    state['module.upnet.conv1.weight'] = state['module.update_block.mask.0.weight']
+    state['module.upnet.conv1.bias'] = state['module.update_block.mask.0.bias']
+    state['module.upnet.conv2.weight'] = state['module.update_block.mask.2.weight']
+    state['module.upnet.conv2.bias'] = state['module.update_block.mask.2.bias']
+
+    del state['module.update_block.mask.0.weight']
+    del state['module.update_block.mask.0.bias']
+    del state['module.update_block.mask.2.weight']
+    del state['module.update_block.mask.2.bias']
+
+    # feature networks
+    state_new = state
+    state_new = {k: v for k, v in state_new.items() if not k.startswith('module.fnet.') }
+    state_new = {k: v for k, v in state_new.items() if not k.startswith('module.fnet_1.') }
+    state_new = {k: v for k, v in state_new.items() if not k.startswith('module.fnet_2.') }
+
+    for k in {k[len('module.fnet.'):] for k in state.keys() if k.startswith('module.fnet.')}:
+        state_new[f'module.fnet.fnet.{k}'] = state[f'module.fnet.{k}']
+
+    for k in {k[len('module.fnet_1.'):] for k in state.keys() if k.startswith('module.fnet_1.')}:
+        state_new[f'module.fnet.fnet_1.{k}'] = state[f'module.fnet_1.{k}']
+
+    for k in {k[len('module.fnet_2.'):] for k in state.keys() if k.startswith('module.fnet_2.')}:
+        state_new[f'module.fnet.fnet_2.{k}'] = state[f'module.fnet_2.{k}']
+
+    return to_checkpoint(chkpt.model, state_new, metadata)
+
+
 def main():
     utils.logging.setup()
 
@@ -178,6 +228,8 @@ def main():
         'init-warp1-via-dicl': convert_init_warp1_via_dicl,
         'init-raftcl-via-dicl': convert_init_raftcl_via_dicl,
         'raft+dicl-ml-sdap-to-fdap': convert_raft_dicl_sdap_to_fdap,
+        'raft-old-to-new': convert_raft_old_to_new,
+        'raft+dicl-ml-old-to-new': convert_rpdml_old_to_new,
     }
 
     # handle command-line input
