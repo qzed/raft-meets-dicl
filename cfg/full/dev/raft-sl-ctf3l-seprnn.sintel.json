@@ -1,6 +1,6 @@
 {
-    "timestamp": "2021-12-20T04:35:07.997463",
-    "commit": "~be42f8c38662a6fac2b87e5a344d5b3e6c3670e5",
+    "timestamp": "2022-03-23T16:11:20.851463",
+    "commit": "~bb0e8e36662c437e548aad96505f0ca6ee111e68",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -34,7 +34,10 @@
                 "encoder-type": "raft",
                 "context-type": "raft",
                 "share-rnn": false,
-                "upsample-hidden": "none"
+                "corr-reg-type": "softargmax",
+                "corr-reg-args": {},
+                "upsample-hidden": "none",
+                "relu-inplace": true
             },
             "arguments": {
                 "iterations": [
@@ -42,7 +45,9 @@
                     3,
                     3
                 ],
-                "upnet": true
+                "upnet": true,
+                "corr_flow": false,
+                "corr_grad_stop": false
             },
             "on-stage": {
                 "freeze_batchnorm": true
@@ -58,7 +63,8 @@
                     0.38,
                     0.6,
                     1.0
-                ]
+                ],
+                "scale": 1.0
             }
         },
         "input": {
@@ -76,7 +82,9 @@
                 "size": [
                     32,
                     32
-                ]
+                ],
+                "align-horizontal": "left",
+                "align-vertical": "top"
             }
         }
     },
@@ -150,7 +158,8 @@
                                 "max-size": [
                                     100,
                                     50
-                                ]
+                                ],
+                                "skew-correction": true
                             },
                             {
                                 "type": "restrict-flow-magnitude",
@@ -343,7 +352,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -411,7 +420,7 @@
                                 "value": "1"
                             }
                         },
-                        "batch_size": 4,
+                        "batch-size": 4,
                         "images": [
                             0,
                             99,
@@ -431,8 +440,8 @@
                 },
                 "model": {
                     "arguments": {},
-                    "on-epoch:": {},
-                    "on-stage:": {}
+                    "on-epoch": {},
+                    "on-stage": {}
                 },
                 "loss": {
                     "arguments": {}
@@ -580,6 +589,10 @@
         "loader": {
             "num_workers": 4,
             "pin_memory": true
+        },
+        "cudnn": {
+            "benchmark": true,
+            "deterministic": false
         }
     }
 }
