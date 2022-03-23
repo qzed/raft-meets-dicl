@@ -11,6 +11,7 @@ model:
   arguments:
     iterations: [4, 3, 3]
     dap: true
+#   corr_flow: true
 
 loss:
   type: raft+dicl/mlseq
@@ -19,6 +20,8 @@ loss:
     ord: 1
     gamma: 0.85
     alpha: [0.38, 0.6, 1.0]
+#   alpha: [0.32, 0.38, 0.51, 0.6, 0.85, 1.0]
+#   scale: 0.5
 
 input:
   clip: [0, 1]
