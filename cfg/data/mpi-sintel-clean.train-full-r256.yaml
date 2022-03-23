@@ -1,0 +1,7 @@
+type: augment
+
+augmentations:
+  - type: restrict-flow-magnitude
+    maximum: 256
+
+source: mpi-sintel-clean.train-full.yaml

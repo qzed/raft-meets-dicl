@@ -1,0 +1,7 @@
+type: augment
+
+augmentations:
+  - type: restrict-flow-magnitude
+    maximum: 64
+
+source: mpi-sintel-final.train-full.yaml
