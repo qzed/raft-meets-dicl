@@ -4,10 +4,10 @@ import tempfile
 import pandas
 import types
 
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import src
-
-from pathlib import Path
 
 
 MODEL_CFG = """
