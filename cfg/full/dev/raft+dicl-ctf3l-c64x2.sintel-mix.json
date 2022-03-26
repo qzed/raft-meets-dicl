@@ -1,6 +1,6 @@
 {
-    "timestamp": "2022-03-24T19:24:02.546204",
-    "commit": "~237b1d98dbcd5aaa3a2b08191c4f31d2a3f41b8f",
+    "timestamp": "2022-03-26T01:01:19.580887",
+    "commit": "~379ddcc3a2c276a239ce3ed8dfcb8fff9c1cc786",
     "cwd": "/media/t0/uni/mt/code",
     "args": {
         "command": "gencfg",
@@ -9,7 +9,7 @@
         "data": "cfg/strategy/dev/train-sintel-mix.aug-full.yaml",
         "model": "cfg/model/raft+dicl-ctf3l.yaml",
         "seeds": "cfg/seeds/dev.yaml",
-        "inspect": null,
+        "inspect": "cfg/inspect/default-1k.yaml",
         "env": null
     },
     "seeds": {
@@ -895,7 +895,48 @@
         "validation": [
             {
                 "type": "strategy",
-                "frequency": "epoch",
+                "frequency": 1000,
+                "checkpoint": true,
+                "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
+                "metrics": [
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "epe",
+                            "key": "EndPointError/",
+                            "distances": [
+                                1,
+                                3,
+                                5
+                            ]
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "fl-all",
+                            "key": "Fl-all"
+                        }
+                    },
+                    {
+                        "reduce": "mean",
+                        "log": true,
+                        "metric": {
+                            "type": "loss",
+                            "key": "Loss"
+                        }
+                    }
+                ],
+                "images": {
+                    "enabled": true,
+                    "prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/i{img_idx}/"
+                }
+            },
+            {
+                "type": "strategy",
+                "frequency": "stage",
                 "checkpoint": true,
                 "tb-metrics-prefix": "Validation:S{n_stage}:{id_stage}:{id_val}/",
                 "metrics": [
