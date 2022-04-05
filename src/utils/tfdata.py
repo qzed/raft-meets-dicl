@@ -23,7 +23,7 @@ def tf_proto_tensor_to_np(tensor):
 
 
 def tfdata_scalars_to_pandas(file, tags=None):
-    df = pd.DataFrame(columns=['tag', 'step', 'time', 'value'])
+    records = []
 
     for event in EventFileLoader(file).Load():
         if not event.HasField('summary'):
@@ -41,8 +41,8 @@ def tfdata_scalars_to_pandas(file, tags=None):
                     'time': event.wall_time,
                     'value': tf_proto_tensor_to_np(value.tensor)
                 }
-                df = df.append(entry, ignore_index=True)
+                records.append(entry)
 
-    return df
+    return pd.DataFrame.from_records(records)
 
 # TODO: allow loading directories and multiple files
