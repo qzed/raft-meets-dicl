@@ -20,6 +20,9 @@ from src import strategy
 from src import evaluation
 
 
+UPSAMPLE = 2
+
+
 def save_cvol(cv, path, cmap=None):
     # reshape
     dx, dy, h, w = cv.shape
@@ -34,6 +37,14 @@ def save_cvol(cv, path, cmap=None):
     # apply color map
     cv = cv.cpu().numpy()
     img = matplotlib.cm.get_cmap(cmap)(cv)
+
+    # scale up
+    repeats = UPSAMPLE
+    img = np.repeat(img, repeats, axis=0)
+    img = np.repeat(img, repeats, axis=1)
+
+    dx = dx * repeats
+    dy = dy * repeats
 
     # add spacing between pixels
     img_new = np.zeros((h, dy + 1, w, dx + 1, 4))
