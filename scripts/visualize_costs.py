@@ -21,6 +21,7 @@ from src import evaluation
 
 
 UPSAMPLE = 2
+BGCOLOR = (0, 0, 0, 1)
 
 
 def save_cvol(cv, path, cmap=None):
@@ -48,7 +49,7 @@ def save_cvol(cv, path, cmap=None):
 
     # add spacing between pixels
     img_new = np.zeros((h, dy + 1, w, dx + 1, 4))
-    img_new[:, :, :, :, 3] = 1.0
+    img_new[:, :, :, :] = BGCOLOR
 
     img = img.reshape(h, dy, w, dx, 4)
     img_new[:, :dy, :, :dx, :] = img
