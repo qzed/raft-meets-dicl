@@ -202,8 +202,13 @@ def main():
 
     args = parser.parse_args()
 
+    # if we have a full config, only extract model part
+    model = utils.config.load(args.model)
+    if 'strategy' in model:
+        model = model['model']
+
     dataf = data.load(args.data)
-    model = models.load(args.model)
+    model = models.load(model)
     chkpt = strategy.Checkpoint.load(args.checkpoint, map_location='cpu')
 
     evaluate(model, chkpt, dataf, path_out_base=Path(args.output), device=args.device)
