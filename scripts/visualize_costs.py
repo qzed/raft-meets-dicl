@@ -129,6 +129,11 @@ def setup_hooks(model, activations):
             register_activation_hook_raft(model, activations, 'module.update_block_5')
             return
 
+    elif model.type == 'raft+dicl/sl':
+        register_reset_hook(model, activations)
+        register_activation_hook_raft(model, activations, 'module.update_block')
+        return
+
     elif model.type == 'raft/baseline':
         register_reset_hook(model, activations)
         register_activation_hook_raft(model, activations, 'module.update_block')
