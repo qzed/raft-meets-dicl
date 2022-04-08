@@ -76,7 +76,7 @@ def register_activation_hook_raft_dicl_dot(model, activations, layer):
     return model.get_submodule(layer).register_forward_hook(_hook)
 
 
-def register_activation_hook_raft(model, activations, layer):
+def register_activation_hook_raft_sl(model, activations, layer):
     def _hook(module, input, output):
         input = input[2].detach()
 
@@ -85,6 +85,23 @@ def register_activation_hook_raft(model, activations, layer):
         input = input.reshape(b, d, d, h, w)
 
         activations[-1][f"{layer}.corr"].append(input)
+
+    return model.get_submodule(layer).register_forward_hook(_hook)
+
+
+def register_activation_hook_raft_ml(model, activations, layer):
+    def _hook(module, input, output):
+        input = input[2].detach()
+
+        m = model.corr_levels
+        b, dxym, h, w = input.shape
+        dxy = dxym / m
+        d = int(np.sqrt(dxy))
+
+        input = input.reshape(b, m, d, d, h, w)
+
+        for lvl in range(m):
+            activations[-1][f"{layer}.lvl{lvl + 3}.corr"].append(input[:, lvl, :, :, :, :])
 
     return model.get_submodule(layer).register_forward_hook(_hook)
 
@@ -119,14 +136,14 @@ def setup_hooks(model, activations):
     elif model.type == 'raft/sl-ctf-l3':
         if model.share_rnn:
             register_reset_hook(model, activations)
-            register_activation_hook_raft(model, activations, 'module.update_block')
+            register_activation_hook_raft_sl(model, activations, 'module.update_block')
             return
 
         else:
             register_reset_hook(model, activations)
-            register_activation_hook_raft(model, activations, 'module.update_block_3')
-            register_activation_hook_raft(model, activations, 'module.update_block_4')
-            register_activation_hook_raft(model, activations, 'module.update_block_5')
+            register_activation_hook_raft_sl(model, activations, 'module.update_block_3')
+            register_activation_hook_raft_sl(model, activations, 'module.update_block_4')
+            register_activation_hook_raft_sl(model, activations, 'module.update_block_5')
             return
 
     elif model.type == 'raft+dicl/sl':
@@ -138,12 +155,12 @@ def setup_hooks(model, activations):
 
     elif model.type == 'raft/sl':
         register_reset_hook(model, activations)
-        register_activation_hook_raft(model, activations, 'module.update_block')
+        register_activation_hook_raft_sl(model, activations, 'module.update_block')
         return
 
     elif model.type == 'raft/baseline':
         register_reset_hook(model, activations)
-        register_activation_hook_raft(model, activations, 'module.update_block')
+        register_activation_hook_raft_ml(model, activations, 'module.update_block')
         return
 
     elif model.type == 'dicl/baseline':
