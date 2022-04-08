@@ -130,9 +130,11 @@ def setup_hooks(model, activations):
             return
 
     elif model.type == 'raft+dicl/sl':
-        register_reset_hook(model, activations)
-        register_activation_hook_raft(model, activations, 'module.update_block')
-        return
+        if model.corr_type == 'dicl':
+            register_reset_hook(model, activations)
+            register_activation_hook(model, activations, 'module.cvol.mnet')
+            register_activation_hook(model, activations, 'module.cvol.dap')
+            return
 
     elif model.type == 'raft/sl':
         register_reset_hook(model, activations)
