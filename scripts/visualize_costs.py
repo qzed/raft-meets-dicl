@@ -106,6 +106,23 @@ def register_activation_hook_raft_ml(model, activations, layer):
     return model.get_submodule(layer).register_forward_hook(_hook)
 
 
+def register_activation_hook_mldap(model, activations, layer):
+    def _hook(module, input, output):
+        output = output.detach()
+
+        m = model.corr_levels
+        b, dxym, h, w = output.shape
+        dxy = dxym / m
+        d = int(np.sqrt(dxy))
+
+        output = output.reshape(b, m, d, d, h, w)
+
+        for lvl in range(m):
+            activations[-1][f"{layer}.lvl{lvl + 3}"].append(output[:, lvl, :, :, :, :])
+
+    return model.get_submodule(layer).register_forward_hook(_hook)
+
+
 def setup_hooks(model, activations):
     if model.type == 'raft+dicl/ctf-l3':
         if not model.share_dicl:
@@ -157,6 +174,33 @@ def setup_hooks(model, activations):
         register_reset_hook(model, activations)
         register_activation_hook_raft_sl(model, activations, 'module.update_block')
         return
+
+    elif model.type == 'raft+dicl/ml':
+        if not model.share_dicl:
+            register_reset_hook(model, activations)
+
+            for lvl in range(model.corr_levels):
+                register_activation_hook(model, activations, f'module.cvol.mnet.{lvl}')
+
+            if model.dap_type == 'separate':
+                for lvl in range(model.corr_levels):
+                    register_activation_hook(model, activations, f'module.cvol.dap.{lvl}')
+
+            else:
+                register_activation_hook_mldap(model, activations, 'module.cvol.dap')
+
+            return
+
+        else:
+            register_reset_hook(model, activations)
+            register_activation_hook(model, activations, 'module.cvol.mnet')
+
+            if model.dap_type == 'separate':
+                register_activation_hook(model, activations, 'module.cvol.dap')
+            else:
+                register_activation_hook_mldap(model, activations, 'module.cvol.dap')
+
+            return
 
     elif model.type == 'raft/baseline':
         register_reset_hook(model, activations)
