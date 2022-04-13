@@ -1,70 +1,62 @@
+#!/usr/bin/env python
+
 import sys
 import types
 import tempfile
 import pandas
 import types
+import json
 
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 import src
 
+basepath = Path(__file__).parent.parent.parent
 
-MODEL_CFG = """
-name: RAFT baseline config
-id: raft/baseline
 
-model:
-  type: raft/baseline
-
-  parameters:
-    droput: 0.0
-    mixed-precision: false
-
-  arguments:
-    iterations: {iter}
-
-loss:
-  type: raft/sequence
-
-  arguments:
-    ord: 1
-    gamma: 0.85
-
-input:
-  clip: [0, 1]
-  range: [-1, 1]
-
-  padding:
-    type: modulo
-    mode: zeros
-    size: [8, 8]
-
-"""
+CONFIGS = {
+#    'raft-sl-ctf3l.433': {
+#        'things': basepath / '../results/runs/dev-1/raft-sl-ctf3l.flyingthings3d/config.json',
+#        'sintel': basepath / '../results/runs/dev-1/raft-sl-ctf3l.sintel/config.json',
+#    },
+#    'raft+dicl-ctf3l.433': {
+#        'things': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l.flyingthings3d/config.json',
+#        'sintel': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l.sintel/config.json',
+#    },
+    'raft+dicl-ctf3l.888': {
+        'things': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l-i8.flyingthings3d/config.json',
+#        'sintel': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l.sintel/config.json',
+    },
+}
 
 DATASETS = {
     'things': {
-        'sintel-clean': Path(__file__).parent / 'cfg' / 'data' / 'mpi-sintel-clean.train-full.yaml',
-        'sintel-final': Path(__file__).parent / 'cfg' / 'data' / 'mpi-sintel-final.train-full.yaml',
+        'sintel-clean': basepath / 'cfg' / 'data' / 'mpi-sintel-clean.train-full.yaml',
+        'sintel-final': basepath / 'cfg' / 'data' / 'mpi-sintel-final.train-full.yaml',
     },
     'sintel': {
-        'sintel-clean': Path(__file__).parent / 'cfg' / 'data' / 'mpi-sintel-clean.val.yaml',
-        'sintel-final': Path(__file__).parent / 'cfg' / 'data' / 'mpi-sintel-final.val.yaml',
+        'sintel-clean': basepath / 'cfg' / 'data' / 'mpi-sintel-clean.val.yaml',
+        'sintel-final': basepath / 'cfg' / 'data' / 'mpi-sintel-final.val.yaml',
     },
 }
 
 CHECKPOINTS = {
-    'raft.04': {
-        'things': Path(__file__).parent / 'raft-baseline-i04.flyingthings3d.pth',
-        'sintel': Path(__file__).parent / 'raft-baseline-i04.sintel.pth',
-    },
-    'raft.12': {
-        'things': Path(__file__).parent / 'raft-baseline-i12.flyingthings3d.pth',
-        'sintel': Path(__file__).parent / 'raft-baseline-i12.sintel.pth',
+#    'raft-sl-ctf3l.433': {
+#        'things': basepath / '../results/runs/dev-1/raft-sl-ctf3l.flyingthings3d/checkpoints/raft_sl.ctf.l3-s0_e10_b100523-epe1.5909.pth',
+#        'sintel': basepath / '../results/runs/dev-1/raft-sl-ctf3l.sintel/checkpoints/raft_sl.ctf.l3-s0_e250_b102000-epe2.1264.pth',
+#    },
+#    'raft+dicl-ctf3l.433': {
+#        'things': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l.flyingthings3d/checkpoints/raft+dicl_ctf.l3-s0_e10_b100514-epe1.7405.pth',
+#        'sintel': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l.sintel/checkpoints/raft+dicl_ctf.l3-s0_e249_b102000-epe2.0433.pth',
+#    },
+    'raft+dicl-ctf3l.888': {
+        'things': basepath / '../results/runs/dev-1-prep5e5/raft+dicl-ctf3l-i8.flyingthings3d/checkpoints/raft+dicl_ctf.l3-s0_e10_b100514-epe1.6867.pth',
+#        'sintel': basepath / 'TODO',
     },
 }
 
-ITERATIONS = list(range(1, 48 + 1))
+ITERATIONS = list(range(1, 24 + 1))
 
 OUTPUT_DIR = Path('eval-iter')
 
@@ -94,10 +86,16 @@ def do_evaluate(model, checkpoint, data, output):
     src.cmd.eval.evaluate(args)
 
 
-def write_model(model_file, iter):
+def write_model(model_file, cfg_file, iter):
+    model = src.utils.config.load(cfg_file)['model']
+    model = src.models.load(model)
+
+    model.model.arguments['iterations'] = [iter, iter, iter]
+    model_cfg = json.dumps(model.get_config())
+
     model_file.seek(0)
     model_file.truncate(0)
-    model_file.write(bytes(MODEL_CFG.format(iter=iter), 'utf-8'))
+    model_file.write(bytes(model_cfg, 'utf-8'))
     model_file.flush()
 
 
@@ -109,13 +107,15 @@ def main():
         for iter in ITERATIONS:
             for model, stages in CHECKPOINTS.items():
                 for stage, checkpoint in stages.items():
+                    cfg_file = CONFIGS[model][stage]
+
                     for dataset_name, dataset_path in DATASETS[stage].items():
                         basename = f"{model}.{stage}.{dataset_name}.{iter}"
                         output = OUTPUT_DIR / f"{basename}.json"
 
                         print(f"== EVALUATING {basename} ============")
 
-                        write_model(model_file, iter)
+                        write_model(model_file, cfg_file, iter)
                         do_evaluate(model_path, checkpoint, dataset_path, output)
 
                         print("")
