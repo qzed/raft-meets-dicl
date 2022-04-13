@@ -20,8 +20,8 @@ from src import strategy
 from src import evaluation
 
 
-UPSAMPLE = 2
-BGCOLOR = (0, 0, 0, 1)
+UPSAMPLE = 4
+BGCOLOR = (0, 0, 0, 0)
 
 
 def save_cvol(cv, path, cmap=None):
@@ -153,6 +153,16 @@ def setup_hooks(model, activations):
                 register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_3.dap')
                 register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_4.dap')
                 register_activation_hook_raft_dicl_dot(model, activations, 'module.corr_5.dap')
+                return
+
+            elif model.corr_type == 'dicl-1x1':
+                register_reset_hook(model, activations)
+                register_activation_hook(model, activations, 'module.corr_3.mnet')
+                register_activation_hook(model, activations, 'module.corr_4.mnet')
+                register_activation_hook(model, activations, 'module.corr_5.mnet')
+                register_activation_hook(model, activations, 'module.corr_3.dap')
+                register_activation_hook(model, activations, 'module.corr_4.dap')
+                register_activation_hook(model, activations, 'module.corr_5.dap')
                 return
 
         else:
