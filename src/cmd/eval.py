@@ -289,6 +289,8 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, out
         'visual:bp-fl': (save_flow_visual_fl_error, [flow, target, valid], {}, 'png'),
         'visual:flow': (save_flow_visual, [flow], visual_args, 'png'),
         'visual:flow:dark': (save_flow_visual_dark, [flow], visual_dark_args, 'png'),
+        'visual:flow:gt': (save_flow_visual, [target], visual_args, 'png'),
+        'visual:i1': (save_image, [img1], visual_args, 'png'),
         'visual:warp:backwards': (save_flow_visual_warp_backwards, [img2, flow], {}, 'png'),
         'visual:intermediate:flow': (save_intermediate_flow_visual, [out], visual_args, 'png'),
     }
@@ -299,6 +301,10 @@ def save_flow_image(dir, format, sample_id, img1, img2, target, valid, flow, out
     path.parent.mkdir(parents=True, exist_ok=True)
 
     write(path, *args, **kwargs)
+
+
+def save_image(path, img, **kwargs):
+    cv2.imwrite(str(path), img[:, :, ::-1] * 255)
 
 
 def save_flow_visual(path, uv, **kwargs):
