@@ -1,0 +1,18 @@
+type: augment
+
+augmentations:
+  - type: crop-center
+    size: [768, 384]
+
+source:
+  type: dataset
+  spec: dataset/mpi-sintel.yaml
+
+  parameters:
+    type: train
+    pass: final
+
+  filter:
+    type: file
+    file: splits/mpi-sintel.visual.txt
+    value: 1

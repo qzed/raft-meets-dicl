@@ -1,0 +1,7 @@
+type: augment
+
+augmentations:
+  - type: crop-center
+    size: [768, 384]
+
+source: mpi-sintel-clean.val.yaml
