@@ -1,6 +1,12 @@
-# Optical Flow Estimation Framework - Work in Progress
+# RAFT meets DICL
 
-Framework for developing and evaluating optical flow estimation methods based on neural networks.
+This repository contains the code for
+
+> **[RAFT meets DICL: A Recurrent All-Pair Transform for Optical Flow Estimation based on Displacement Invariant Cost Volume Learning](http://dx.doi.org/10.18419/opus-13298)**<br/>
+> _Master Thesis, University of Stuttgart, 2022_ <br/>
+> Maximilian Luz
+
+If you find this work useful please [cite via BibTeX](CITATIONS.bib).
 
 
 ## Setup
